@@ -269,6 +269,14 @@
                         <CheckBox x:Name="RunOnStartupCheckBox" Content="Запуск вместе с Windows" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
                         <CheckBox x:Name="AutoCheckUpdatesCheckBox" Content="Автоматически проверять обновления" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
                         <CheckBox x:Name="ShowNotificationsCheckBox" Content="Показывать уведомления" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                        <CheckBox x:Name="ShowTrayTemperatureCheckBox" Content="Показывать температуру в трее" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                        <CheckBox x:Name="MinimizeToTrayOnCloseCheckBox" Content="При закрытии скрывать в трей" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                        <CheckBox x:Name="StartMinimizedToTrayCheckBox" Content="Запускать сразу в трее" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                        <TextBlock Text="Если включить трей-режим, приложение можно будет вернуть двойным кликом по иконке в трее."
+                                   Margin="0,6,0,0"
+                                   FontSize="11"
+                                   Opacity="0.75"
+                                   TextWrapping="Wrap"/>
                         <Separator Margin="0,10,0,10"/>
                         <Button x:Name="CheckUpdatesButton" Content="Проверить наличие обновлений"
                                 Style="{StaticResource DialogActionButtonStyle}"

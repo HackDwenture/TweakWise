@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using Application = System.Windows.Application;
 
 namespace TweakWise.Pages
 {

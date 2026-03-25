@@ -1,10 +1,10 @@
 {
-  "version": "2.2.0-beta",
-  "displayVersion": "v2.2 beta",
+  "version": "3.0.0-beta",
+  "displayVersion": "v3.0 beta",
   "changelog": [
-    "Добавлены стилизованные диалоги приложения.",
-    "Улучшена панель уведомлений и окно обновлений.",
-    "Версия приложения теперь отображается рядом с названием."
+    "Вкладка \"Система\" переделана в аппаратный раздел с живым мониторингом CPU, GPU, памяти и накопителей.",
+    "Добавлена детальная системная сводка, датчики охлаждения и честные статусы поддержки advanced-функций.",
+    "Версия приложения обновлена до v3.0 beta."
   ],
   "downloadUrl": "https://github.com/HackDwenture/TweakWise/tree/release",
   "detailsUrl": "https://github.com/HackDwenture/TweakWise/blob/release/src/TweakWise/version.json"

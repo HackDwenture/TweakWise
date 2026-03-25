@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Windows;
 using Microsoft.Win32;
 using TweakWise.Models;
+using Application = System.Windows.Application;
 
 namespace TweakWise.Managers
 {
@@ -97,6 +98,28 @@ namespace TweakWise.Managers
             SaveSettings();
         }
 
+        public void SetShowTrayTemperature(bool enabled)
+        {
+            CurrentSettings.ShowTrayTemperature = enabled;
+            SaveSettings();
+        }
+
+        public void SetMinimizeToTrayOnClose(bool enabled)
+        {
+            CurrentSettings.MinimizeToTrayOnClose = enabled;
+            SaveSettings();
+        }
+
+        public void SetStartMinimizedToTray(bool enabled)
+        {
+            CurrentSettings.StartMinimizedToTray = enabled;
+
+            if (CurrentSettings.RunOnStartup)
+                ApplyRunOnStartup(true);
+
+            SaveSettings();
+        }
+
         public void ApplySavedSystemSettings()
         {
             ApplyRunOnStartup(CurrentSettings.RunOnStartup);
@@ -116,7 +139,10 @@ namespace TweakWise.Managers
                 {
                     string exePath = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
                     if (!string.IsNullOrWhiteSpace(exePath))
-                        key.SetValue(RunRegistryValueName, $"\"{exePath}\"");
+                    {
+                        string launchArguments = CurrentSettings.StartMinimizedToTray ? " --tray-start" : string.Empty;
+                        key.SetValue(RunRegistryValueName, $"\"{exePath}\"{launchArguments}");
+                    }
                 }
                 else
                 {

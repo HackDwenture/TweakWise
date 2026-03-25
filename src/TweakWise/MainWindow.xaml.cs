@@ -6,6 +6,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using TweakWise.Managers;
+using Application = System.Windows.Application;
+using Button = System.Windows.Controls.Button;
 
 namespace TweakWise
 {
@@ -14,7 +16,9 @@ namespace TweakWise
         private readonly SettingsManager _settingsManager;
         private readonly UpdateManager _updateManager;
         private readonly DialogManager _dialogManager;
+        private readonly TrayTemperatureManager _trayTemperatureManager;
         private bool _settingsLoaded;
+        private bool _allowClose;
 
         public MainWindow()
         {
@@ -23,6 +27,7 @@ namespace TweakWise
             _settingsManager = App.SettingsManager;
             _updateManager = App.UpdateManager;
             _dialogManager = App.DialogManager;
+            _trayTemperatureManager = new TrayTemperatureManager();
 
             NotificationsList.ItemsSource = App.NotificationManager.Notifications;
             App.NotificationManager.UnreadCountChanged += UpdateBadge;
@@ -38,6 +43,8 @@ namespace TweakWise
             NotificationsButton.Unchecked += (s, e) => NotificationsPopup.IsOpen = false;
 
             Loaded += MainWindow_Loaded;
+            Closed += MainWindow_Closed;
+            Closing += MainWindow_Closing;
 
             MainFrame.Navigate(new Pages.DashboardPage());
 
@@ -62,6 +69,9 @@ namespace TweakWise
             RunOnStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.RunOnStartup;
             AutoCheckUpdatesCheckBox.IsChecked = _settingsManager.CurrentSettings.AutoCheckUpdates;
             ShowNotificationsCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowNotifications;
+            ShowTrayTemperatureCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowTrayTemperature;
+            MinimizeToTrayOnCloseCheckBox.IsChecked = _settingsManager.CurrentSettings.MinimizeToTrayOnClose;
+            StartMinimizedToTrayCheckBox.IsChecked = _settingsManager.CurrentSettings.StartMinimizedToTray;
             _settingsLoaded = true;
         }
 
@@ -148,7 +158,7 @@ namespace TweakWise
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.Shutdown();
+            Close();
         }
 
         private void SettingsPopup_Closed(object sender, EventArgs e)
@@ -178,12 +188,77 @@ namespace TweakWise
             _settingsManager.SetRunOnStartup(RunOnStartupCheckBox.IsChecked == true);
             _settingsManager.SetAutoCheckUpdates(AutoCheckUpdatesCheckBox.IsChecked == true);
             _settingsManager.SetShowNotifications(ShowNotificationsCheckBox.IsChecked == true);
+            _settingsManager.SetShowTrayTemperature(ShowTrayTemperatureCheckBox.IsChecked == true);
+            _settingsManager.SetMinimizeToTrayOnClose(MinimizeToTrayOnCloseCheckBox.IsChecked == true);
+            _settingsManager.SetStartMinimizedToTray(StartMinimizedToTrayCheckBox.IsChecked == true);
+            ApplyTrayPreferences();
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            ApplyTrayPreferences();
+
+            if (ShouldStartHiddenInTray())
+                HideToTray();
+
             if (_settingsManager.CurrentSettings.AutoCheckUpdates)
                 await CheckForUpdatesAsync(false);
+        }
+
+        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (_allowClose)
+                return;
+
+            if (ShouldHideToTrayOnClose())
+            {
+                e.Cancel = true;
+                HideToTray();
+            }
+        }
+
+        private void MainWindow_Closed(object sender, EventArgs e)
+        {
+            _trayTemperatureManager.Dispose();
+        }
+
+        private void ApplyTrayPreferences()
+        {
+            bool trayActive = IsTrayModeEnabled();
+            _trayTemperatureManager.ApplyPreferences(trayActive, _settingsManager.CurrentSettings.ShowTrayTemperature);
+        }
+
+        private bool IsTrayModeEnabled()
+        {
+            return _settingsManager.CurrentSettings.ShowTrayTemperature ||
+                   _settingsManager.CurrentSettings.MinimizeToTrayOnClose ||
+                   _settingsManager.CurrentSettings.StartMinimizedToTray;
+        }
+
+        private bool ShouldHideToTrayOnClose()
+        {
+            return IsTrayModeEnabled() && _settingsManager.CurrentSettings.MinimizeToTrayOnClose;
+        }
+
+        private bool ShouldStartHiddenInTray()
+        {
+            string[] args = Environment.GetCommandLineArgs();
+            bool launchedForTray = Array.Exists(args, arg => string.Equals(arg, "--tray-start", StringComparison.OrdinalIgnoreCase));
+            return IsTrayModeEnabled() && (_settingsManager.CurrentSettings.StartMinimizedToTray || launchedForTray);
+        }
+
+        private void HideToTray()
+        {
+            ApplyTrayPreferences();
+            ShowInTaskbar = false;
+            WindowState = WindowState.Minimized;
+            Hide();
+        }
+
+        public void AllowCloseAndShutdown()
+        {
+            _allowClose = true;
+            Application.Current.Shutdown();
         }
 
         private async void CheckUpdatesButton_Click(object sender, RoutedEventArgs e)

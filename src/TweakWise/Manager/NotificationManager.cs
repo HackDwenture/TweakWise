@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using TweakWise.Models;
+using Application = System.Windows.Application;
 
 namespace TweakWise.Managers
 {

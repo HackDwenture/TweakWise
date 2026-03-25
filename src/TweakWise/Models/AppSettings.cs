@@ -8,6 +8,9 @@ namespace TweakWise.Models
         public bool RunOnStartup { get; set; } = false;
         public bool AutoCheckUpdates { get; set; } = true;
         public bool ShowNotifications { get; set; } = true;
+        public bool ShowTrayTemperature { get; set; } = false;
+        public bool MinimizeToTrayOnClose { get; set; } = false;
+        public bool StartMinimizedToTray { get; set; } = false;
         public bool FirstRunCompleted { get; set; } = false;
         public string LastNotifiedUpdateVersion { get; set; } = string.Empty;
         public string LastNotifiedReleaseCommit { get; set; } = string.Empty;

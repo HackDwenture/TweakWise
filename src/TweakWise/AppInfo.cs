@@ -2,7 +2,7 @@ namespace TweakWise
 {
     public static class AppInfo
     {
-        public const string VersionId = "2.2.0-beta";
-        public const string DisplayVersion = "v2.2 beta";
+        public const string VersionId = "3.0.0-beta";
+        public const string DisplayVersion = "v3.0 beta";
     }
 }
