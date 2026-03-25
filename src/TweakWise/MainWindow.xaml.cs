@@ -209,12 +209,19 @@ namespace TweakWise
                     case UpdateCheckStatus.UpToDate:
                         if (userInitiated)
                         {
-                            _dialogManager.Show(
-                                this,
-                                "Обновления",
-                                "Изменений нет",
-                                "Новых коммитов в ветке release не найдено.",
-                                AppDialogKind.Info);
+                            if (!string.IsNullOrWhiteSpace(result.ReleaseCommitSha))
+                            {
+                                ShowUpdateWindow(result);
+                            }
+                            else
+                            {
+                                _dialogManager.Show(
+                                    this,
+                                    "Обновления",
+                                    "Изменений нет",
+                                    "Новых коммитов в ветке release не найдено.",
+                                    AppDialogKind.Info);
+                            }
                         }
                         break;
                     case UpdateCheckStatus.Error:
