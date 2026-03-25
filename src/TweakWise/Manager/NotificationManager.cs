@@ -14,6 +14,13 @@ namespace TweakWise.Managers
         private readonly SettingsManager _settingsManager;
         private int _unreadCount;
 
+        public NotificationManager(SettingsManager settingsManager)
+        {
+            _settingsManager = settingsManager;
+            _notifications.CollectionChanged += (s, e) => UpdateUnreadCount();
+            LoadFromSettings();
+        }
+
         public ObservableCollection<Notification> Notifications => _notifications;
 
         public int UnreadCount
@@ -27,13 +34,7 @@ namespace TweakWise.Managers
         }
 
         public event Action UnreadCountChanged;
-
-        public NotificationManager(SettingsManager settingsManager)
-        {
-            _settingsManager = settingsManager;
-            _notifications.CollectionChanged += (s, e) => UpdateUnreadCount();
-            LoadFromSettings();
-        }
+        public event PropertyChangedEventHandler PropertyChanged;
 
         private void LoadFromSettings()
         {
@@ -68,12 +69,11 @@ namespace TweakWise.Managers
             {
                 return () =>
                 {
-                    var owner = Application.Current.MainWindow;
                     App.DialogManager?.Show(
-                        owner,
+                        Application.Current.MainWindow,
                         "Обновление",
                         "Автообновление",
-                        "Загрузка обновления будет доступна после подготовки установщика.",
+                        "Загрузка обновления будет доступна после подготовки отдельного установщика.",
                         AppDialogKind.Info);
                 };
             }
@@ -106,10 +106,10 @@ namespace TweakWise.Managers
 
         public void MarkAllAsRead()
         {
-            foreach (var n in _notifications)
+            foreach (var notification in _notifications)
             {
-                if (!n.IsRead)
-                    n.IsRead = true;
+                if (!notification.IsRead)
+                    notification.IsRead = true;
             }
 
             UpdateUnreadCount();
@@ -118,12 +118,12 @@ namespace TweakWise.Managers
 
         private void SaveToSettings()
         {
-            _settingsManager.CurrentSettings.Notifications = _notifications.Select(n => new NotificationData
+            _settingsManager.CurrentSettings.Notifications = _notifications.Select(notification => new NotificationData
             {
-                Title = n.Title,
-                Message = n.Message,
-                IsRead = n.IsRead,
-                HasAction = n.Action != null
+                Title = notification.Title,
+                Message = notification.Message,
+                IsRead = notification.IsRead,
+                HasAction = notification.Action != null
             }).ToList();
 
             _settingsManager.SaveSettings();
@@ -131,12 +131,9 @@ namespace TweakWise.Managers
 
         private void UpdateUnreadCount()
         {
-            int count = _notifications.Count(n => !n.IsRead);
-            UnreadCount = count;
+            UnreadCount = _notifications.Count(notification => !notification.IsRead);
             UnreadCountChanged?.Invoke();
         }
-
-        public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
@@ -164,6 +161,8 @@ namespace TweakWise.Managers
 
         public ICommand ClickCommand => new RelayCommand(Execute);
 
+        public event PropertyChangedEventHandler PropertyChanged;
+
         private void Execute()
         {
             if (!IsRead)
@@ -171,8 +170,6 @@ namespace TweakWise.Managers
 
             Action?.Invoke();
         }
-
-        public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
@@ -191,14 +188,14 @@ namespace TweakWise.Managers
             _canExecute = canExecute;
         }
 
-        public bool CanExecute(object parameter) => _canExecute == null || _canExecute();
-
-        public void Execute(object parameter) => _execute();
-
         public event EventHandler CanExecuteChanged
         {
             add { CommandManager.RequerySuggested += value; }
             remove { CommandManager.RequerySuggested -= value; }
         }
+
+        public bool CanExecute(object parameter) => _canExecute == null || _canExecute();
+
+        public void Execute(object parameter) => _execute();
     }
 }

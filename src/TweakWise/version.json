@@ -1,0 +1,11 @@
+{
+  "version": "2.1.0-beta",
+  "displayVersion": "v2.1 beta",
+  "changelog": [
+    "Добавлены стилизованные диалоги приложения.",
+    "Улучшена панель уведомлений и окно обновлений.",
+    "Версия приложения теперь отображается рядом с названием."
+  ],
+  "downloadUrl": "https://github.com/HackDwenture/TweakWise/tree/release",
+  "detailsUrl": "https://github.com/HackDwenture/TweakWise/blob/release/src/TweakWise/version.json"
+}

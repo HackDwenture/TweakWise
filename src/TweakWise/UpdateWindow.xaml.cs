@@ -16,7 +16,7 @@ namespace TweakWise
             _updateManager = updateManager;
             _result = result;
 
-            VersionTextBlock.Text = $"Обнаружены изменения: {_result.LatestVersionText}";
+            VersionTextBlock.Text = $"Доступна версия {_result.LatestVersionText}";
             CurrentVersionTextBlock.Text = _result.CurrentVersionText;
             ReleaseNotesTextBlock.Text = _result.ReleaseNotes;
         }

@@ -199,7 +199,7 @@ namespace TweakWise
 
             try
             {
-                var result = await _updateManager.CheckForUpdatesAsync(_settingsManager.CurrentSettings.LastNotifiedReleaseCommit);
+                var result = await _updateManager.CheckForUpdatesAsync();
 
                 switch (result.Status)
                 {
@@ -209,19 +209,12 @@ namespace TweakWise
                     case UpdateCheckStatus.UpToDate:
                         if (userInitiated)
                         {
-                            if (!string.IsNullOrWhiteSpace(result.ReleaseCommitSha))
-                            {
-                                ShowUpdateWindow(result);
-                            }
-                            else
-                            {
-                                _dialogManager.Show(
-                                    this,
-                                    "Обновления",
-                                    "Изменений нет",
-                                    "Новых коммитов в ветке release не найдено.",
-                                    AppDialogKind.Info);
-                            }
+                            _dialogManager.Show(
+                                this,
+                                "Обновления",
+                                "Установлена актуальная версия",
+                                $"У вас уже установлена последняя версия приложения: {AppInfo.DisplayVersion}.",
+                                AppDialogKind.Info);
                         }
                         break;
                     case UpdateCheckStatus.Error:
@@ -248,17 +241,17 @@ namespace TweakWise
         {
             if (!userInitiated)
             {
-                if (_settingsManager.CurrentSettings.LastNotifiedReleaseCommit == result.ReleaseCommitSha)
+                if (_settingsManager.CurrentSettings.LastNotifiedUpdateVersion == result.LatestVersionId)
                     return;
 
-                _settingsManager.CurrentSettings.LastNotifiedReleaseCommit = result.ReleaseCommitSha;
+                _settingsManager.CurrentSettings.LastNotifiedUpdateVersion = result.LatestVersionId;
                 _settingsManager.SaveSettings();
 
                 if (_settingsManager.CurrentSettings.ShowNotifications)
                 {
                     App.NotificationManager.AddNotification(
                         "Доступно обновление",
-                        $"В ветке release появились изменения {result.LatestVersionText}. Нажмите, чтобы открыть changelog.",
+                        $"Доступна новая версия {result.LatestVersionText}. Нажмите, чтобы открыть changelog.",
                         () => ShowUpdateWindow(result));
                 }
                 return;

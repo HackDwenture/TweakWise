@@ -1,8 +1,7 @@
 using System;
 using System.Diagnostics;
-using System.Net;
+using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -14,60 +13,49 @@ namespace TweakWise.Managers
         private const string RepoOwner = "HackDwenture";
         private const string RepoName = "TweakWise";
         private const string ReleaseBranchName = "release";
-        private static readonly string BranchApiUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/branches/{ReleaseBranchName}";
-        private static readonly string CommitsApiUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/commits?sha={ReleaseBranchName}&per_page=8";
-        private static readonly string BranchPageUrl = $"https://github.com/{RepoOwner}/{RepoName}/tree/{ReleaseBranchName}";
+        private static readonly string VersionManifestUrl =
+            $"https://raw.githubusercontent.com/{RepoOwner}/{RepoName}/{ReleaseBranchName}/src/TweakWise/version.json";
         private static readonly HttpClient HttpClient = CreateHttpClient();
 
-        public async Task<UpdateCheckResult> CheckForUpdatesAsync(string lastKnownReleaseCommit = null)
+        public async Task<UpdateCheckResult> CheckForUpdatesAsync()
         {
             try
             {
-                using var branchResponse = await HttpClient.GetAsync(BranchApiUrl);
-                if (branchResponse.StatusCode == HttpStatusCode.NotFound)
+                using var response = await HttpClient.GetAsync(VersionManifestUrl);
+                if (!response.IsSuccessStatusCode)
                 {
                     return new UpdateCheckResult
                     {
                         Status = UpdateCheckStatus.Error,
-                        ErrorMessage = "Ветка release не найдена на GitHub."
+                        ErrorMessage = $"Не удалось загрузить version.json. Код ответа: {(int)response.StatusCode}."
                     };
                 }
 
-                if (!branchResponse.IsSuccessStatusCode)
+                await using var stream = await response.Content.ReadAsStreamAsync();
+                var manifest = await JsonSerializer.DeserializeAsync<VersionManifestDto>(stream);
+                if (manifest == null || string.IsNullOrWhiteSpace(manifest.Version))
                 {
                     return new UpdateCheckResult
                     {
                         Status = UpdateCheckStatus.Error,
-                        ErrorMessage = $"GitHub вернул код {(int)branchResponse.StatusCode}."
+                        ErrorMessage = "Файл version.json повреждён или не содержит версию."
                     };
                 }
 
-                await using var branchStream = await branchResponse.Content.ReadAsStreamAsync();
-                var branch = await JsonSerializer.DeserializeAsync<GitHubBranchDto>(branchStream);
-                if (branch?.Commit?.Sha == null)
-                {
-                    return new UpdateCheckResult
-                    {
-                        Status = UpdateCheckStatus.Error,
-                        ErrorMessage = "Не удалось определить последний коммит ветки release."
-                    };
-                }
-
-                string latestCommitSha = branch.Commit.Sha;
-                string releaseNotes = await LoadReleaseBranchNotesAsync();
-                bool hasNewCommit = !string.Equals(latestCommitSha, lastKnownReleaseCommit, StringComparison.OrdinalIgnoreCase);
+                var localVersion = AppInfo.VersionId;
+                int compareResult = CompareVersions(manifest.Version, localVersion);
 
                 return new UpdateCheckResult
                 {
-                    Status = hasNewCommit ? UpdateCheckStatus.UpdateAvailable : UpdateCheckStatus.UpToDate,
-                    CurrentVersionText = string.IsNullOrWhiteSpace(lastKnownReleaseCommit)
-                        ? "Локальная версия ещё не синхронизировалась с веткой release"
-                        : $"Последний просмотренный коммит: {ShortSha(lastKnownReleaseCommit)}",
-                    LatestVersionText = $"release / {ShortSha(latestCommitSha)}",
-                    ReleaseCommitSha = latestCommitSha,
-                    ReleaseUrl = BranchPageUrl,
-                    DownloadUrl = BranchPageUrl,
-                    ReleaseNotes = releaseNotes
+                    Status = compareResult > 0 ? UpdateCheckStatus.UpdateAvailable : UpdateCheckStatus.UpToDate,
+                    CurrentVersionText = $"Текущая версия: {AppInfo.DisplayVersion}",
+                    LatestVersionText = string.IsNullOrWhiteSpace(manifest.DisplayVersion)
+                        ? manifest.Version
+                        : manifest.DisplayVersion,
+                    LatestVersionId = manifest.Version,
+                    DownloadUrl = string.IsNullOrWhiteSpace(manifest.DownloadUrl) ? manifest.DetailsUrl : manifest.DownloadUrl,
+                    ReleaseUrl = string.IsNullOrWhiteSpace(manifest.DetailsUrl) ? VersionManifestUrl : manifest.DetailsUrl,
+                    ReleaseNotes = BuildReleaseNotes(manifest)
                 };
             }
             catch (Exception ex)
@@ -87,60 +75,22 @@ namespace TweakWise.Managers
 
         public void OpenLatestReleasePage()
         {
-            OpenUrl(BranchPageUrl);
+            OpenUrl(VersionManifestUrl);
         }
 
-        private async Task<string> LoadReleaseBranchNotesAsync()
+        private static string BuildReleaseNotes(VersionManifestDto manifest)
         {
-            using var commitsResponse = await HttpClient.GetAsync(CommitsApiUrl);
-            if (!commitsResponse.IsSuccessStatusCode)
-                return "Не удалось загрузить changelog из ветки release.";
+            if (manifest.Changelog == null || manifest.Changelog.Length == 0)
+                return "Список изменений не указан.";
 
-            await using var commitsStream = await commitsResponse.Content.ReadAsStreamAsync();
-            var commits = await JsonSerializer.DeserializeAsync<GitHubCommitDto[]>(commitsStream);
-            if (commits == null || commits.Length == 0)
-                return "В ветке release пока нет коммитов.";
-
-            var builder = new StringBuilder();
-            builder.AppendLine("Последние изменения в ветке release:");
-            builder.AppendLine();
-
-            foreach (var commit in commits)
-            {
-                string shortSha = ShortSha(commit.Sha);
-                string author = commit.Commit?.Author?.Name ?? "Unknown";
-                string date = commit.Commit?.Author?.Date?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? string.Empty;
-                string message = commit.Commit?.Message?.Trim() ?? "(без описания)";
-
-                builder.Append("• ");
-                builder.Append(shortSha);
-
-                if (!string.IsNullOrWhiteSpace(date))
-                {
-                    builder.Append("  ");
-                    builder.Append(date);
-                }
-
-                if (!string.IsNullOrWhiteSpace(author))
-                {
-                    builder.Append("  ");
-                    builder.Append(author);
-                }
-
-                builder.AppendLine();
-                builder.AppendLine(message);
-                builder.AppendLine();
-            }
-
-            return builder.ToString().TrimEnd();
+            return string.Join(Environment.NewLine + Environment.NewLine, manifest.Changelog.Select(item => $"• {item}"));
         }
 
-        private static string ShortSha(string sha)
+        private static int CompareVersions(string left, string right)
         {
-            if (string.IsNullOrWhiteSpace(sha))
-                return "unknown";
-
-            return sha.Length <= 7 ? sha : sha.Substring(0, 7);
+            var leftVersion = ParsedVersion.Parse(left);
+            var rightVersion = ParsedVersion.Parse(right);
+            return leftVersion.CompareTo(rightVersion);
         }
 
         private static void OpenUrl(string url)
@@ -163,43 +113,87 @@ namespace TweakWise.Managers
             return client;
         }
 
-        private class GitHubBranchDto
+        private sealed class VersionManifestDto
         {
-            [JsonPropertyName("commit")]
-            public GitHubBranchCommitDto Commit { get; set; }
+            [JsonPropertyName("version")]
+            public string Version { get; set; }
+
+            [JsonPropertyName("displayVersion")]
+            public string DisplayVersion { get; set; }
+
+            [JsonPropertyName("changelog")]
+            public string[] Changelog { get; set; }
+
+            [JsonPropertyName("downloadUrl")]
+            public string DownloadUrl { get; set; }
+
+            [JsonPropertyName("detailsUrl")]
+            public string DetailsUrl { get; set; }
         }
 
-        private class GitHubBranchCommitDto
+        private readonly struct ParsedVersion : IComparable<ParsedVersion>
         {
-            [JsonPropertyName("sha")]
-            public string Sha { get; set; }
-        }
+            public ParsedVersion(int major, int minor, int patch, int channelRank, int channelNumber)
+            {
+                Major = major;
+                Minor = minor;
+                Patch = patch;
+                ChannelRank = channelRank;
+                ChannelNumber = channelNumber;
+            }
 
-        private class GitHubCommitDto
-        {
-            [JsonPropertyName("sha")]
-            public string Sha { get; set; }
+            public int Major { get; }
+            public int Minor { get; }
+            public int Patch { get; }
+            public int ChannelRank { get; }
+            public int ChannelNumber { get; }
 
-            [JsonPropertyName("commit")]
-            public GitHubCommitDetailsDto Commit { get; set; }
-        }
+            public static ParsedVersion Parse(string value)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    return new ParsedVersion(0, 0, 0, 0, 0);
 
-        private class GitHubCommitDetailsDto
-        {
-            [JsonPropertyName("message")]
-            public string Message { get; set; }
+                string normalized = value.Trim().TrimStart('v', 'V');
+                string[] versionAndSuffix = normalized.Split('-', 2, StringSplitOptions.RemoveEmptyEntries);
+                string[] numberParts = versionAndSuffix[0].Split('.');
 
-            [JsonPropertyName("author")]
-            public GitHubCommitAuthorDto Author { get; set; }
-        }
+                int major = numberParts.Length > 0 && int.TryParse(numberParts[0], out var parsedMajor) ? parsedMajor : 0;
+                int minor = numberParts.Length > 1 && int.TryParse(numberParts[1], out var parsedMinor) ? parsedMinor : 0;
+                int patch = numberParts.Length > 2 && int.TryParse(numberParts[2], out var parsedPatch) ? parsedPatch : 0;
 
-        private class GitHubCommitAuthorDto
-        {
-            [JsonPropertyName("name")]
-            public string Name { get; set; }
+                int channelRank = 3;
+                int channelNumber = 0;
 
-            [JsonPropertyName("date")]
-            public DateTimeOffset? Date { get; set; }
+                if (versionAndSuffix.Length > 1)
+                {
+                    string suffix = versionAndSuffix[1].Trim().ToLowerInvariant();
+                    if (suffix.StartsWith("alpha"))
+                        channelRank = 0;
+                    else if (suffix.StartsWith("beta"))
+                        channelRank = 1;
+                    else if (suffix.StartsWith("rc"))
+                        channelRank = 2;
+                }
+
+                return new ParsedVersion(major, minor, patch, channelRank, channelNumber);
+            }
+
+            public int CompareTo(ParsedVersion other)
+            {
+                int result = Major.CompareTo(other.Major);
+                if (result != 0) return result;
+
+                result = Minor.CompareTo(other.Minor);
+                if (result != 0) return result;
+
+                result = Patch.CompareTo(other.Patch);
+                if (result != 0) return result;
+
+                result = ChannelRank.CompareTo(other.ChannelRank);
+                if (result != 0) return result;
+
+                return ChannelNumber.CompareTo(other.ChannelNumber);
+            }
         }
     }
 
@@ -208,7 +202,7 @@ namespace TweakWise.Managers
         public UpdateCheckStatus Status { get; set; }
         public string CurrentVersionText { get; set; } = string.Empty;
         public string LatestVersionText { get; set; } = string.Empty;
-        public string ReleaseCommitSha { get; set; } = string.Empty;
+        public string LatestVersionId { get; set; } = string.Empty;
         public string ReleaseUrl { get; set; } = string.Empty;
         public string DownloadUrl { get; set; } = string.Empty;
         public string ReleaseNotes { get; set; } = string.Empty;
