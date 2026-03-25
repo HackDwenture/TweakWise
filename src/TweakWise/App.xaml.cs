@@ -8,16 +8,22 @@ namespace TweakWise
     {
         public static SettingsManager SettingsManager { get; private set; }
         public static NotificationManager NotificationManager { get; private set; }
+        public static UpdateManager UpdateManager { get; private set; }
+        public static DialogManager DialogManager { get; private set; }
 
         public App()
         {
             SettingsManager = new SettingsManager();
             NotificationManager = new NotificationManager(SettingsManager);
+            UpdateManager = new UpdateManager();
+            DialogManager = new DialogManager();
         }
 
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            SettingsManager.ApplySavedSystemSettings();
 
             // Сначала применяем тему
             ChangeTheme(SettingsManager.CurrentSettings.Theme);

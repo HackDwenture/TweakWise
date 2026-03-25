@@ -55,10 +55,12 @@
             </ScrollViewer>
 
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
-                <Button Content="Принимаю" Width="120" Height="30" Margin="0,0,10,0" 
+                <Button Content="Принимаю" Width="140" Height="38" Margin="0,0,10,0"
+                        Style="{StaticResource DialogActionButtonStyle}"
                         Click="AcceptButton_Click" IsDefault="True"
                         BorderThickness="1"/>
-                <Button Content="Отказываюсь" Width="120" Height="30" 
+                <Button Content="Отказываюсь" Width="140" Height="38"
+                        Style="{StaticResource DialogActionButtonStyle}"
                         Click="DeclineButton_Click"
                         BorderThickness="1"/>
             </StackPanel>

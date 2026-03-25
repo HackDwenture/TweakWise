@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -10,10 +10,12 @@ namespace TweakWise.Managers
 {
     public class NotificationManager : INotifyPropertyChanged
     {
-        private ObservableCollection<Notification> _notifications = new ObservableCollection<Notification>();
+        private readonly ObservableCollection<Notification> _notifications = new ObservableCollection<Notification>();
+        private readonly SettingsManager _settingsManager;
+        private int _unreadCount;
+
         public ObservableCollection<Notification> Notifications => _notifications;
 
-        private int _unreadCount;
         public int UnreadCount
         {
             get => _unreadCount;
@@ -25,8 +27,6 @@ namespace TweakWise.Managers
         }
 
         public event Action UnreadCountChanged;
-
-        private SettingsManager _settingsManager;
 
         public NotificationManager(SettingsManager settingsManager)
         {
@@ -49,19 +49,38 @@ namespace TweakWise.Managers
                 };
                 _notifications.Add(notification);
             }
+
             UpdateUnreadCount();
         }
 
         private Action CreateDemoAction(NotificationData data)
         {
             if (data.Title == "Новые настройки")
+            {
                 return () =>
                 {
                     var mainWindow = Application.Current.MainWindow as MainWindow;
                     mainWindow?.NavigateToPage("Explorer");
                 };
+            }
+
             if (data.Title == "Автообновление")
-                return () => MessageBox.Show("Загрузка обновления...", "Обновление");
+            {
+                return () =>
+                {
+                    var owner = Application.Current.MainWindow;
+                    App.DialogManager?.Show(
+                        owner,
+                        "Обновление",
+                        "Автообновление",
+                        "Загрузка обновления будет доступна после подготовки установщика.",
+                        AppDialogKind.Info);
+                };
+            }
+
+            if (data.Title == "Доступно обновление")
+                return () => App.UpdateManager?.OpenLatestReleasePage();
+
             return null;
         }
 
@@ -74,6 +93,7 @@ namespace TweakWise.Managers
                 Action = action,
                 IsRead = false
             };
+
             _notifications.Add(notification);
             SaveToSettings();
         }
@@ -87,7 +107,11 @@ namespace TweakWise.Managers
         public void MarkAllAsRead()
         {
             foreach (var n in _notifications)
-                if (!n.IsRead) n.IsRead = true;
+            {
+                if (!n.IsRead)
+                    n.IsRead = true;
+            }
+
             UpdateUnreadCount();
             SaveToSettings();
         }
@@ -101,6 +125,7 @@ namespace TweakWise.Managers
                 IsRead = n.IsRead,
                 HasAction = n.Action != null
             }).ToList();
+
             _settingsManager.SaveSettings();
         }
 
@@ -112,6 +137,7 @@ namespace TweakWise.Managers
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
+
         protected virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -121,9 +147,11 @@ namespace TweakWise.Managers
     public class Notification : INotifyPropertyChanged
     {
         private bool _isRead;
+
         public string Title { get; set; }
         public string Message { get; set; }
         public Action Action { get; set; }
+
         public bool IsRead
         {
             get => _isRead;
@@ -140,10 +168,12 @@ namespace TweakWise.Managers
         {
             if (!IsRead)
                 IsRead = true;
+
             Action?.Invoke();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
+
         protected virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -162,7 +192,9 @@ namespace TweakWise.Managers
         }
 
         public bool CanExecute(object parameter) => _canExecute == null || _canExecute();
+
         public void Execute(object parameter) => _execute();
+
         public event EventHandler CanExecuteChanged
         {
             add { CommandManager.RequerySuggested += value; }

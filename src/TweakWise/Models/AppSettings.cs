@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using TweakWise.Managers;
+using System.Collections.Generic;
 
 namespace TweakWise.Models
 {
@@ -10,6 +9,8 @@ namespace TweakWise.Models
         public bool AutoCheckUpdates { get; set; } = true;
         public bool ShowNotifications { get; set; } = true;
         public bool FirstRunCompleted { get; set; } = false;
+        public string LastNotifiedUpdateVersion { get; set; } = string.Empty;
+        public string LastNotifiedReleaseCommit { get; set; } = string.Empty;
         public List<NotificationData> Notifications { get; set; } = new List<NotificationData>();
     }
 
@@ -18,6 +19,6 @@ namespace TweakWise.Models
         public string Title { get; set; }
         public string Message { get; set; }
         public bool IsRead { get; set; }
-        public bool HasAction { get; set; } // для демо, действие не сериализуется
+        public bool HasAction { get; set; }
     }
 }

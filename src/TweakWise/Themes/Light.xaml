@@ -11,7 +11,7 @@
     <SolidColorBrush x:Key="BorderBrush" Color="#D0D0D0"/>
     <SolidColorBrush x:Key="ButtonBackground" Color="#E1E1E1"/>
     <SolidColorBrush x:Key="ButtonForeground" Color="#1E1E1E"/>
-    <SolidColorBrush x:Key="ButtonHoverBackground" Color="#C0C0C0"/>
+    <SolidColorBrush x:Key="ButtonHoverBackground" Color="#E0E0E0"/>
     <SolidColorBrush x:Key="AccentBrush" Color="#007ACC"/>
     <SolidColorBrush x:Key="ScrollBarBackground" Color="#F0F0F0"/>
     <SolidColorBrush x:Key="ScrollBarThumb" Color="#C0C0C0"/>
@@ -25,4 +25,12 @@
     <SolidColorBrush x:Key="CaptionButtonCloseHover" Color="#E81123"/>
     <SolidColorBrush x:Key="CaptionButtonForeground" Color="#1E1E1E"/>
     <SolidColorBrush x:Key="NotificationBadgeColor" Color="#FF4444"/>
+    <SolidColorBrush x:Key="DialogInfoBackground" Color="#E8F1FE"/>
+    <SolidColorBrush x:Key="DialogInfoForeground" Color="#1E5AA8"/>
+    <SolidColorBrush x:Key="DialogSuccessBackground" Color="#E8F6EC"/>
+    <SolidColorBrush x:Key="DialogSuccessForeground" Color="#237A3B"/>
+    <SolidColorBrush x:Key="DialogWarningBackground" Color="#FFF2DD"/>
+    <SolidColorBrush x:Key="DialogWarningForeground" Color="#9A5B00"/>
+    <SolidColorBrush x:Key="DialogErrorBackground" Color="#FDEBEC"/>
+    <SolidColorBrush x:Key="DialogErrorForeground" Color="#B42318"/>
 </ResourceDictionary>

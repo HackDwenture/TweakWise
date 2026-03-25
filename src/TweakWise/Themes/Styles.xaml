@@ -26,7 +26,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{DynamicResource MenuItemHoverBackground}"/>
+                            <Setter Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource MenuItemSelectedBackground}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -34,18 +37,51 @@
         </Setter>
     </Style>
 
-    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+    <Style x:Key="ActionButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
         <Setter Property="Foreground" Value="{DynamicResource ButtonForeground}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="10,5"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
-            </Trigger>
-        </Style.Triggers>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="4"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource MenuItemSelectedBackground}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="DialogActionButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+        <Setter Property="Padding" Value="16,8"/>
+    </Style>
+
+    <Style x:Key="DialogPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource DialogActionButtonStyle}">
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+    </Style>
+
+    <Style TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
     </Style>
 
     <Style TargetType="TextBlock">

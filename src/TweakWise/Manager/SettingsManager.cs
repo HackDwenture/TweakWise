@@ -1,14 +1,19 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
+using Microsoft.Win32;
 using TweakWise.Models;
 
 namespace TweakWise.Managers
 {
     public class SettingsManager
     {
+        private const string RunRegistryKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string RunRegistryValueName = "TweakWise";
+
         private readonly string _settingsPath;
+
         public AppSettings CurrentSettings { get; private set; }
 
         public event Action SettingsChanged;
@@ -17,7 +22,9 @@ namespace TweakWise.Managers
         {
             _settingsPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "TweakWise", "settings.json");
+                "TweakWise",
+                "settings.json");
+
             LoadSettings();
         }
 
@@ -31,7 +38,9 @@ namespace TweakWise.Managers
                     CurrentSettings = JsonSerializer.Deserialize<AppSettings>(json);
                 }
             }
-            catch { }
+            catch
+            {
+            }
 
             if (CurrentSettings == null)
                 CurrentSettings = new AppSettings();
@@ -48,7 +57,10 @@ namespace TweakWise.Managers
                 string json = JsonSerializer.Serialize(CurrentSettings, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(_settingsPath, json);
             }
-            catch { }
+            catch
+            {
+            }
+
             SettingsChanged?.Invoke();
         }
 
@@ -64,6 +76,56 @@ namespace TweakWise.Managers
         {
             CurrentSettings.FirstRunCompleted = true;
             SaveSettings();
+        }
+
+        public void SetRunOnStartup(bool enabled)
+        {
+            CurrentSettings.RunOnStartup = enabled;
+            ApplyRunOnStartup(enabled);
+            SaveSettings();
+        }
+
+        public void SetAutoCheckUpdates(bool enabled)
+        {
+            CurrentSettings.AutoCheckUpdates = enabled;
+            SaveSettings();
+        }
+
+        public void SetShowNotifications(bool enabled)
+        {
+            CurrentSettings.ShowNotifications = enabled;
+            SaveSettings();
+        }
+
+        public void ApplySavedSystemSettings()
+        {
+            ApplyRunOnStartup(CurrentSettings.RunOnStartup);
+        }
+
+        private void ApplyRunOnStartup(bool enabled)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(RunRegistryKeyPath, true)
+                    ?? Registry.CurrentUser.CreateSubKey(RunRegistryKeyPath);
+
+                if (key == null)
+                    return;
+
+                if (enabled)
+                {
+                    string exePath = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                    if (!string.IsNullOrWhiteSpace(exePath))
+                        key.SetValue(RunRegistryValueName, $"\"{exePath}\"");
+                }
+                else
+                {
+                    key.DeleteValue(RunRegistryValueName, false);
+                }
+            }
+            catch
+            {
+            }
         }
     }
 }
