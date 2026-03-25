@@ -278,11 +278,6 @@
                                 Style="{StaticResource DialogActionButtonStyle}"
                                 Margin="0,5,0,0"
                                 Click="ResetButton_Click"/>
-                        <TextBlock Text="{x:Static local:AppInfo.DisplayVersion}"
-                                   HorizontalAlignment="Right"
-                                   Margin="0,12,0,0"
-                                   FontSize="11"
-                                   Opacity="0.7"/>
                     </StackPanel>
                 </Border>
             </Popup>
