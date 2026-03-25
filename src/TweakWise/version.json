@@ -1,6 +1,6 @@
 {
-  "version": "2.1.0-beta",
-  "displayVersion": "v2.1 beta",
+  "version": "2.2.0-beta",
+  "displayVersion": "v2.2 beta",
   "changelog": [
     "Добавлены стилизованные диалоги приложения.",
     "Улучшена панель уведомлений и окно обновлений.",
