@@ -1,0 +1,27 @@
+﻿<Page x:Class="TweakWise.Pages.ExplorerPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Проводник" Background="{DynamicResource ContentBackground}">
+    <ScrollViewer Padding="20">
+        <StackPanel>
+            <TextBlock Text="Настройки Проводника" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,20"/>
+            <GroupBox Header="Вид" Margin="0,0,0,15" Padding="10">
+                <StackPanel>
+                    <CheckBox Content="Показывать скрытые файлы и папки" Margin="0,5"/>
+                    <CheckBox Content="Показывать расширения для зарегистрированных типов файлов" Margin="0,5"/>
+                    <CheckBox Content="Показывать полный путь в заголовке окна" Margin="0,5"/>
+                    <CheckBox Content="Отключить галерею (папка 'Изображения')" Margin="0,5"/>
+                    <CheckBox Content="Отключить недавно использовавшиеся файлы в панели быстрого доступа" Margin="0,5"/>
+                </StackPanel>
+            </GroupBox>
+            <GroupBox Header="Контекстное меню" Padding="10">
+                <StackPanel>
+                    <CheckBox Content="Добавить 'Открыть окно команд' (cmd) в контекстное меню папок" Margin="0,5"/>
+                    <CheckBox Content="Добавить 'Проводник как администратор' для папок" Margin="0,5"/>
+                    <CheckBox Content="Удалить пункт 'Поделиться' из контекстного меню" Margin="0,5"/>
+                </StackPanel>
+            </GroupBox>
+            <Button Content="Сохранить изменения" Width="200" Margin="0,20,0,0" HorizontalAlignment="Left"/>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

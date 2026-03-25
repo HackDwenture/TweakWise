@@ -1,0 +1,28 @@
+﻿<Page x:Class="TweakWise.Pages.TaskbarPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Панель задач" Background="{DynamicResource ContentBackground}">
+    <ScrollViewer Padding="20">
+        <StackPanel>
+            <TextBlock Text="Настройки панели задач" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,20"/>
+            <GroupBox Header="Поведение" Margin="0,0,0,15" Padding="10">
+                <StackPanel>
+                    <CheckBox Content="Автоматически скрывать панель задач" Margin="0,5"/>
+                    <CheckBox Content="Сгруппировать кнопки на панели задач (никогда / при заполнении / всегда)" Margin="0,5"/>
+                    <CheckBox Content="Показывать значки на маленькой панели задач" Margin="0,5"/>
+                    <CheckBox Content="Отключить кнопку 'Просмотр задач' (Task View)" Margin="0,5"/>
+                    <CheckBox Content="Отключить кнопку 'Чат' (Microsoft Teams)" Margin="0,5"/>
+                </StackPanel>
+            </GroupBox>
+            <GroupBox Header="Системный трей" Padding="10">
+                <StackPanel>
+                    <CheckBox Content="Всегда отображать все значки в трее" Margin="0,5"/>
+                    <CheckBox Content="Скрыть индикатор громкости" Margin="0,5"/>
+                    <CheckBox Content="Скрыть индикатор сети" Margin="0,5"/>
+                    <CheckBox Content="Скрыть часы" Margin="0,5"/>
+                </StackPanel>
+            </GroupBox>
+            <Button Content="Сохранить изменения" Width="200" Margin="0,20,0,0" HorizontalAlignment="Left"/>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,25 @@
+﻿<Page x:Class="TweakWise.Pages.StartMenuPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Меню Пуск" Background="{DynamicResource ContentBackground}">
+    <ScrollViewer Padding="20">
+        <StackPanel>
+            <TextBlock Text="Настройки меню Пуск" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,20"/>
+            <GroupBox Header="Внешний вид" Margin="0,0,0,15" Padding="10">
+                <StackPanel>
+                    <CheckBox Content="Отключить рекомендации (рекламу) в меню Пуск" Margin="0,5"/>
+                    <CheckBox Content="Показывать больше плиток (увеличить высоту)" Margin="0,5"/>
+                    <CheckBox Content="Отключить недавно добавленные приложения" Margin="0,5"/>
+                </StackPanel>
+            </GroupBox>
+            <GroupBox Header="Поведение" Padding="10">
+                <StackPanel>
+                    <CheckBox Content="Открывать меню Пуск в полноэкранном режиме" Margin="0,5"/>
+                    <CheckBox Content="Отключить поиск в Интернете при вводе в меню Пуск" Margin="0,5"/>
+                    <CheckBox Content="Отключить список наиболее используемых приложений" Margin="0,5"/>
+                </StackPanel>
+            </GroupBox>
+            <Button Content="Сохранить изменения" Width="200" Margin="0,20,0,0" HorizontalAlignment="Left"/>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

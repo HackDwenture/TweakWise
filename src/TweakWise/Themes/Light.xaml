@@ -1,0 +1,28 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="WindowBackground" Color="#F5F5F5"/>
+    <SolidColorBrush x:Key="WindowForeground" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="MenuBackground" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="MenuItemBackground" Color="Transparent"/>
+    <SolidColorBrush x:Key="MenuItemForeground" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="MenuItemHoverBackground" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="MenuItemSelectedBackground" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="ContentBackground" Color="#FAFAFA"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="#D0D0D0"/>
+    <SolidColorBrush x:Key="ButtonBackground" Color="#E1E1E1"/>
+    <SolidColorBrush x:Key="ButtonForeground" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="ButtonHoverBackground" Color="#C0C0C0"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="#007ACC"/>
+    <SolidColorBrush x:Key="ScrollBarBackground" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="ScrollBarThumb" Color="#C0C0C0"/>
+    <SolidColorBrush x:Key="ScrollBarThumbHover" Color="#A0A0A0"/>
+    <SolidColorBrush x:Key="ScrollBarThumbPressed" Color="#808080"/>
+    <SolidColorBrush x:Key="ScrollBarButton" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="ScrollBarButtonHover" Color="#D0D0D0"/>
+    <SolidColorBrush x:Key="CaptionButtonBackground" Color="Transparent"/>
+    <SolidColorBrush x:Key="CaptionButtonHover" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="CaptionButtonPressed" Color="#C0C0C0"/>
+    <SolidColorBrush x:Key="CaptionButtonCloseHover" Color="#E81123"/>
+    <SolidColorBrush x:Key="CaptionButtonForeground" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="NotificationBadgeColor" Color="#FF4444"/>
+</ResourceDictionary>

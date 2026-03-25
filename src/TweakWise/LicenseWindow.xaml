@@ -1,0 +1,67 @@
+﻿<Window x:Class="TweakWise.LicenseWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Лицензионное соглашение"
+        Width="600" Height="450"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent">
+
+    <Border Background="{DynamicResource WindowBackground}" 
+            BorderBrush="{DynamicResource BorderBrush}" 
+            BorderThickness="1"
+            CornerRadius="5">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" 
+                    Background="{DynamicResource MenuBackground}" 
+                    Padding="10,0" 
+                    Height="40"
+                    CornerRadius="5,5,0,0"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Лицензионное соглашение" 
+                               FontSize="16" FontWeight="SemiBold" 
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource WindowForeground}"/>
+                    <Button x:Name="CloseButton" Grid.Column="2"
+                            Style="{StaticResource CloseButtonStyle}"
+                            Content="&#xE711;" 
+                            Click="CloseButton_Click"
+                            ToolTip="Закрыть"
+                            Width="40" Height="32"/>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" Margin="20,15,20,10" VerticalScrollBarVisibility="Auto">
+                <TextBlock TextWrapping="Wrap" FontSize="12" 
+                           Foreground="{DynamicResource WindowForeground}">
+                    <Run Text="Настоящее программное обеспечение (далее – ПО) предоставляется на условиях «как есть» (AS IS). Автор не несёт ответственности за любые прямые или косвенные убытки, возникшие в результате использования ПО, включая, но не ограничиваясь: потерю данных, нарушение работоспособности системы, некорректную работу оборудования или программного обеспечения третьих лиц.&#x0a;&#x0a;"/>
+                    <Run Text="ПО предназначено для изменения системных параметров Windows, что может повлиять на стабильность операционной системы. Пользователь принимает на себя все риски, связанные с применением ПО. Перед использованием рекомендуется создать точку восстановления системы и резервные копии важных данных.&#x0a;&#x0a;"/>
+                    <Run Text="Устанавливая и используя ПО, вы подтверждаете, что ознакомились с настоящими условиями, понимаете их и принимаете безоговорочно. Если вы не согласны с условиями, не используйте данное ПО.&#x0a;&#x0a;"/>
+                    <Run Text="© 2025 TweakWise. Все права защищены."/>
+                </TextBlock>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
+                <Button Content="Принимаю" Width="120" Height="30" Margin="0,0,10,0" 
+                        Click="AcceptButton_Click" IsDefault="True"
+                        BorderThickness="1"/>
+                <Button Content="Отказываюсь" Width="120" Height="30" 
+                        Click="DeclineButton_Click"
+                        BorderThickness="1"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

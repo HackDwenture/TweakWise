@@ -1,0 +1,25 @@
+﻿<Page x:Class="TweakWise.Pages.SystemPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Система" Background="{DynamicResource ContentBackground}">
+    <ScrollViewer Padding="20">
+        <StackPanel>
+            <TextBlock Text="Мониторинг и разгон" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,20"/>
+            <Border Background="{DynamicResource MenuBackground}" Padding="15" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}">
+                <StackPanel>
+                    <TextBlock Text="🖥️ Информация о системе (в разработке)" FontSize="18" Margin="0,0,0,15"/>
+                    <TextBlock Text="CPU: Intel Core i7-12700K (заглушка)" Margin="0,5"/>
+                    <TextBlock Text="Температура: 45°C" Margin="0,5"/>
+                    <TextBlock Text="Скорость вентиляторов: 1200 RPM" Margin="0,5"/>
+                    <TextBlock Text="GPU: NVIDIA RTX 3070" Margin="0,5"/>
+                    <TextBlock Text="Память: 16 GB DDR4" Margin="0,5"/>
+                </StackPanel>
+            </Border>
+            <TextBlock Text="В будущих версиях здесь появятся:" FontSize="16" Margin="0,20,0,10"/>
+            <TextBlock Text="• Мониторинг температуры CPU/GPU в реальном времени" Margin="20,2"/>
+            <TextBlock Text="• Управление оборотами вентиляторов" Margin="20,2"/>
+            <TextBlock Text="• Разгон видеокарты (подобно MSI Afterburner)" Margin="20,2"/>
+            <TextBlock Text="• Детальная информация о системе" Margin="20,2"/>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
