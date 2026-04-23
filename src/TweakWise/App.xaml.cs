@@ -2,6 +2,8 @@ using System;
 using System.Windows;
 using Microsoft.Win32;
 using TweakWise.Managers;
+using TweakWise.Providers;
+using TweakWise.Search;
 using Application = System.Windows.Application;
 
 namespace TweakWise
@@ -12,6 +14,8 @@ namespace TweakWise
         public static NotificationManager NotificationManager { get; private set; }
         public static UpdateManager UpdateManager { get; private set; }
         public static DialogManager DialogManager { get; private set; }
+        public static ITweakCatalogProvider TweakCatalogProvider { get; private set; }
+        public static GlobalSearchService GlobalSearchService { get; private set; }
 
         public App()
         {
@@ -19,6 +23,8 @@ namespace TweakWise
             NotificationManager = new NotificationManager(SettingsManager);
             UpdateManager = new UpdateManager();
             DialogManager = new DialogManager();
+            TweakCatalogProvider = new MockTweakCatalogProvider();
+            GlobalSearchService = new GlobalSearchService(TweakCatalogProvider);
         }
 
         protected override void OnStartup(StartupEventArgs e)

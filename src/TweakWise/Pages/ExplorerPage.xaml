@@ -1,27 +1,86 @@
-﻿<Page x:Class="TweakWise.Pages.ExplorerPage"
+<Page x:Class="TweakWise.Pages.ExplorerPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      Title="Проводник" Background="{DynamicResource ContentBackground}">
-    <ScrollViewer Padding="20">
+      xmlns:controls="clr-namespace:TweakWise.Controls"
+      Title="Интерфейс Windows"
+      Background="{DynamicResource ContentBackground}">
+    <ScrollViewer Padding="20" VerticalScrollBarVisibility="Auto">
         <StackPanel>
-            <TextBlock Text="Настройки Проводника" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,20"/>
-            <GroupBox Header="Вид" Margin="0,0,0,15" Padding="10">
+            <Border Style="{StaticResource CatalogSectionBorderStyle}"
+                    Padding="20">
                 <StackPanel>
-                    <CheckBox Content="Показывать скрытые файлы и папки" Margin="0,5"/>
-                    <CheckBox Content="Показывать расширения для зарегистрированных типов файлов" Margin="0,5"/>
-                    <CheckBox Content="Показывать полный путь в заголовке окна" Margin="0,5"/>
-                    <CheckBox Content="Отключить галерею (папка 'Изображения')" Margin="0,5"/>
-                    <CheckBox Content="Отключить недавно использовавшиеся файлы в панели быстрого доступа" Margin="0,5"/>
+                    <TextBlock Text="Интерфейс Windows"
+                               FontSize="28"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="Здесь собраны повседневные настройки, которые меняют внешний вид и поведение Windows без перегруза техническими терминами. Обычные действия остаются простыми, а детали раскрываются только внутри карточек."
+                               Margin="0,10,0,0"
+                               Opacity="0.86"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="Первый этап этой страницы уже объединяет Проводник, меню Пуск и панель задач на одном смысловом уровне."
+                               Margin="0,8,0,0"
+                               Opacity="0.8"
+                               TextWrapping="Wrap"/>
                 </StackPanel>
-            </GroupBox>
-            <GroupBox Header="Контекстное меню" Padding="10">
-                <StackPanel>
-                    <CheckBox Content="Добавить 'Открыть окно команд' (cmd) в контекстное меню папок" Margin="0,5"/>
-                    <CheckBox Content="Добавить 'Проводник как администратор' для папок" Margin="0,5"/>
-                    <CheckBox Content="Удалить пункт 'Поделиться' из контекстного меню" Margin="0,5"/>
-                </StackPanel>
-            </GroupBox>
-            <Button Content="Сохранить изменения" Width="200" Margin="0,20,0,0" HorizontalAlignment="Left"/>
+            </Border>
+
+            <TextBlock Text="Локальные шаблоны"
+                       FontSize="22"
+                       FontWeight="SemiBold"
+                       Margin="0,8,0,6"/>
+            <TextBlock Text="Шаблоны на этой странице собирают несколько связанных изменений в один понятный сценарий, но остаются частью раздела, а не отдельным top-level режимом."
+                       Margin="0,0,0,14"
+                       Opacity="0.82"
+                       TextWrapping="Wrap"/>
+
+            <ItemsControl x:Name="TemplateItemsControl">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <controls:LocalTemplateCardControl TemplateCard="{Binding}"
+                                                           Width="300"
+                                                           Margin="0,0,14,14"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <ItemsControl x:Name="SectionsItemsControl"
+                          Margin="0,8,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}"
+                                           FontSize="22"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding Description}"
+                                           Margin="0,8,0,0"
+                                           Opacity="0.84"
+                                           TextWrapping="Wrap"/>
+
+                                <ItemsControl ItemsSource="{Binding Settings}"
+                                              Margin="0,14,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <controls:SettingCardControl Setting="{Binding}"
+                                                                         Width="360"
+                                                                         Margin="0,0,14,14"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </StackPanel>
     </ScrollViewer>
 </Page>

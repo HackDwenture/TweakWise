@@ -1,0 +1,200 @@
+<Page x:Class="TweakWise.Pages.MaintenancePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:TweakWise.Controls"
+      Title="Обслуживание"
+      Background="{DynamicResource ContentBackground}">
+    <Page.Resources>
+        <Style x:Key="FilterChipStyle" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Border"
+                                Background="{DynamicResource ContentBackground}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="14"
+                                Padding="10,5">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource MenuItemSelectedBackground}"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer Padding="20" VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+            <Border Style="{StaticResource CatalogSectionBorderStyle}"
+                    Padding="20">
+                <StackPanel>
+                    <TextBlock Text="Обслуживание"
+                               FontSize="28"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="Это clean maintenance center: понятная очистка, удаление лишнего, безопасные быстрые исправления и обслуживание по расписанию без дешёвой риторики про «ускорение ПК»."
+                               Margin="0,10,0,0"
+                               Opacity="0.86"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="Для операций очистки и удаления используется preview before apply: внутри карточки видно, что будет затронуто, примерный объём, риск и насколько ограничен откат."
+                               Margin="0,8,0,0"
+                               Opacity="0.8"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                <StackPanel>
+                    <TextBlock Text="Быстрые фильтры"
+                               FontSize="22"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="Оставьте только рекомендуемые, безопасные, требующие подтверждение или продвинутые сценарии обслуживания, не теряя общей структуры раздела."
+                               Margin="0,8,0,0"
+                               Opacity="0.84"
+                               TextWrapping="Wrap"/>
+
+                    <TextBlock Text="Фильтры"
+                               Margin="0,14,0,0"
+                               FontWeight="SemiBold"/>
+                    <WrapPanel Margin="0,8,0,0">
+                        <RadioButton x:Name="FilterAllButton"
+                                     Content="Все"
+                                     Tag="All"
+                                     GroupName="MaintenanceFilters"
+                                     Style="{StaticResource FilterChipStyle}"
+                                     IsChecked="True"
+                                     Checked="FilterButton_Checked"/>
+                        <RadioButton Content="Рекомендуемые"
+                                     Tag="Recommended"
+                                     GroupName="MaintenanceFilters"
+                                     Style="{StaticResource FilterChipStyle}"
+                                     Checked="FilterButton_Checked"/>
+                        <RadioButton Content="Безопасные"
+                                     Tag="Safe"
+                                     GroupName="MaintenanceFilters"
+                                     Style="{StaticResource FilterChipStyle}"
+                                     Checked="FilterButton_Checked"/>
+                        <RadioButton Content="Требуют подтверждение"
+                                     Tag="RequiresConfirmation"
+                                     GroupName="MaintenanceFilters"
+                                     Style="{StaticResource FilterChipStyle}"
+                                     Checked="FilterButton_Checked"/>
+                        <RadioButton Content="Требуют перезапуск"
+                                     Tag="RequiresRestart"
+                                     GroupName="MaintenanceFilters"
+                                     Style="{StaticResource FilterChipStyle}"
+                                     Checked="FilterButton_Checked"/>
+                        <RadioButton Content="Продвинутые"
+                                     Tag="Advanced"
+                                     GroupName="MaintenanceFilters"
+                                     Style="{StaticResource FilterChipStyle}"
+                                     Checked="FilterButton_Checked"/>
+                    </WrapPanel>
+
+                    <TextBlock x:Name="ResultsSummaryTextBlock"
+                               Margin="0,14,0,0"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentBrush}"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Локальные шаблоны"
+                       FontSize="22"
+                       FontWeight="SemiBold"
+                       Margin="0,8,0,6"/>
+            <TextBlock Text="Шаблоны внутри раздела собирают частые maintenance-сценарии: быстрая и глубокая чистка, действия после обновления и освобождение места."
+                       Margin="0,0,0,14"
+                       Opacity="0.82"
+                       TextWrapping="Wrap"/>
+
+            <ItemsControl x:Name="TemplateItemsControl">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <controls:LocalTemplateCardControl TemplateCard="{Binding}"
+                                                           Width="300"
+                                                           Margin="0,0,14,14"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border x:Name="EmptyStateBorder"
+                    Style="{StaticResource CatalogSectionBorderStyle}"
+                    Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Ничего не найдено"
+                               FontSize="20"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="Попробуйте снять часть фильтров. Сценарии обслуживания останутся в тех же секциях, когда выбор снова станет шире."
+                               Margin="0,8,0,0"
+                               Opacity="0.84"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <ItemsControl x:Name="SectionsItemsControl"
+                          Margin="0,8,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontSize="22"
+                                               FontWeight="SemiBold"/>
+                                    <Border Style="{StaticResource CatalogSubtlePanelStyle}"
+                                            Margin="10,0,0,0"
+                                            Padding="8,3"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding CountText}"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="12"/>
+                                    </Border>
+                                </StackPanel>
+
+                                <TextBlock Text="{Binding Description}"
+                                           Margin="0,8,0,0"
+                                           Opacity="0.84"
+                                           TextWrapping="Wrap"/>
+
+                                <ItemsControl ItemsSource="{Binding Settings}"
+                                              Margin="0,14,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <controls:SettingCardControl Setting="{Binding}"
+                                                                         Width="360"
+                                                                         Margin="0,0,14,14"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

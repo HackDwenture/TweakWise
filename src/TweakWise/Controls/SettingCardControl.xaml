@@ -1,0 +1,307 @@
+<UserControl x:Class="TweakWise.Controls.SettingCardControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:TweakWise.Controls"
+             x:Name="Root">
+    <Border>
+        <Border.Style>
+            <Style TargetType="Border"
+                   BasedOn="{StaticResource CatalogCardBorderStyle}">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Setting.IsHighlighted, ElementName=Root}" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                        <Setter Property="BorderThickness" Value="2"/>
+                        <Setter Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
+        <StackPanel>
+            <TextBlock Text="{Binding Setting.Title, ElementName=Root}"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       TextWrapping="Wrap"/>
+
+            <TextBlock Text="{Binding Setting.ShortDescription, ElementName=Root}"
+                       Margin="0,8,0,0"
+                       Opacity="0.86"
+                       TextWrapping="Wrap"/>
+
+            <WrapPanel Margin="0,12,0,0">
+                <controls:CatalogBadgeControl Text="{Binding Setting.SourceBadgeText, ElementName=Root}"
+                                             Tone="{Binding Setting.SourceTone, ElementName=Root}"/>
+                <controls:CatalogBadgeControl Text="{Binding Setting.RiskBadgeText, ElementName=Root}"
+                                             Tone="{Binding Setting.RiskTone, ElementName=Root}"/>
+                <controls:CatalogBadgeControl Text="{Binding Setting.RestartBadgeText, ElementName=Root}"
+                                             Tone="{Binding Setting.RestartTone, ElementName=Root}"/>
+                <controls:CatalogBadgeControl Text="{Binding Setting.RollbackBadgeText, ElementName=Root}"
+                                             Tone="{Binding Setting.RollbackTone, ElementName=Root}"/>
+            </WrapPanel>
+
+            <Grid Margin="0,6,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Style="{StaticResource CatalogSubtlePanelStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Сейчас"
+                                   Style="{StaticResource CatalogStateTitleTextStyle}"/>
+                        <TextBlock Text="{Binding Setting.CurrentState, ElementName=Root}"
+                                   Margin="0,6,0,0"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2"
+                        Style="{StaticResource CatalogSubtlePanelStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Рекомендуется"
+                                   Style="{StaticResource CatalogStateTitleTextStyle}"/>
+                        <TextBlock Text="{Binding Setting.RecommendedState, ElementName=Root}"
+                                   Margin="0,6,0,0"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource AccentBrush}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <TextBlock Text="{Binding Setting.LongDescription, ElementName=Root}"
+                       Margin="0,12,0,0"
+                       Opacity="0.82"
+                       TextWrapping="Wrap">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock"
+                           BasedOn="{StaticResource {x:Type TextBlock}}">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Setting.HasLongDescription, ElementName=Root}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <Border Style="{StaticResource CatalogSubtlePanelStyle}"
+                    Margin="0,14,0,0">
+                <Expander Header="Технические детали">
+                    <Expander.Style>
+                        <Style TargetType="Expander" BasedOn="{StaticResource CatalogTechnicalExpanderStyle}">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Setting.HasDetails, ElementName=Root}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Expander.Style>
+
+                    <StackPanel Margin="0,12,0,0">
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Setting.HasTechnicalSummary, ElementName=Root}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Что меняется"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding Setting.TechnicalSummary, ElementName=Root}"
+                                       Margin="0,6,0,0"
+                                       Opacity="0.84"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,12,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Setting.HasAffectedComponents, ElementName=Root}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Затрагивает"
+                                       FontWeight="SemiBold"/>
+                            <ItemsControl ItemsSource="{Binding Setting.AffectedComponents, ElementName=Root}"
+                                          Margin="0,6,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Style="{StaticResource CatalogListItemTextStyle}"
+                                                   Text="{Binding ., StringFormat=• {0}}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,12,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Setting.HasTechnicalNotes, ElementName=Root}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="На что обратить внимание"
+                                       FontWeight="SemiBold"/>
+                            <ItemsControl ItemsSource="{Binding Setting.TechnicalNotes, ElementName=Root}"
+                                          Margin="0,6,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Style="{StaticResource CatalogListItemTextStyle}"
+                                                   Text="{Binding ., StringFormat=• {0}}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,12,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Setting.HasPreview, ElementName=Root}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Предпросмотр перед применением"
+                                       FontWeight="SemiBold"/>
+
+                            <StackPanel Margin="0,6,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Setting.HasPreviewSummary, ElementName=Root}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="{Binding Setting.PreviewSummary, ElementName=Root}"
+                                           Opacity="0.84"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,10,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Setting.HasPreviewEstimatedImpact, ElementName=Root}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="Примерный эффект"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding Setting.PreviewEstimatedImpact, ElementName=Root}"
+                                           Margin="0,6,0,0"
+                                           Opacity="0.84"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,10,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Setting.HasPreviewItems, ElementName=Root}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="Что будет затронуто"
+                                           FontWeight="SemiBold"/>
+                                <ItemsControl ItemsSource="{Binding Setting.PreviewItems, ElementName=Root}"
+                                              Margin="0,6,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Style="{StaticResource CatalogListItemTextStyle}"
+                                                       Text="{Binding ., StringFormat=• {0}}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,10,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Setting.HasConfirmationText, ElementName=Root}" Value="False">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="Подтверждение"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding Setting.ConfirmationText, ElementName=Root}"
+                                           Margin="0,6,0,0"
+                                           Opacity="0.84"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,12,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Setting.HasRollbackSummary, ElementName=Root}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Как откатить"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding Setting.RollbackSummary, ElementName=Root}"
+                                       Margin="0,6,0,0"
+                                       Opacity="0.84"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,12,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Setting.HasValidationHint, ElementName=Root}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Как проверить результат"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding Setting.ValidationHint, ElementName=Root}"
+                                       Margin="0,6,0,0"
+                                       Opacity="0.84"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Expander>
+            </Border>
+        </StackPanel>
+    </Border>
+</UserControl>

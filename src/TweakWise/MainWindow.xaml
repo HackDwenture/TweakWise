@@ -1,6 +1,7 @@
 ﻿<Window x:Class="TweakWise.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:TweakWise.Controls"
         xmlns:local="clr-namespace:TweakWise"
         Title="TweakWise - Настройка Windows" 
         Width="1000" Height="600"
@@ -233,12 +234,25 @@
                         BorderThickness="0,0,1,0" 
                         BorderBrush="{DynamicResource BorderBrush}">
                     <StackPanel Margin="0,10,0,0" Cursor="">
+                        <controls:GlobalSearchBlockControl IsCompact="True"
+                                                           Margin="12,0,12,6"/>
                         <Button x:Name="NavDashboard" Content="🏠 Главная" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click" Tag="Dashboard"/>
-                        <Button x:Name="NavExplorer" Content="📁 Проводник" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click" Tag="Explorer"/>
-                        <Button x:Name="NavStartMenu" Content="📔 Меню Пуск" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click" Tag="StartMenu"/>
-                        <Button x:Name="NavTaskbar" Content="📌 Панель задач" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click" Tag="Taskbar"/>
-                        <Button x:Name="NavOptimize" Content="⚡ Оптимизация" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click" Tag="Optimize"/>
-                        <Button x:Name="NavSystem" Content="🖥️ Система" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click" Tag="System"/>
+                        <Button x:Name="NavWindowsInterface"
+                                Content="🖼️ Интерфейс"
+                                Style="{StaticResource NavButtonStyle}"
+                                Click="NavButton_Click"
+                                Tag="WindowsInterface"
+                                ToolTip="Интерфейс Windows"/>
+                        <Button x:Name="NavSystem" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click" Tag="System">
+                            <TextBlock Text="💻 Система" TextWrapping="Wrap"/>
+                        </Button>
+                        <Button x:Name="NavMaintenance" Content="🧰 Обслуживание" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click" Tag="Maintenance"/>
+                        <Button x:Name="NavMonitoringPerformance"
+                                Content="📊 Мониторинг"
+                                Style="{StaticResource NavButtonStyle}"
+                                Click="NavButton_Click"
+                                Tag="MonitoringPerformance"
+                                ToolTip="Мониторинг и производительность"/>
                     </StackPanel>
                 </Border>
 

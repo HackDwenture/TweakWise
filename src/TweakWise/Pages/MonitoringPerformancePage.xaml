@@ -1,0 +1,553 @@
+<Page x:Class="TweakWise.Pages.MonitoringPerformancePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:TweakWise.Controls"
+      Title="Мониторинг и производительность"
+      Background="{DynamicResource ContentBackground}">
+    <Page.Resources>
+        <Style x:Key="TabChipStyle" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Border"
+                                Background="{DynamicResource ContentBackground}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="14"
+                                Padding="10,5">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource MenuItemSelectedBackground}"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MetricProgressBarStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+            <Setter Property="Maximum" Value="100"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+        </Style>
+
+        <Style x:Key="MetricCardBorderStyle" TargetType="Border"
+               BasedOn="{StaticResource CatalogSubtlePanelStyle}">
+            <Setter Property="Width" Value="260"/>
+            <Setter Property="Margin" Value="0,0,14,14"/>
+        </Style>
+
+        <DataTemplate x:Key="OverviewCardTemplate">
+            <Border Style="{StaticResource MetricCardBorderStyle}">
+                <StackPanel>
+                    <DockPanel>
+                        <TextBlock Text="{Binding Title}"
+                                   FontWeight="SemiBold"
+                                   DockPanel.Dock="Left"/>
+                        <controls:CatalogBadgeControl Text="{Binding StatusText}"
+                                                     Tone="{Binding StatusTone}"
+                                                     HorizontalAlignment="Right"/>
+                    </DockPanel>
+
+                    <TextBlock Text="{Binding ValueText}"
+                               Margin="0,10,0,0"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"/>
+
+                    <TextBlock Text="{Binding Description}"
+                               Margin="0,8,0,0"
+                               Opacity="0.82"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="MetricCardTemplate">
+            <Border Style="{StaticResource MetricCardBorderStyle}">
+                <StackPanel>
+                    <DockPanel>
+                        <TextBlock Text="{Binding Title}"
+                                   FontWeight="SemiBold"
+                                   DockPanel.Dock="Left"/>
+                        <controls:CatalogBadgeControl Text="{Binding StatusText}"
+                                                     Tone="{Binding StatusTone}"
+                                                     HorizontalAlignment="Right"/>
+                    </DockPanel>
+
+                    <TextBlock Text="{Binding ValueText}"
+                               Margin="0,10,0,0"
+                               FontSize="22"
+                               FontWeight="SemiBold"/>
+
+                    <TextBlock Text="{Binding SecondaryText}"
+                               Margin="0,6,0,0"
+                               Opacity="0.82"
+                               TextWrapping="Wrap"/>
+
+                    <ProgressBar Value="{Binding UsagePercent}"
+                                 Style="{StaticResource MetricProgressBarStyle}"/>
+
+                    <ItemsControl ItemsSource="{Binding HistoryBars}"
+                                  Margin="0,12,0,0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Width="8"
+                                        Height="{Binding Height}"
+                                        Margin="0,0,4,0"
+                                        VerticalAlignment="Bottom"
+                                        Background="{DynamicResource AccentBrush}"
+                                        CornerRadius="2"
+                                        Opacity="0.55"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ProfileCardTemplate">
+            <Border Margin="0,0,14,14"
+                    Width="300">
+                <Border.Style>
+                    <Style TargetType="Border"
+                           BasedOn="{StaticResource CatalogCardBorderStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="BorderThickness" Value="2"/>
+                                <Setter Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <StackPanel>
+                    <DockPanel>
+                        <TextBlock Text="{Binding Title}"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   DockPanel.Dock="Left"/>
+                        <controls:CatalogBadgeControl Text="{Binding StatusText}"
+                                                     Tone="{Binding StatusTone}"
+                                                     HorizontalAlignment="Right"/>
+                    </DockPanel>
+
+                    <TextBlock Text="{Binding Description}"
+                               Margin="0,8,0,0"
+                               Opacity="0.84"
+                               TextWrapping="Wrap"/>
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Style="{StaticResource CatalogSubtlePanelStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Шум"
+                                           Style="{StaticResource CatalogStateTitleTextStyle}"/>
+                                <TextBlock Text="{Binding NoiseText}"
+                                           Margin="0,6,0,0"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2"
+                                Style="{StaticResource CatalogSubtlePanelStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Энергия"
+                                           Style="{StaticResource CatalogStateTitleTextStyle}"/>
+                                <TextBlock Text="{Binding PowerText}"
+                                           Margin="0,6,0,0"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <TextBlock Text="{Binding ThermalText}"
+                               Margin="0,12,0,0"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentBrush}"
+                               TextWrapping="Wrap"/>
+
+                    <TextBlock Text="{Binding TargetText}"
+                               Margin="0,6,0,0"
+                               Opacity="0.82"
+                               TextWrapping="Wrap"/>
+
+                    <ItemsControl ItemsSource="{Binding Highlights}"
+                                  Margin="0,12,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Style="{StaticResource CatalogListItemTextStyle}"
+                                           Text="{Binding ., StringFormat=• {0}}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </Page.Resources>
+
+    <ScrollViewer Padding="20" VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+            <Border Style="{StaticResource CatalogSectionBorderStyle}"
+                    Padding="20">
+                <StackPanel>
+                    <TextBlock Text="Мониторинг и производительность"
+                               FontSize="28"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="Это универсальный раздел для ежедневного контроля состояния системы, мониторинга железа, профилей производительности и безопасного тюнинга без ухода в игровой центр."
+                               Margin="0,10,0,0"
+                               Opacity="0.86"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="Метрики сейчас идут из лёгкого mock telemetry provider, но страница уже собрана так, чтобы позже подключить live refresh от реальных источников."
+                               Margin="0,8,0,0"
+                               Opacity="0.8"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                <StackPanel>
+                    <TextBlock Text="Режимы просмотра"
+                               FontSize="22"
+                               FontWeight="SemiBold"/>
+                    <TextBlock x:Name="CurrentViewDescriptionTextBlock"
+                               Margin="0,8,0,0"
+                               Opacity="0.84"
+                               TextWrapping="Wrap"/>
+
+                    <WrapPanel Margin="0,14,0,0">
+                        <RadioButton Content="Обзор"
+                                     Tag="Overview"
+                                     GroupName="MonitoringTabs"
+                                     Style="{StaticResource TabChipStyle}"
+                                     IsChecked="True"
+                                     Checked="TabButton_Checked"/>
+                        <RadioButton Content="Железо"
+                                     Tag="Hardware"
+                                     GroupName="MonitoringTabs"
+                                     Style="{StaticResource TabChipStyle}"
+                                     Checked="TabButton_Checked"/>
+                        <RadioButton Content="Профили"
+                                     Tag="Profiles"
+                                     GroupName="MonitoringTabs"
+                                     Style="{StaticResource TabChipStyle}"
+                                     Checked="TabButton_Checked"/>
+                        <RadioButton Content="Тюнинг"
+                                     Tag="Tuning"
+                                     GroupName="MonitoringTabs"
+                                     Style="{StaticResource TabChipStyle}"
+                                     Checked="TabButton_Checked"/>
+                        <RadioButton Content="Pro"
+                                     Tag="Pro"
+                                     GroupName="MonitoringTabs"
+                                     Style="{StaticResource TabChipStyle}"
+                                     Checked="TabButton_Checked"/>
+                    </WrapPanel>
+
+                    <TextBlock x:Name="LastRefreshTextBlock"
+                               Margin="0,14,0,0"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentBrush}"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <StackPanel x:Name="OverviewPanel"
+                        Margin="0,8,0,0">
+                <TextBlock Text="Состояние системы"
+                           FontSize="22"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,8"/>
+                <ItemsControl x:Name="OverviewCardsItemsControl"
+                              ItemTemplate="{StaticResource OverviewCardTemplate}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+
+                <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Ежедневная нагрузка"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Быстрый срез по основным узлам: CPU, GPU, RAM и диск. Сейчас это mock-метрики, но архитектура уже готова для будущего live refresh."
+                                   Margin="0,8,0,0"
+                                   Opacity="0.84"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="OverviewMetricsItemsControl"
+                                      Margin="0,14,0,0"
+                                      ItemTemplate="{StaticResource MetricCardTemplate}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <StackPanel x:Name="HardwarePanel"
+                        Margin="0,8,0,0"
+                        Visibility="Collapsed">
+                <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Температуры и датчики"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Сводка по самым важным датчикам без сырых сенсорных кодов в основном интерфейсе."
+                                   Margin="0,8,0,0"
+                                   Opacity="0.84"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="TemperatureMetricsItemsControl"
+                                      Margin="0,14,0,0"
+                                      ItemTemplate="{StaticResource MetricCardTemplate}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="CPU / GPU / RAM / диск"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Повседневная загрузка по ключевым ресурсам системы."
+                                   Margin="0,8,0,0"
+                                   Opacity="0.84"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="HardwareUsageItemsControl"
+                                      Margin="0,14,0,0"
+                                      ItemTemplate="{StaticResource MetricCardTemplate}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Батарея и SSD"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Зона здоровья устройства: ресурс батареи, накопителя и повседневные признаки износа."
+                                   Margin="0,8,0,0"
+                                   Opacity="0.84"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="HealthMetricsItemsControl"
+                                      Margin="0,14,0,0"
+                                      ItemTemplate="{StaticResource MetricCardTemplate}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Вентиляторы и охлаждение"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Скорость вентиляторов и поведение охлаждения как понятный ежедневный контроль."
+                                   Margin="0,8,0,0"
+                                   Opacity="0.84"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="FanMetricsItemsControl"
+                                      Margin="0,14,0,0"
+                                      ItemTemplate="{StaticResource MetricCardTemplate}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <StackPanel x:Name="ProfilesPanel"
+                        Margin="0,8,0,0"
+                        Visibility="Collapsed">
+                <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Профили производительности"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock x:Name="ActiveProfileSummaryTextBlock"
+                                   Margin="0,8,0,0"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   TextWrapping="Wrap"/>
+                        <TextBlock x:Name="ActiveProfileDetailsTextBlock"
+                                   Margin="0,6,0,0"
+                                   Opacity="0.84"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="ProfileItemsControl"
+                                      Margin="0,14,0,0"
+                                      ItemTemplate="{StaticResource ProfileCardTemplate}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <StackPanel x:Name="TuningPanel"
+                        Margin="0,8,0,0"
+                        Visibility="Collapsed">
+                <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Профили производительности"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Понятные настройки профиля без показа сырых GUID схем питания."
+                                   Margin="0,8,0,0"
+                                   Opacity="0.84"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="ProfileSettingsItemsControl"
+                                      Margin="0,14,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <controls:SettingCardControl Setting="{Binding}"
+                                                                 Width="360"
+                                                                 Margin="0,0,14,14"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Вентиляторы и охлаждение"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Только пользовательские и безопасные сценарии охлаждения, без тяжёлого low-level редактирования."
+                                   Margin="0,8,0,0"
+                                   Opacity="0.84"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="CoolingSettingsItemsControl"
+                                      Margin="0,14,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <controls:SettingCardControl Setting="{Binding}"
+                                                                 Width="360"
+                                                                 Margin="0,0,14,14"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Безопасный тюнинг"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Настройки для ровной отзывчивости, температуры и шума без экстремального разгона и «магических» обещаний."
+                                   Margin="0,8,0,0"
+                                   Opacity="0.84"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="SafeTuningItemsControl"
+                                      Margin="0,14,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <controls:SettingCardControl Setting="{Binding}"
+                                                                 Width="360"
+                                                                 Margin="0,0,14,14"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <StackPanel x:Name="ProPanel"
+                        Margin="0,8,0,0"
+                        Visibility="Collapsed">
+                <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Расширенные параметры"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Этот слой для pro-сценариев: больше контроля над поведением CPU, GPU и хранения, но технические детали по-прежнему спрятаны в раскрываемых карточках."
+                                   Margin="0,8,0,0"
+                                   Opacity="0.84"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="AdvancedSettingsItemsControl"
+                                      Margin="0,14,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <controls:SettingCardControl Setting="{Binding}"
+                                                                 Width="360"
+                                                                 Margin="0,0,14,14"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using TweakWise.Managers;
+using TweakWise.Search;
 using Application = System.Windows.Application;
 using Button = System.Windows.Controls.Button;
 
@@ -46,7 +47,7 @@ namespace TweakWise
             Closed += MainWindow_Closed;
             Closing += MainWindow_Closing;
 
-            MainFrame.Navigate(new Pages.DashboardPage());
+            NavigateToTopLevelPage("Dashboard");
 
             LoadSavedTheme();
             LoadSavedSettings();
@@ -77,12 +78,7 @@ namespace TweakWise
 
         public void NavigateToPage(string pageName)
         {
-            switch (pageName)
-            {
-                case "Explorer":
-                    MainFrame.Navigate(new Pages.ExplorerPage());
-                    break;
-            }
+            NavigateToTopLevelPage(pageName);
         }
 
         private void UpdateBadge()
@@ -375,19 +371,77 @@ namespace TweakWise
             Application.Current.Shutdown();
         }
 
+        public async Task HandleGlobalSearchSelectionAsync(GlobalSearchResultViewModel result)
+        {
+            if (result.NavigationTarget.ResultKind == GlobalSearchResultKind.Action)
+            {
+                await ExecuteGlobalSearchActionAsync(result.NavigationTarget.ActionKey);
+                return;
+            }
+
+            GlobalSearchNavigationStore.Clear();
+
+            if (ShouldStorePendingNavigation(result.NavigationTarget))
+                GlobalSearchNavigationStore.SetPending(result.NavigationTarget);
+
+            NavigateToTopLevelPage(result.NavigationTarget.PageKey);
+        }
+
+        private async Task ExecuteGlobalSearchActionAsync(string actionKey)
+        {
+            switch (actionKey)
+            {
+                case "OpenSettings":
+                    SettingsButton.IsChecked = true;
+                    break;
+                case "OpenNotifications":
+                    NotificationsButton.IsChecked = true;
+                    break;
+                case "CheckUpdates":
+                    await CheckForUpdatesAsync(true);
+                    break;
+            }
+        }
+
+        private static bool ShouldStorePendingNavigation(GlobalSearchNavigationTarget target)
+        {
+            return target.PageKey == "WindowsInterface" &&
+                   (target.ResultKind == GlobalSearchResultKind.Subsection ||
+                    target.ResultKind == GlobalSearchResultKind.Setting ||
+                    target.ResultKind == GlobalSearchResultKind.Template);
+        }
+
+        private void NavigateToTopLevelPage(string pageName)
+        {
+            switch (pageName)
+            {
+                case "Explorer":
+                case "WindowsInterface":
+                case "StartMenu":
+                case "Taskbar":
+                    MainFrame.Navigate(new Pages.WindowsInterfacePage());
+                    break;
+                case "System":
+                    MainFrame.Navigate(new Pages.SystemHubPage());
+                    break;
+                case "Maintenance":
+                    MainFrame.Navigate(new Pages.MaintenancePage());
+                    break;
+                case "MonitoringPerformance":
+                    MainFrame.Navigate(new Pages.MonitoringPerformancePage());
+                    break;
+                default:
+                    MainFrame.Navigate(new Pages.DashboardPage());
+                    break;
+            }
+        }
+
         private void NavButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is string pageName)
             {
-                switch (pageName)
-                {
-                    case "Dashboard": MainFrame.Navigate(new Pages.DashboardPage()); break;
-                    case "Explorer": MainFrame.Navigate(new Pages.ExplorerPage()); break;
-                    case "StartMenu": MainFrame.Navigate(new Pages.StartMenuPage()); break;
-                    case "Taskbar": MainFrame.Navigate(new Pages.TaskbarPage()); break;
-                    case "Optimize": MainFrame.Navigate(new Pages.OptimizePage()); break;
-                    case "System": MainFrame.Navigate(new Pages.SystemPage()); break;
-                }
+                GlobalSearchNavigationStore.Clear();
+                NavigateToTopLevelPage(pageName);
             }
         }
     }

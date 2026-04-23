@@ -1,0 +1,61 @@
+<UserControl x:Class="TweakWise.Controls.LocalTemplateCardControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:TweakWise.Controls"
+             x:Name="Root">
+    <Border Style="{StaticResource CatalogCardBorderStyle}">
+        <StackPanel>
+            <TextBlock Text="{Binding TemplateCard.Title, ElementName=Root}"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       TextWrapping="Wrap"/>
+
+            <TextBlock Text="{Binding TemplateCard.Description, ElementName=Root}"
+                       Margin="0,8,0,0"
+                       Opacity="0.84"
+                       TextWrapping="Wrap"/>
+
+            <WrapPanel Margin="0,12,0,0">
+                <controls:CatalogBadgeControl Text="{Binding TemplateCard.RiskBadgeText, ElementName=Root}"
+                                             Tone="{Binding TemplateCard.RiskTone, ElementName=Root}"/>
+                <controls:CatalogBadgeControl Text="{Binding TemplateCard.RestartBadgeText, ElementName=Root}"
+                                             Tone="{Binding TemplateCard.RestartTone, ElementName=Root}"/>
+            </WrapPanel>
+
+            <TextBlock Text="{Binding TemplateCard.ScopeText, ElementName=Root}"
+                       Margin="0,4,0,0"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource AccentBrush}"
+                       TextWrapping="Wrap"/>
+
+            <TextBlock Text="{Binding TemplateCard.AudienceText, ElementName=Root}"
+                       Margin="0,6,0,0"
+                       Opacity="0.82"
+                       TextWrapping="Wrap"/>
+
+            <StackPanel Margin="0,12,0,0">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding TemplateCard.HasIncludedItems, ElementName=Root}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <TextBlock Text="Внутри шаблона"
+                           FontWeight="SemiBold"/>
+                <ItemsControl ItemsSource="{Binding TemplateCard.IncludedItems, ElementName=Root}"
+                              Margin="0,8,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Style="{StaticResource CatalogListItemTextStyle}"
+                                       Text="{Binding ., StringFormat=• {0}}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>
