@@ -21,6 +21,7 @@ namespace TweakWise.Models
         public TweakAdvancedDetails AdvancedDetails { get; set; } = new TweakAdvancedDetails();
         public TweakPreviewMeta PreviewMeta { get; set; } = new TweakPreviewMeta();
         public TweakRollbackMeta RollbackMeta { get; set; } = new TweakRollbackMeta();
+        public TweakExecutionDefinition Execution { get; set; } = new TweakExecutionDefinition();
     }
 
     public class TweakAdvancedDetails
@@ -43,6 +44,29 @@ namespace TweakWise.Models
         public string EstimatedImpact { get; set; } = string.Empty;
         public List<string> SampleItems { get; set; } = new List<string>();
         public string ConfirmationHint { get; set; } = string.Empty;
+    }
+
+    public class TweakExecutionDefinition
+    {
+        public TweakExecutionKind Kind { get; set; } = TweakExecutionKind.None;
+        public bool IsDangerous { get; set; }
+        public bool RequiresElevation { get; set; }
+        public string AppliedStateLabel { get; set; } = string.Empty;
+        public string NotAppliedStateLabel { get; set; } = string.Empty;
+        public List<RegistryTweakOperationDefinition> RegistryOperations { get; set; } = new List<RegistryTweakOperationDefinition>();
+
+        public bool IsSupported => Kind == TweakExecutionKind.Registry && RegistryOperations.Count > 0;
+    }
+
+    public class RegistryTweakOperationDefinition
+    {
+        public RegistryTweakOperationKind OperationKind { get; set; } = RegistryTweakOperationKind.SetValue;
+        public RegistryTweakHive Hive { get; set; } = RegistryTweakHive.CurrentUser;
+        public string SubKeyPath { get; set; } = string.Empty;
+        public string ValueName { get; set; } = string.Empty;
+        public RegistryTweakValueKind ValueKind { get; set; } = RegistryTweakValueKind.DWord;
+        public object TargetValue { get; set; } = 0;
+        public bool AllowValueDeleteOnRollbackWhenMissing { get; set; } = true;
     }
 
     public class TweakCategoryDefinition
@@ -81,5 +105,36 @@ namespace TweakWise.Models
         Low,
         Medium,
         High
+    }
+
+    public enum TweakExecutionKind
+    {
+        None,
+        Registry
+    }
+
+    public enum RegistryTweakOperationKind
+    {
+        SetValue,
+        DeleteValue
+    }
+
+    public enum RegistryTweakHive
+    {
+        CurrentUser,
+        LocalMachine,
+        ClassesRoot,
+        Users,
+        CurrentConfig
+    }
+
+    public enum RegistryTweakValueKind
+    {
+        String,
+        ExpandString,
+        DWord,
+        QWord,
+        MultiString,
+        Binary
     }
 }

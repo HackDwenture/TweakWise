@@ -105,6 +105,23 @@ namespace TweakWise.Managers
             SaveToSettings();
         }
 
+        public void RemoveByTitle(string title)
+        {
+            bool removed = false;
+
+            for (int i = _notifications.Count - 1; i >= 0; i--)
+            {
+                if (!string.Equals(_notifications[i].Title, title, StringComparison.Ordinal))
+                    continue;
+
+                _notifications.RemoveAt(i);
+                removed = true;
+            }
+
+            if (removed)
+                SaveToSettings();
+        }
+
         public void MarkAllAsRead()
         {
             foreach (var notification in _notifications)

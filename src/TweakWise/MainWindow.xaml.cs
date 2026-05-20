@@ -1,14 +1,16 @@
 using System;
 using System.Collections.Specialized;
-using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using TweakWise.Managers;
+using TweakWise.Models;
+using TweakWise.Pages;
 using TweakWise.Search;
 using Application = System.Windows.Application;
 using Button = System.Windows.Controls.Button;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 
 namespace TweakWise
 {
@@ -34,9 +36,6 @@ namespace TweakWise
             App.NotificationManager.UnreadCountChanged += UpdateBadge;
             App.NotificationManager.Notifications.CollectionChanged += Notifications_CollectionChanged;
 
-            UpdateBadge();
-            UpdateNotificationsState();
-
             SettingsButton.Checked += (s, e) => SettingsPopup.IsOpen = true;
             SettingsButton.Unchecked += (s, e) => SettingsPopup.IsOpen = false;
 
@@ -47,10 +46,88 @@ namespace TweakWise
             Closed += MainWindow_Closed;
             Closing += MainWindow_Closing;
 
-            NavigateToTopLevelPage("Dashboard");
-
             LoadSavedTheme();
             LoadSavedSettings();
+            UpdateBadge();
+            UpdateNotificationsState();
+            NavigateToSavedScreen();
+        }
+
+        public void NavigateToCoreHome()
+        {
+            MainFrame.Navigate(new CoreHomePage());
+            _settingsManager.CurrentSettings.LastOpenedCoreModuleId = string.Empty;
+            _settingsManager.SaveSettings();
+        }
+
+        public void OpenModuleWorkspace(CoreModuleId moduleId)
+        {
+            MainFrame.Navigate(new ModuleWorkspacePage(moduleId));
+            _settingsManager.CurrentSettings.LastOpenedCoreModuleId = moduleId.ToString();
+            _settingsManager.SaveSettings();
+        }
+
+        public void NavigateToPage(string pageName)
+        {
+            NavigateToModuleFromPageKey(pageName);
+        }
+
+        public async Task HandleGlobalSearchSelectionAsync(GlobalSearchResultViewModel result)
+        {
+            CommandPalettePopup.IsOpen = false;
+
+            if (result.NavigationTarget.ResultKind == GlobalSearchResultKind.Action)
+            {
+                await ExecuteGlobalSearchActionAsync(result.NavigationTarget.ActionKey);
+                return;
+            }
+
+            NavigateToModuleFromPageKey(result.NavigationTarget.PageKey);
+        }
+
+        private void NavigateToSavedScreen()
+        {
+            string savedModuleId = _settingsManager.CurrentSettings.LastOpenedCoreModuleId;
+            if (Enum.TryParse(savedModuleId, ignoreCase: true, out CoreModuleId moduleId))
+            {
+                MainFrame.Navigate(new ModuleWorkspacePage(moduleId));
+                return;
+            }
+
+            MainFrame.Navigate(new CoreHomePage());
+        }
+
+        private void NavigateToModuleFromPageKey(string pageName)
+        {
+            CoreModuleId moduleId = pageName switch
+            {
+                "Explorer" => CoreModuleId.WindowsSetup,
+                "StartMenu" => CoreModuleId.WindowsSetup,
+                "Taskbar" => CoreModuleId.WindowsSetup,
+                "WindowsInterface" => CoreModuleId.WindowsSetup,
+                "System" => CoreModuleId.SystemParameters,
+                "Maintenance" => CoreModuleId.Maintenance,
+                "MonitoringPerformance" => CoreModuleId.Performance,
+                _ => CoreModuleId.WindowsSetup
+            };
+
+            OpenModuleWorkspace(moduleId);
+        }
+
+        private async Task ExecuteGlobalSearchActionAsync(string actionKey)
+        {
+            switch (actionKey)
+            {
+                case "OpenSettings":
+                    SettingsButton.IsChecked = true;
+                    break;
+                case "OpenNotifications":
+                    NotificationsButton.IsChecked = true;
+                    break;
+                case "CheckUpdates":
+                    await CheckForUpdatesAsync(true);
+                    break;
+            }
         }
 
         private void LoadSavedTheme()
@@ -74,11 +151,6 @@ namespace TweakWise
             MinimizeToTrayOnCloseCheckBox.IsChecked = _settingsManager.CurrentSettings.MinimizeToTrayOnClose;
             StartMinimizedToTrayCheckBox.IsChecked = _settingsManager.CurrentSettings.StartMinimizedToTray;
             _settingsLoaded = true;
-        }
-
-        public void NavigateToPage(string pageName)
-        {
-            NavigateToTopLevelPage(pageName);
         }
 
         private void UpdateBadge()
@@ -190,12 +262,20 @@ namespace TweakWise
             ApplyTrayPreferences();
         }
 
+        private async void CheckUpdatesButton_Click(object sender, RoutedEventArgs e)
+        {
+            await CheckForUpdatesAsync(true);
+        }
+
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             ApplyTrayPreferences();
 
             if (ShouldStartHiddenInTray())
                 HideToTray();
+
+            if (App.ComputerHealthService != null)
+                await App.ComputerHealthService.RefreshStatusAsync();
 
             if (_settingsManager.CurrentSettings.AutoCheckUpdates)
                 await CheckForUpdatesAsync(false);
@@ -215,6 +295,8 @@ namespace TweakWise
 
         private void MainWindow_Closed(object sender, EventArgs e)
         {
+            App.NotificationManager.UnreadCountChanged -= UpdateBadge;
+            App.NotificationManager.Notifications.CollectionChanged -= Notifications_CollectionChanged;
             _trayTemperatureManager.Dispose();
         }
 
@@ -257,16 +339,18 @@ namespace TweakWise
             Application.Current.Shutdown();
         }
 
-        private async void CheckUpdatesButton_Click(object sender, RoutedEventArgs e)
-        {
-            await CheckForUpdatesAsync(true);
-        }
-
         private async Task CheckForUpdatesAsync(bool userInitiated)
         {
-            CheckUpdatesButton.IsEnabled = false;
-            string originalButtonText = CheckUpdatesButton.Content?.ToString() ?? "Проверить наличие обновлений";
-            CheckUpdatesButton.Content = "Проверка...";
+            bool hasButton = CheckUpdatesButton != null;
+            string originalButtonText = hasButton
+                ? CheckUpdatesButton.Content?.ToString() ?? "Проверить обновления"
+                : string.Empty;
+
+            if (hasButton)
+            {
+                CheckUpdatesButton.IsEnabled = false;
+                CheckUpdatesButton.Content = "Проверка...";
+            }
 
             try
             {
@@ -278,6 +362,8 @@ namespace TweakWise
                         HandleAvailableUpdate(result, userInitiated);
                         break;
                     case UpdateCheckStatus.UpToDate:
+                        App.NotificationManager.RemoveByTitle("Доступно обновление");
+
                         if (userInitiated)
                         {
                             _dialogManager.Show(
@@ -301,10 +387,25 @@ namespace TweakWise
                         break;
                 }
             }
+            catch (Exception ex)
+            {
+                if (userInitiated)
+                {
+                    _dialogManager.Show(
+                        this,
+                        "Ошибка проверки",
+                        "Не удалось проверить обновления",
+                        ex.Message,
+                        AppDialogKind.Error);
+                }
+            }
             finally
             {
-                CheckUpdatesButton.Content = originalButtonText;
-                CheckUpdatesButton.IsEnabled = true;
+                if (hasButton)
+                {
+                    CheckUpdatesButton.Content = originalButtonText;
+                    CheckUpdatesButton.IsEnabled = true;
+                }
             }
         }
 
@@ -341,108 +442,13 @@ namespace TweakWise
             updateWindow.ShowDialog();
         }
 
-        private void ResetButton_Click(object sender, RoutedEventArgs e)
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            var dialogResult = _dialogManager.Show(
-                this,
-                "Подтверждение сброса",
-                "Сбросить все настройки?",
-                "Будут удалены настройки и уведомления. Программа закроется, а при следующем запуске потребуется заново принять лицензионное соглашение.",
-                AppDialogKind.Warning,
-                AppDialogButtons.YesNo);
-
-            if (dialogResult != AppDialogResult.Primary)
+            if (e.Key != Key.K || Keyboard.Modifiers != ModifierKeys.Control)
                 return;
 
-            try
-            {
-                string settingsPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "TweakWise",
-                    "settings.json");
-
-                if (File.Exists(settingsPath))
-                    File.Delete(settingsPath);
-            }
-            catch
-            {
-            }
-
-            Application.Current.Shutdown();
-        }
-
-        public async Task HandleGlobalSearchSelectionAsync(GlobalSearchResultViewModel result)
-        {
-            if (result.NavigationTarget.ResultKind == GlobalSearchResultKind.Action)
-            {
-                await ExecuteGlobalSearchActionAsync(result.NavigationTarget.ActionKey);
-                return;
-            }
-
-            GlobalSearchNavigationStore.Clear();
-
-            if (ShouldStorePendingNavigation(result.NavigationTarget))
-                GlobalSearchNavigationStore.SetPending(result.NavigationTarget);
-
-            NavigateToTopLevelPage(result.NavigationTarget.PageKey);
-        }
-
-        private async Task ExecuteGlobalSearchActionAsync(string actionKey)
-        {
-            switch (actionKey)
-            {
-                case "OpenSettings":
-                    SettingsButton.IsChecked = true;
-                    break;
-                case "OpenNotifications":
-                    NotificationsButton.IsChecked = true;
-                    break;
-                case "CheckUpdates":
-                    await CheckForUpdatesAsync(true);
-                    break;
-            }
-        }
-
-        private static bool ShouldStorePendingNavigation(GlobalSearchNavigationTarget target)
-        {
-            return target.PageKey == "WindowsInterface" &&
-                   (target.ResultKind == GlobalSearchResultKind.Subsection ||
-                    target.ResultKind == GlobalSearchResultKind.Setting ||
-                    target.ResultKind == GlobalSearchResultKind.Template);
-        }
-
-        private void NavigateToTopLevelPage(string pageName)
-        {
-            switch (pageName)
-            {
-                case "Explorer":
-                case "WindowsInterface":
-                case "StartMenu":
-                case "Taskbar":
-                    MainFrame.Navigate(new Pages.WindowsInterfacePage());
-                    break;
-                case "System":
-                    MainFrame.Navigate(new Pages.SystemHubPage());
-                    break;
-                case "Maintenance":
-                    MainFrame.Navigate(new Pages.MaintenancePage());
-                    break;
-                case "MonitoringPerformance":
-                    MainFrame.Navigate(new Pages.MonitoringPerformancePage());
-                    break;
-                default:
-                    MainFrame.Navigate(new Pages.DashboardPage());
-                    break;
-            }
-        }
-
-        private void NavButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string pageName)
-            {
-                GlobalSearchNavigationStore.Clear();
-                NavigateToTopLevelPage(pageName);
-            }
+            e.Handled = true;
+            CommandPalettePopup.IsOpen = true;
         }
     }
 }

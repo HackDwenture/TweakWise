@@ -1,15 +1,18 @@
-﻿<Window x:Class="TweakWise.MainWindow"
+<Window x:Class="TweakWise.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:TweakWise.Controls"
         xmlns:local="clr-namespace:TweakWise"
-        Title="TweakWise - Настройка Windows" 
-        Width="1000" Height="600"
-        MinWidth="800" MinHeight="450"
+        Title="TweakWise"
+        Width="1120"
+        Height="720"
+        MinWidth="860"
+        MinHeight="560"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
-        Background="Transparent">
+        Background="Transparent"
+        PreviewKeyDown="Window_PreviewKeyDown">
 
     <Window.Resources>
         <ControlTemplate x:Key="SettingsButtonTemplate" TargetType="ToggleButton">
@@ -29,16 +32,14 @@
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                 </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
-                </Trigger>
                 <Trigger Property="IsChecked" Value="True">
                     <Trigger.EnterActions>
                         <BeginStoryboard>
                             <Storyboard>
                                 <DoubleAnimation Storyboard.TargetName="RotateTransform"
                                                  Storyboard.TargetProperty="Angle"
-                                                 To="360" Duration="0:0:0.5"
+                                                 To="360"
+                                                 Duration="0:0:0.45"
                                                  FillBehavior="HoldEnd"/>
                             </Storyboard>
                         </BeginStoryboard>
@@ -48,7 +49,8 @@
                             <Storyboard>
                                 <DoubleAnimation Storyboard.TargetName="RotateTransform"
                                                  Storyboard.TargetProperty="Angle"
-                                                 To="0" Duration="0:0:0.5"
+                                                 To="0"
+                                                 Duration="0:0:0.45"
                                                  FillBehavior="HoldEnd"/>
                             </Storyboard>
                         </BeginStoryboard>
@@ -66,7 +68,7 @@
                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                   RenderTransformOrigin="0.5,0.5">
                     <ContentPresenter.RenderTransform>
-                        <RotateTransform x:Name="RotateTransform" Angle="0"/>
+                        <RotateTransform x:Name="NotificationRotateTransform" Angle="0"/>
                     </ContentPresenter.RenderTransform>
                 </ContentPresenter>
             </Border>
@@ -78,20 +80,30 @@
                     <Trigger.EnterActions>
                         <BeginStoryboard>
                             <Storyboard>
-                                <DoubleAnimation Storyboard.TargetName="RotateTransform"
+                                <DoubleAnimation Storyboard.TargetName="NotificationRotateTransform"
                                                  Storyboard.TargetProperty="Angle"
-                                                 To="180" Duration="0:0:0.15"
-                                                 FillBehavior="HoldEnd"/>
+                                                 To="180"
+                                                 Duration="0:0:0.22"
+                                                 FillBehavior="HoldEnd">
+                                    <DoubleAnimation.EasingFunction>
+                                        <QuadraticEase EasingMode="EaseOut"/>
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
                             </Storyboard>
                         </BeginStoryboard>
                     </Trigger.EnterActions>
                     <Trigger.ExitActions>
                         <BeginStoryboard>
                             <Storyboard>
-                                <DoubleAnimation Storyboard.TargetName="RotateTransform"
+                                <DoubleAnimation Storyboard.TargetName="NotificationRotateTransform"
                                                  Storyboard.TargetProperty="Angle"
-                                                 To="0" Duration="0:0:0.15"
-                                                 FillBehavior="HoldEnd"/>
+                                                 To="0"
+                                                 Duration="0:0:0.22"
+                                                 FillBehavior="HoldEnd">
+                                    <DoubleAnimation.EasingFunction>
+                                        <QuadraticEase EasingMode="EaseOut"/>
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
                             </Storyboard>
                         </BeginStoryboard>
                     </Trigger.ExitActions>
@@ -99,13 +111,61 @@
             </ControlTemplate.Triggers>
         </ControlTemplate>
 
+        <Style x:Key="ThemeChoiceRadioStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="12,7"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="14"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource WindowBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Margin" Value="0,7,0,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
         <DataTemplate x:Key="NotificationTemplate">
-            <Border Background="{DynamicResource MenuBackground}" 
-                    BorderBrush="{DynamicResource BorderBrush}" 
-                    BorderThickness="1" 
-                    CornerRadius="4" 
-                    Margin="0,0,0,5" 
-                    Padding="10" 
+            <Border Background="{DynamicResource CoreNodeBackgroundBrush}"
+                    BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="0,0,0,8"
+                    Padding="12"
                     Cursor="Hand"
                     Tag="{Binding}">
                 <Grid>
@@ -113,21 +173,34 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="🔔" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <Ellipse Width="8"
+                             Height="8"
+                             Fill="{DynamicResource AccentBrush}"
+                             Margin="0,6,10,0"
+                             VerticalAlignment="Top"/>
                     <StackPanel Grid.Column="1">
-                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14"/>
-                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" FontSize="12" Margin="0,3,0,0"/>
+                        <TextBlock Text="{Binding Title}"
+                                   FontWeight="SemiBold"
+                                   FontSize="13"
+                                   TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding Message}"
+                                   TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Opacity="0.74"
+                                   Margin="0,4,0,0"/>
                     </StackPanel>
                 </Grid>
                 <Border.InputBindings>
-                    <MouseBinding MouseAction="LeftClick" Command="{Binding ClickCommand}" CommandParameter="{Binding}"/>
+                    <MouseBinding MouseAction="LeftClick"
+                                  Command="{Binding ClickCommand}"
+                                  CommandParameter="{Binding}"/>
                 </Border.InputBindings>
             </Border>
         </DataTemplate>
     </Window.Resources>
 
-    <Border Background="{DynamicResource WindowBackground}" 
-            BorderBrush="{DynamicResource BorderBrush}" 
+    <Border Background="{DynamicResource WindowBackground}"
+            BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1"
             CornerRadius="5">
         <Grid>
@@ -136,10 +209,12 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" 
-                    Background="{DynamicResource MenuBackground}" 
-                    Padding="10,0" 
-                    Height="40"
+            <Border Grid.Row="0"
+                    Background="{DynamicResource MenuBackground}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="12,0"
+                    Height="44"
                     CornerRadius="5,5,0,0"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid>
@@ -151,11 +226,12 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="TweakWise" 
-                                   FontSize="16" FontWeight="SemiBold" 
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource WindowForeground}"/>
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="TweakWise"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
                         <Border Margin="8,0,0,0"
                                 Padding="8,2"
                                 Background="{DynamicResource MenuItemHoverBackground}"
@@ -164,187 +240,265 @@
                             <TextBlock Text="{x:Static local:AppInfo.DisplayVersion}"
                                        FontSize="11"
                                        FontWeight="SemiBold"
-                                       Opacity="0.9"
-                                       Foreground="{DynamicResource WindowForeground}"/>
+                                       Opacity="0.9"/>
                         </Border>
                     </StackPanel>
 
-                    <ToggleButton x:Name="NotificationsButton" Grid.Column="2"
-                                  FontFamily="Segoe MDL2 Assets" Content="&#xE70E;" 
-                                  FontSize="18" Width="32" Height="32" 
-                                  Background="Transparent" 
-                                  BorderBrush="{x:Null}" 
+                    <ToggleButton x:Name="NotificationsButton"
+                                  Grid.Column="2"
+                                  FontFamily="Segoe MDL2 Assets"
+                                  Content="&#xE70E;"
+                                  FontSize="18"
+                                  Width="34"
+                                  Height="34"
+                                  Background="Transparent"
+                                  BorderBrush="{x:Null}"
                                   BorderThickness="0"
                                   Foreground="{DynamicResource WindowForeground}"
-                                  Cursor="Hand" 
-                                  ToolTip="Уведомления"
+                                  Cursor="Hand"
+                                  ToolTip="События состояния"
                                   Template="{StaticResource NotificationsButtonTemplate}"
                                   VerticalAlignment="Center"
                                   Margin="0,0,8,0"/>
 
-                    <Border x:Name="NotificationBadge" Grid.Column="2"
+                    <Border x:Name="NotificationBadge"
+                            Grid.Column="2"
                             Background="{DynamicResource NotificationBadgeColor}"
-                            CornerRadius="8" Width="16" Height="16"
-                            HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Margin="20,2,0,0" Visibility="Collapsed">
-                        <TextBlock x:Name="BadgeCount" Text="0" Foreground="White" 
-                                   FontSize="10" HorizontalAlignment="Center" 
-                                   VerticalAlignment="Center" FontWeight="Bold"/>
+                            CornerRadius="8"
+                            Width="16"
+                            Height="16"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="20,3,0,0"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="BadgeCount"
+                                   Text="0"
+                                   Foreground="{DynamicResource CoreOrbForegroundBrush}"
+                                   FontSize="10"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontWeight="Bold"/>
                     </Border>
 
-                    <ToggleButton x:Name="SettingsButton" Grid.Column="3"
-                                  FontFamily="Segoe MDL2 Assets" Content="&#xE713;" 
-                                  FontSize="18" Width="32" Height="32" 
-                                  Background="Transparent" 
-                                  BorderBrush="{x:Null}" 
+                    <ToggleButton x:Name="SettingsButton"
+                                  Grid.Column="3"
+                                  FontFamily="Segoe MDL2 Assets"
+                                  Content="&#xE713;"
+                                  FontSize="18"
+                                  Width="34"
+                                  Height="34"
+                                  Background="Transparent"
+                                  BorderBrush="{x:Null}"
                                   BorderThickness="0"
                                   Foreground="{DynamicResource WindowForeground}"
-                                  Cursor="Hand" 
+                                  Cursor="Hand"
                                   ToolTip="Настройки программы"
                                   Template="{StaticResource SettingsButtonTemplate}"
                                   VerticalAlignment="Center"/>
 
-                    <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="MinimizeButton" 
+                    <StackPanel Grid.Column="4"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Margin="8,0,0,0">
+                        <Button x:Name="MinimizeButton"
                                 Style="{StaticResource CaptionButtonStyle}"
-                                Content="&#xE949;" 
+                                Content="&#xE949;"
                                 Click="MinimizeButton_Click"
                                 ToolTip="Свернуть"/>
-                        <Button x:Name="MaximizeButton" 
+                        <Button x:Name="MaximizeButton"
                                 Style="{StaticResource CaptionButtonStyle}"
-                                Content="&#xE739;" 
+                                Content="&#xE739;"
                                 Click="MaximizeButton_Click"
                                 ToolTip="Развернуть"/>
-                        <Button x:Name="CloseButton" 
+                        <Button x:Name="CloseButton"
                                 Style="{StaticResource CloseButtonStyle}"
-                                Content="&#xE711;" 
+                                Content="&#xE711;"
                                 Click="CloseButton_Click"
                                 ToolTip="Закрыть"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+            <Frame x:Name="MainFrame"
+                   Grid.Row="1"
+                   NavigationUIVisibility="Hidden"
+                   Background="{DynamicResource ContentBackground}"/>
 
-                <Border Grid.Column="0" Background="{DynamicResource MenuBackground}" 
-                        BorderThickness="0,0,1,0" 
-                        BorderBrush="{DynamicResource BorderBrush}">
-                    <StackPanel Margin="0,10,0,0" Cursor="">
-                        <controls:GlobalSearchBlockControl IsCompact="True"
-                                                           Margin="12,0,12,6"/>
-                        <Button x:Name="NavDashboard" Content="🏠 Главная" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click" Tag="Dashboard"/>
-                        <Button x:Name="NavWindowsInterface"
-                                Content="🖼️ Интерфейс"
-                                Style="{StaticResource NavButtonStyle}"
-                                Click="NavButton_Click"
-                                Tag="WindowsInterface"
-                                ToolTip="Интерфейс Windows"/>
-                        <Button x:Name="NavSystem" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click" Tag="System">
-                            <TextBlock Text="💻 Система" TextWrapping="Wrap"/>
-                        </Button>
-                        <Button x:Name="NavMaintenance" Content="🧰 Обслуживание" Style="{StaticResource NavButtonStyle}" Click="NavButton_Click" Tag="Maintenance"/>
-                        <Button x:Name="NavMonitoringPerformance"
-                                Content="📊 Мониторинг"
-                                Style="{StaticResource NavButtonStyle}"
-                                Click="NavButton_Click"
-                                Tag="MonitoringPerformance"
-                                ToolTip="Мониторинг и производительность"/>
-                    </StackPanel>
-                </Border>
-
-                <Frame x:Name="MainFrame" Grid.Column="1" NavigationUIVisibility="Hidden" Background="{DynamicResource ContentBackground}"/>
-            </Grid>
-
-            <Popup x:Name="SettingsPopup" 
-       PlacementTarget="{Binding ElementName=SettingsButton}" 
-       Placement="Bottom" 
-       StaysOpen="False" 
-       PopupAnimation="Fade" 
-       AllowsTransparency="True"
-       HorizontalOffset="-150" 
-       VerticalOffset="5" 
-       Closed="SettingsPopup_Closed">
-                <Border Background="{DynamicResource MenuBackground}" 
-            BorderBrush="{DynamicResource BorderBrush}" 
-            BorderThickness="1" 
-            CornerRadius="5" 
-            Padding="15">
-                    <StackPanel MinWidth="200">
-                        <TextBlock Text="Настройки" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                        <TextBlock Text="Тема оформления" Margin="0,5,0,5"/>
-                        <RadioButton x:Name="ThemeSystem" Content="Системная" GroupName="Theme" Checked="ThemeRadio_Checked" IsChecked="True" Margin="5,2"/>
-                        <RadioButton x:Name="ThemeLight" Content="Светлая" GroupName="Theme" Checked="ThemeRadio_Checked" Margin="5,2"/>
-                        <RadioButton x:Name="ThemeDark" Content="Тёмная" GroupName="Theme" Checked="ThemeRadio_Checked" Margin="5,2"/>
-                        <Separator Margin="0,10,0,10"/>
-                        <CheckBox x:Name="RunOnStartupCheckBox" Content="Запуск вместе с Windows" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
-                        <CheckBox x:Name="AutoCheckUpdatesCheckBox" Content="Автоматически проверять обновления" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
-                        <CheckBox x:Name="ShowNotificationsCheckBox" Content="Показывать уведомления" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
-                        <CheckBox x:Name="ShowTrayTemperatureCheckBox" Content="Показывать температуру в трее" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
-                        <CheckBox x:Name="MinimizeToTrayOnCloseCheckBox" Content="При закрытии скрывать в трей" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
-                        <CheckBox x:Name="StartMinimizedToTrayCheckBox" Content="Запускать сразу в трее" Margin="0,3" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
-                        <TextBlock Text="Если включить трей-режим, приложение можно будет вернуть двойным кликом по иконке в трее."
-                                   Margin="0,6,0,0"
-                                   FontSize="11"
-                                   Opacity="0.75"
-                                   TextWrapping="Wrap"/>
-                        <Separator Margin="0,10,0,10"/>
-                        <Button x:Name="CheckUpdatesButton" Content="Проверить наличие обновлений"
-                                Style="{StaticResource DialogActionButtonStyle}"
-                                Margin="0,0,0,5"
-                                Click="CheckUpdatesButton_Click"/>
-                        <Button x:Name="ResetButton" Content="Сбросить все настройки"
-                                Style="{StaticResource DialogActionButtonStyle}"
-                                Margin="0,5,0,0"
-                                Click="ResetButton_Click"/>
-                    </StackPanel>
+            <Popup x:Name="CommandPalettePopup"
+                   PlacementTarget="{Binding ElementName=MainFrame}"
+                   Placement="Center"
+                   StaysOpen="False"
+                   PopupAnimation="Fade"
+                   AllowsTransparency="True">
+                <Border Background="{DynamicResource MenuBackground}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="16"
+                        Width="560">
+                    <controls:GlobalSearchBlockControl/>
                 </Border>
             </Popup>
 
-            <Popup x:Name="NotificationsPopup" 
-                   PlacementTarget="{Binding ElementName=NotificationsButton}" 
-                   Placement="Bottom" 
-                   StaysOpen="False" 
-                   PopupAnimation="Fade" 
+            <Popup x:Name="SettingsPopup"
+                   PlacementTarget="{Binding ElementName=SettingsButton}"
+                   Placement="Bottom"
+                   StaysOpen="False"
+                   PopupAnimation="Fade"
                    AllowsTransparency="True"
-                   HorizontalOffset="-250" 
-                   VerticalOffset="5" 
+                   HorizontalOffset="-320"
+                   VerticalOffset="6"
+                   Closed="SettingsPopup_Closed">
+                <Border Background="{DynamicResource MenuBackground}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="16"
+                        Width="340"
+                        MaxHeight="560">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="Настройки"
+                                       FontSize="17"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBlock Text="Внешний вид"
+                                       Margin="0,18,0,8"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.78"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <RadioButton x:Name="ThemeSystem"
+                                             Grid.Column="0"
+                                             Content="Системная"
+                                             GroupName="Theme"
+                                             Checked="ThemeRadio_Checked"
+                                             IsChecked="True"
+                                             Style="{StaticResource ThemeChoiceRadioStyle}"/>
+                                <RadioButton x:Name="ThemeLight"
+                                             Grid.Column="2"
+                                             Content="Светлая"
+                                             GroupName="Theme"
+                                             Checked="ThemeRadio_Checked"
+                                             Style="{StaticResource ThemeChoiceRadioStyle}"/>
+                                <RadioButton x:Name="ThemeDark"
+                                             Grid.Column="4"
+                                             Content="Тёмная"
+                                             GroupName="Theme"
+                                             Checked="ThemeRadio_Checked"
+                                             Style="{StaticResource ThemeChoiceRadioStyle}"/>
+                            </Grid>
+
+                            <TextBlock Text="Поведение"
+                                       Margin="0,18,0,4"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.78"/>
+                            <CheckBox x:Name="RunOnStartupCheckBox"
+                                      Content="Запускать вместе с Windows"
+                                      Checked="SettingsCheckBox_Changed"
+                                      Unchecked="SettingsCheckBox_Changed"/>
+                            <CheckBox x:Name="StartMinimizedToTrayCheckBox"
+                                      Content="Запускать свернутым в трей"
+                                      Checked="SettingsCheckBox_Changed"
+                                      Unchecked="SettingsCheckBox_Changed"/>
+                            <CheckBox x:Name="MinimizeToTrayOnCloseCheckBox"
+                                      Content="Сворачивать в трей при закрытии"
+                                      Checked="SettingsCheckBox_Changed"
+                                      Unchecked="SettingsCheckBox_Changed"/>
+                            <CheckBox x:Name="ShowTrayTemperatureCheckBox"
+                                      Content="Показывать температуру в трее"
+                                      Checked="SettingsCheckBox_Changed"
+                                      Unchecked="SettingsCheckBox_Changed"/>
+
+                            <TextBlock Text="Уведомления"
+                                       Margin="0,18,0,4"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.78"/>
+                            <CheckBox x:Name="ShowNotificationsCheckBox"
+                                      Content="Показывать события состояния"
+                                      Checked="SettingsCheckBox_Changed"
+                                      Unchecked="SettingsCheckBox_Changed"/>
+
+                            <TextBlock Text="Обновления"
+                                       Margin="0,18,0,4"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.78"/>
+                            <CheckBox x:Name="AutoCheckUpdatesCheckBox"
+                                      Content="Автоматически проверять обновления"
+                                      Checked="SettingsCheckBox_Changed"
+                                      Unchecked="SettingsCheckBox_Changed"/>
+                            <Button x:Name="CheckUpdatesButton"
+                                    Content="Проверить обновления"
+                                    Margin="0,12,0,0"
+                                    HorizontalAlignment="Left"
+                                    Padding="14,7"
+                                    Click="CheckUpdatesButton_Click"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Popup>
+
+            <Popup x:Name="NotificationsPopup"
+                   PlacementTarget="{Binding ElementName=NotificationsButton}"
+                   Placement="Bottom"
+                   StaysOpen="False"
+                   PopupAnimation="Fade"
+                   AllowsTransparency="True"
+                   HorizontalOffset="-300"
+                   VerticalOffset="6"
                    Closed="NotificationsPopup_Closed"
                    Opened="NotificationsPopup_Opened">
-                <Border Background="{DynamicResource MenuBackground}" 
-                        BorderBrush="{DynamicResource BorderBrush}" 
-                        BorderThickness="1" 
-                        CornerRadius="5" 
-                        Padding="10" 
-                        MinWidth="300" MaxWidth="400" MaxHeight="400">
+                <Border Background="{DynamicResource MenuBackground}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="14"
+                        MinWidth="320"
+                        MaxWidth="420"
+                        MaxHeight="430">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <TextBlock Text="Уведомления" FontSize="16" FontWeight="SemiBold"/>
-                            <Button Content="Очистить все" Margin="10,0,0,0" Padding="5,2" Click="ClearAllNotifications_Click" FontSize="12"/>
-                        </StackPanel>
+
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="События состояния"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"/>
+                            <Button Grid.Column="1"
+                                    Content="Очистить"
+                                    Padding="10,4"
+                                    Click="ClearAllNotifications_Click"
+                                    FontSize="12"/>
+                        </Grid>
+
                         <Grid Grid.Row="1">
-                            <ScrollViewer x:Name="NotificationsScrollViewer" VerticalScrollBarVisibility="Auto">
-                                <ItemsControl x:Name="NotificationsList" 
+                            <ScrollViewer x:Name="NotificationsScrollViewer"
+                                          VerticalScrollBarVisibility="Auto">
+                                <ItemsControl x:Name="NotificationsList"
                                               ItemTemplate="{StaticResource NotificationTemplate}"
-                                              Background="Transparent">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Vertical"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                </ItemsControl>
+                                              Background="Transparent"/>
                             </ScrollViewer>
                             <TextBlock x:Name="EmptyNotificationsText"
-                                       Text="Нет уведомлений"
+                                       Text="Нет событий состояния"
                                        FontSize="12"
-                                       Opacity="0.8"
+                                       Opacity="0.72"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
                                        Visibility="Collapsed"/>

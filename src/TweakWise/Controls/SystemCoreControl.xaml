@@ -1,0 +1,528 @@
+<UserControl x:Class="TweakWise.Controls.SystemCoreControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root"
+             Background="Transparent"
+             MinWidth="120"
+             MinHeight="120"
+             Loaded="Root_Loaded"
+             Unloaded="Root_Unloaded"
+             MouseEnter="Root_MouseEnter"
+             MouseLeave="Root_MouseLeave">
+    <UserControl.Resources>
+        <Storyboard x:Key="CorePulseStoryboard" RepeatBehavior="Forever">
+            <DoubleAnimation Storyboard.TargetName="PulseScale"
+                             Storyboard.TargetProperty="ScaleX"
+                             From="0.985"
+                             To="1.035"
+                             Duration="0:0:1.85"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="PulseScale"
+                             Storyboard.TargetProperty="ScaleY"
+                             From="0.985"
+                             To="1.035"
+                             Duration="0:0:1.85"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="BreathHaloScale"
+                             Storyboard.TargetProperty="ScaleX"
+                             From="0.96"
+                             To="1.07"
+                             Duration="0:0:2.15"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="BreathHaloScale"
+                             Storyboard.TargetProperty="ScaleY"
+                             From="0.96"
+                             To="1.07"
+                             Duration="0:0:2.15"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="BreathHalo"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.07"
+                             To="0.20"
+                             Duration="0:0:2.15"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="OuterGlow"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.28"
+                             To="0.78"
+                             Duration="0:0:1.45"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="CoreShellScale"
+                             Storyboard.TargetProperty="ScaleX"
+                             From="0.99"
+                             To="1.03"
+                             Duration="0:0:1.55"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="CoreShellScale"
+                             Storyboard.TargetProperty="ScaleY"
+                             From="0.99"
+                             To="1.03"
+                             Duration="0:0:1.55"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="EnergyMassA"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.72"
+                             To="1"
+                             Duration="0:0:1.10"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="EnergyMassB"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.24"
+                             To="0.58"
+                             Duration="0:0:1.35"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="EnergyMassC"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.20"
+                             To="0.52"
+                             Duration="0:0:0.95"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="EnergyMassAScale"
+                             Storyboard.TargetProperty="ScaleX"
+                             From="0.99"
+                             To="1.035"
+                             Duration="0:0:1.70"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="EnergyMassAScale"
+                             Storyboard.TargetProperty="ScaleY"
+                             From="0.99"
+                             To="1.035"
+                             Duration="0:0:1.70"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="EnergyMassBRotate"
+                             Storyboard.TargetProperty="Angle"
+                             From="-7"
+                             To="9"
+                             Duration="0:0:2.60"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="EnergyMassCScale"
+                             Storyboard.TargetProperty="ScaleX"
+                             From="0.985"
+                             To="1.045"
+                             Duration="0:0:1.95"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="EnergyMassCScale"
+                             Storyboard.TargetProperty="ScaleY"
+                             From="0.985"
+                             To="1.045"
+                             Duration="0:0:1.95"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="AuraWaveAScale"
+                             Storyboard.TargetProperty="ScaleX"
+                             From="0.985"
+                             To="1.018"
+                             Duration="0:0:2.60"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="AuraWaveAScale"
+                             Storyboard.TargetProperty="ScaleY"
+                             From="0.985"
+                             To="1.018"
+                             Duration="0:0:2.60"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="AuraWaveA"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.06"
+                             To="0.18"
+                             Duration="0:0:2.60"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="AuraWaveBScale"
+                             Storyboard.TargetProperty="ScaleX"
+                             From="1.010"
+                             To="0.992"
+                             Duration="0:0:3.10"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="AuraWaveBScale"
+                             Storyboard.TargetProperty="ScaleY"
+                             From="1.010"
+                             To="0.992"
+                             Duration="0:0:3.10"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="AuraWaveB"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.045"
+                             To="0.14"
+                             Duration="0:0:3.10"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="AuraWaveCScale"
+                             Storyboard.TargetProperty="ScaleX"
+                             From="0.995"
+                             To="1.022"
+                             Duration="0:0:3.55"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="AuraWaveCScale"
+                             Storyboard.TargetProperty="ScaleY"
+                             From="0.995"
+                             To="1.022"
+                             Duration="0:0:3.55"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="AuraWaveC"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.035"
+                             To="0.11"
+                             Duration="0:0:3.55"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="PlasmaBoltA"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.20"
+                             To="0.96"
+                             Duration="0:0:0.78"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="PlasmaBoltB"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.18"
+                             To="0.76"
+                             Duration="0:0:0.95"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="PlasmaBoltC"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.14"
+                             To="0.64"
+                             Duration="0:0:1.15"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="PlasmaBoltADrift"
+                             Storyboard.TargetProperty="X"
+                             From="-2"
+                             To="2"
+                             Duration="0:0:1.10"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="PlasmaBoltADrift"
+                             Storyboard.TargetProperty="Y"
+                             From="1"
+                             To="-1.5"
+                             Duration="0:0:1.10"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="PlasmaBoltBDrift"
+                             Storyboard.TargetProperty="X"
+                             From="1.5"
+                             To="-2"
+                             Duration="0:0:1.35"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="PlasmaBoltCDrift"
+                             Storyboard.TargetProperty="Y"
+                             From="-1.2"
+                             To="2"
+                             Duration="0:0:1.55"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="SurfaceSheen"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0.10"
+                             To="0.24"
+                             Duration="0:0:1.20"
+                             AutoReverse="True"/>
+            <DoubleAnimation Storyboard.TargetName="RotatingOrbitA"
+                             Storyboard.TargetProperty="Angle"
+                             From="0"
+                             To="360"
+                             Duration="0:0:7.5"
+                             RepeatBehavior="Forever"/>
+            <DoubleAnimation Storyboard.TargetName="RotatingOrbitB"
+                             Storyboard.TargetProperty="Angle"
+                             From="360"
+                             To="0"
+                             Duration="0:0:10.5"
+                             RepeatBehavior="Forever"/>
+        </Storyboard>
+    </UserControl.Resources>
+
+    <Grid RenderTransformOrigin="0.5,0.5">
+        <Grid.RenderTransform>
+            <TransformGroup>
+                <ScaleTransform x:Name="PulseScale"/>
+                <ScaleTransform x:Name="HoverScale"/>
+            </TransformGroup>
+        </Grid.RenderTransform>
+
+        <Viewbox Stretch="Uniform"
+                 IsHitTestVisible="False">
+            <Canvas Width="300"
+                    Height="300">
+                <Ellipse x:Name="BreathHalo"
+                         Canvas.Left="50"
+                         Canvas.Top="50"
+                         Width="200"
+                         Height="200"
+                         StrokeThickness="16"
+                         Opacity="0.16"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform x:Name="BreathHaloScale" ScaleX="1" ScaleY="1"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Effect>
+                        <BlurEffect Radius="18"/>
+                    </Ellipse.Effect>
+                </Ellipse>
+
+                <Ellipse x:Name="OuterGlow"
+                         Canvas.Left="38"
+                         Canvas.Top="38"
+                         Width="224"
+                         Height="224"
+                         StrokeThickness="34"
+                         Opacity="0.42">
+                    <Ellipse.Effect>
+                        <BlurEffect Radius="24"/>
+                    </Ellipse.Effect>
+                </Ellipse>
+
+                <Ellipse x:Name="AuraWaveC"
+                         Canvas.Left="58"
+                         Canvas.Top="58"
+                         Width="184"
+                         Height="184"
+                         StrokeThickness="18"
+                         Opacity="0.07"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform x:Name="AuraWaveCScale" ScaleX="1" ScaleY="1"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Effect>
+                        <BlurEffect Radius="13"/>
+                    </Ellipse.Effect>
+                </Ellipse>
+
+                <Ellipse x:Name="AuraWaveB"
+                         Canvas.Left="64"
+                         Canvas.Top="64"
+                         Width="172"
+                         Height="172"
+                         StrokeThickness="14"
+                         Opacity="0.08"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform x:Name="AuraWaveBScale" ScaleX="1" ScaleY="1"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Effect>
+                        <BlurEffect Radius="10"/>
+                    </Ellipse.Effect>
+                </Ellipse>
+
+                <Ellipse x:Name="AuraWaveA"
+                         Canvas.Left="70"
+                         Canvas.Top="70"
+                         Width="160"
+                         Height="160"
+                         StrokeThickness="10"
+                         Opacity="0.10"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform x:Name="AuraWaveAScale" ScaleX="1" ScaleY="1"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Effect>
+                        <BlurEffect Radius="8"/>
+                    </Ellipse.Effect>
+                </Ellipse>
+
+                <Ellipse x:Name="EnergyMassB"
+                         Canvas.Left="45"
+                         Canvas.Top="45"
+                         Width="210"
+                         Height="210"
+                         Opacity="0.34"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <RotateTransform x:Name="EnergyMassBRotate" Angle="0"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Effect>
+                        <BlurEffect Radius="24"/>
+                    </Ellipse.Effect>
+                </Ellipse>
+
+                <Ellipse x:Name="EnergyMassC"
+                         Canvas.Left="53"
+                         Canvas.Top="53"
+                         Width="194"
+                         Height="194"
+                         Opacity="0.30"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform x:Name="EnergyMassCScale" ScaleX="1" ScaleY="1"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Effect>
+                        <BlurEffect Radius="22"/>
+                    </Ellipse.Effect>
+                </Ellipse>
+
+                <Ellipse x:Name="EnergyMassA"
+                         Canvas.Left="59"
+                         Canvas.Top="59"
+                         Width="182"
+                         Height="182"
+                         Opacity="0.88"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform x:Name="EnergyMassAScale" ScaleX="1" ScaleY="1"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Effect>
+                        <BlurEffect Radius="4"/>
+                    </Ellipse.Effect>
+                </Ellipse>
+
+                <Ellipse Canvas.Left="48"
+                         Canvas.Top="48"
+                         Width="204"
+                         Height="204"
+                         Stroke="{DynamicResource CoreOrbLineBrush}"
+                         StrokeThickness="0.85"
+                         StrokeDashArray="8,8"
+                         Opacity="0.28"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <RotateTransform x:Name="RotatingOrbitA" Angle="0"/>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+
+                <Ellipse Canvas.Left="62"
+                         Canvas.Top="62"
+                         Width="176"
+                         Height="176"
+                         Stroke="{DynamicResource CoreOrbLineBrush}"
+                         StrokeThickness="0.75"
+                         StrokeDashArray="5,10"
+                         Opacity="0.24"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <RotateTransform x:Name="RotatingOrbitB" Angle="0"/>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+
+                <Ellipse x:Name="CoreShell"
+                         Canvas.Left="68"
+                         Canvas.Top="68"
+                         Width="164"
+                         Height="164"
+                         StrokeThickness="1.4"
+                         Opacity="0.88"
+                         RenderTransformOrigin="0.5,0.5">
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform x:Name="CoreShellScale" ScaleX="1" ScaleY="1"/>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+
+                <Ellipse Canvas.Left="76"
+                         Canvas.Top="76"
+                         Width="148"
+                         Height="148"
+                         Opacity="0.28"
+                         Stroke="{DynamicResource CoreOrbLineBrush}"
+                         StrokeThickness="0.8"/>
+
+                <Ellipse x:Name="SoftRing"
+                         Canvas.Left="82"
+                         Canvas.Top="82"
+                         Width="136"
+                         Height="136"
+                         StrokeThickness="1.2"
+                         Opacity="0.24"/>
+
+                <Path Data="M83,156 C107,118 132,111 158,129 C184,146 206,130 224,101"
+                      Stroke="{DynamicResource CorePlasmaSecondaryBrush}"
+                      StrokeThickness="6"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      StrokeLineJoin="Round"
+                      Opacity="0.16">
+                    <Path.Effect>
+                        <BlurEffect Radius="9"/>
+                    </Path.Effect>
+                </Path>
+
+                <Path Data="M109,214 C127,183 151,177 164,147 C178,117 195,103 218,86"
+                      Stroke="{DynamicResource CorePlasmaHazeBrush}"
+                      StrokeThickness="5.2"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      StrokeLineJoin="Round"
+                      Opacity="0.14">
+                    <Path.Effect>
+                        <BlurEffect Radius="9"/>
+                    </Path.Effect>
+                </Path>
+
+                <Path x:Name="PlasmaBoltA"
+                      Data="M83,156 C107,118 132,111 158,129 C184,146 206,130 224,101"
+                      Stroke="{DynamicResource CorePlasmaPrimaryBrush}"
+                      StrokeThickness="1.45"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      StrokeLineJoin="Round"
+                      Opacity="0.30">
+                    <Path.RenderTransform>
+                        <TranslateTransform x:Name="PlasmaBoltADrift"/>
+                    </Path.RenderTransform>
+                </Path>
+
+                <Path x:Name="PlasmaBoltB"
+                      Data="M109,214 C127,183 151,177 164,147 C178,117 195,103 218,86"
+                      Stroke="{DynamicResource CorePlasmaSecondaryBrush}"
+                      StrokeThickness="1.25"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      StrokeLineJoin="Round"
+                      Opacity="0.18">
+                    <Path.RenderTransform>
+                        <TranslateTransform x:Name="PlasmaBoltBDrift"/>
+                    </Path.RenderTransform>
+                </Path>
+
+                <Path x:Name="PlasmaBoltC"
+                      Data="M74,120 C102,132 121,101 146,103 C173,105 184,79 205,72"
+                      Stroke="{DynamicResource CorePlasmaHazeBrush}"
+                      StrokeThickness="1.05"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      StrokeLineJoin="Round"
+                      Opacity="0.14">
+                    <Path.RenderTransform>
+                        <TranslateTransform x:Name="PlasmaBoltCDrift"/>
+                    </Path.RenderTransform>
+                </Path>
+
+                <Ellipse x:Name="SurfaceSheen"
+                         Canvas.Left="82"
+                         Canvas.Top="66"
+                         Width="112"
+                         Height="78"
+                         Fill="{DynamicResource CoreOrbHighlightBrush}"
+                         Opacity="0.12">
+                    <Ellipse.RenderTransform>
+                        <RotateTransform Angle="-18" CenterX="56" CenterY="39"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Effect>
+                        <BlurEffect Radius="18"/>
+                    </Ellipse.Effect>
+                </Ellipse>
+
+                <Ellipse Canvas.Left="82"
+                         Canvas.Top="82"
+                         Width="138"
+                         Height="132"
+                         Fill="{DynamicResource CoreOrbShadowBrush}"
+                         Opacity="0.08">
+                    <Ellipse.Effect>
+                        <BlurEffect Radius="26"/>
+                    </Ellipse.Effect>
+                </Ellipse>
+            </Canvas>
+        </Viewbox>
+
+        <StackPanel HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MaxWidth="145"
+                    Margin="18">
+            <TextBlock x:Name="StatusTextBlock"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource CoreOrbForegroundBrush}"/>
+            <TextBlock x:Name="CountTextBlock"
+                       Margin="0,8,0,0"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       Opacity="0.9"
+                       Foreground="{DynamicResource CoreOrbForegroundBrush}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

@@ -9,9 +9,21 @@ namespace TweakWise.Models
         public bool AutoCheckUpdates { get; set; } = true;
         public bool ShowNotifications { get; set; } = true;
         public bool ShowTrayTemperature { get; set; } = false;
+        public bool ShowCoreCpuTemperature { get; set; } = true;
+        public bool ShowCoreGpuTemperature { get; set; } = true;
+        public bool ShowCoreStorageTemperature { get; set; } = true;
+        public bool ShowCoreMotherboardTemperature { get; set; } = true;
+        public bool ShowCoreOtherTemperature { get; set; } = false;
         public bool MinimizeToTrayOnClose { get; set; } = false;
         public bool StartMinimizedToTray { get; set; } = false;
         public bool FirstRunCompleted { get; set; } = false;
+        public string LastOpenedCoreModuleId { get; set; } = string.Empty;
+        public bool PendingRestart { get; set; } = false;
+        public string LastHealthLevel { get; set; } = "Unknown";
+        public int LastHealthProblemCount { get; set; } = 0;
+        public int LastHealthRecommendationCount { get; set; } = 0;
+        public int LastHealthCriticalCount { get; set; } = 0;
+        public System.DateTime? LastHealthCheckedAt { get; set; }
         public string LastNotifiedUpdateVersion { get; set; } = string.Empty;
         public string LastNotifiedReleaseCommit { get; set; } = string.Empty;
         public List<NotificationData> Notifications { get; set; } = new List<NotificationData>();

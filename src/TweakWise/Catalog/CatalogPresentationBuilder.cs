@@ -42,7 +42,10 @@ namespace TweakWise.Catalog
                 ConfirmationText = tweak.PreviewMeta?.ConfirmationHint ?? string.Empty,
                 RequiresConfirmation = tweak.RequiresConfirmation,
                 RollbackSummary = tweak.RollbackMeta?.RollbackSummary ?? string.Empty,
-                ValidationHint = tweak.RollbackMeta?.ValidationHint ?? string.Empty
+                ValidationHint = tweak.RollbackMeta?.ValidationHint ?? string.Empty,
+                IsExecutionSupported = tweak.Execution?.IsSupported == true,
+                ApplyButtonText = tweak.Execution?.IsSupported == true ? "Применить" : "Недоступно в этой версии",
+                CanApply = tweak.Execution?.IsSupported == true
             };
         }
 

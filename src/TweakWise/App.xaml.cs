@@ -1,9 +1,11 @@
 using System;
 using System.Windows;
 using Microsoft.Win32;
+using TweakWise.Execution;
 using TweakWise.Managers;
 using TweakWise.Providers;
 using TweakWise.Search;
+using TweakWise.Services;
 using Application = System.Windows.Application;
 
 namespace TweakWise
@@ -16,6 +18,8 @@ namespace TweakWise
         public static DialogManager DialogManager { get; private set; }
         public static ITweakCatalogProvider TweakCatalogProvider { get; private set; }
         public static GlobalSearchService GlobalSearchService { get; private set; }
+        public static ITweakExecutionService TweakExecutionService { get; private set; }
+        public static IComputerHealthService ComputerHealthService { get; private set; }
 
         public App()
         {
@@ -23,8 +27,13 @@ namespace TweakWise
             NotificationManager = new NotificationManager(SettingsManager);
             UpdateManager = new UpdateManager();
             DialogManager = new DialogManager();
+            ComputerHealthService = new ComputerHealthService(SettingsManager);
             TweakCatalogProvider = new MockTweakCatalogProvider();
             GlobalSearchService = new GlobalSearchService(TweakCatalogProvider);
+            var rollbackService = new RegistryRollbackService();
+            var stateReader = new RegistryTweakStateReader();
+            var applier = new RegistryTweakApplier(rollbackService);
+            TweakExecutionService = new TweakExecutionService(TweakCatalogProvider, stateReader, applier, rollbackService);
         }
 
         protected override void OnStartup(StartupEventArgs e)

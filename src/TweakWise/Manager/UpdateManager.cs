@@ -44,10 +44,11 @@ namespace TweakWise.Managers
 
                 var localVersion = AppInfo.VersionId;
                 int compareResult = CompareVersions(manifest.Version, localVersion);
+                bool updateAvailable = compareResult > 0 && !IsSupersededUpdateVersion(manifest.Version);
 
                 return new UpdateCheckResult
                 {
-                    Status = compareResult > 0 ? UpdateCheckStatus.UpdateAvailable : UpdateCheckStatus.UpToDate,
+                    Status = updateAvailable ? UpdateCheckStatus.UpdateAvailable : UpdateCheckStatus.UpToDate,
                     CurrentVersionText = $"Текущая версия: {AppInfo.DisplayVersion}",
                     LatestVersionText = string.IsNullOrWhiteSpace(manifest.DisplayVersion)
                         ? manifest.Version
@@ -91,6 +92,12 @@ namespace TweakWise.Managers
             var leftVersion = ParsedVersion.Parse(left);
             var rightVersion = ParsedVersion.Parse(right);
             return leftVersion.CompareTo(rightVersion);
+        }
+
+        private static bool IsSupersededUpdateVersion(string version)
+        {
+            return AppInfo.SupersededUpdateVersionIds.Any(supersededVersion =>
+                string.Equals(supersededVersion, version?.Trim(), StringComparison.OrdinalIgnoreCase));
         }
 
         private static void OpenUrl(string url)

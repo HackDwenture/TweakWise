@@ -1,0 +1,380 @@
+<Page x:Class="TweakWise.Pages.CoreHomePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:TweakWise.Controls"
+      Background="{DynamicResource WindowBackground}">
+    <Page.Resources>
+        <Style x:Key="CorePanelButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TemperatureToggleStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="42"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="SwitchTrack"
+                                    Width="36"
+                                    Height="20"
+                                    CornerRadius="10"
+                                    Background="{DynamicResource CardBackground}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    HorizontalAlignment="Left">
+                                <Ellipse x:Name="SwitchThumb"
+                                         Width="14"
+                                         Height="14"
+                                         Margin="3,0,0,0"
+                                         HorizontalAlignment="Left"
+                                         VerticalAlignment="Center"
+                                         Fill="{DynamicResource WindowForeground}"
+                                         Opacity="0.62"/>
+                            </Border>
+                            <ContentPresenter Grid.Column="1"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="SwitchTrack" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="SwitchThumb" Property="Fill" Value="White"/>
+                                <Setter TargetName="SwitchThumb" Property="Opacity" Value="1"/>
+                                <Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="SwitchThumb" Property="Margin" Value="0,0,3,0"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="28,22,28,18" ClipToBounds="True">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,14">
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,2,0,0">
+                <TextBlock x:Name="LastCheckTextBlock"
+                           FontSize="13"
+                           Opacity="0.72"
+                           Foreground="{DynamicResource WindowForeground}"/>
+            </StackPanel>
+
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top">
+                <TextBlock x:Name="HeaderStatusTextBlock"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           TextAlignment="Right"
+                           Foreground="{DynamicResource WindowForeground}"/>
+                <TextBlock x:Name="HeaderCountersTextBlock"
+                           Margin="0,8,0,0"
+                           FontSize="13"
+                           Opacity="0.72"
+                           TextAlignment="Right"
+                           Foreground="{DynamicResource WindowForeground}"/>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" ClipToBounds="True">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Viewbox Grid.Row="0"
+                     Stretch="Uniform"
+                     MaxWidth="1220"
+                     MaxHeight="670"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center">
+                <Canvas x:Name="MapLayer"
+                        Width="1100"
+                        Height="610"
+                        RenderTransformOrigin="0.5,0.5">
+                    <Canvas.RenderTransform>
+                        <ScaleTransform x:Name="MapScale" ScaleX="1" ScaleY="1"/>
+                    </Canvas.RenderTransform>
+
+                    <Canvas x:Name="CircuitTextureLayer"
+                            IsHitTestVisible="False"
+                            Opacity="0.58">
+                        <Canvas.Resources>
+                            <Style TargetType="Polyline">
+                                <Setter Property="Stroke" Value="{DynamicResource CoreLineBrush}"/>
+                                <Setter Property="StrokeThickness" Value="1.05"/>
+                                <Setter Property="Opacity" Value="0.32"/>
+                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                            </Style>
+                            <Style TargetType="Line">
+                                <Setter Property="Stroke" Value="{DynamicResource CoreLineBrush}"/>
+                                <Setter Property="StrokeThickness" Value="0.95"/>
+                                <Setter Property="Opacity" Value="0.24"/>
+                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                            </Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Stroke" Value="{DynamicResource CoreLineBrush}"/>
+                                <Setter Property="StrokeThickness" Value="0.95"/>
+                                <Setter Property="Opacity" Value="0.20"/>
+                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                            </Style>
+                        </Canvas.Resources>
+
+                        <Ellipse Canvas.Left="412" Canvas.Top="232" Width="276" Height="276" Opacity="0.18"/>
+                        <Ellipse Canvas.Left="354" Canvas.Top="174" Width="392" Height="392" StrokeDashArray="10,10" Opacity="0.22"/>
+                        <Ellipse Canvas.Left="298" Canvas.Top="118" Width="504" Height="504" Opacity="0.12"/>
+
+                        <Line X1="550" Y1="28" X2="550" Y2="612" Opacity="0.14"/>
+                        <Line X1="70" Y1="370" X2="1030" Y2="370" Opacity="0.14"/>
+                        <Line X1="245" Y1="30" X2="245" Y2="610" Opacity="0.10"/>
+                        <Line X1="855" Y1="30" X2="855" Y2="610" Opacity="0.10"/>
+                        <Line X1="120" Y1="160" X2="980" Y2="160" Opacity="0.08"/>
+                        <Line X1="120" Y1="505" X2="980" Y2="505" Opacity="0.08"/>
+
+                        <Polyline Points="78,88 245,88 245,174 330,174 330,238 438,238"/>
+                        <Polyline Points="92,538 245,538 245,488 338,488 338,452 442,452"/>
+                        <Polyline Points="1012,88 855,88 855,174 770,174 770,238 662,238"/>
+                        <Polyline Points="1018,538 855,538 855,488 762,488 762,452 658,452"/>
+                        <Polyline Points="58,304 314,304 314,330 442,330"/>
+                        <Polyline Points="1042,304 786,304 786,330 658,330"/>
+                        <Polyline Points="132,226 398,226 398,280 465,280"/>
+                        <Polyline Points="968,226 702,226 702,280 635,280"/>
+                        <Polyline Points="132,452 390,452 390,422 445,422"/>
+                        <Polyline Points="968,452 710,452 710,422 655,422"/>
+
+                        <Ellipse Canvas.Left="241" Canvas.Top="84" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32"/>
+                        <Ellipse Canvas.Left="326" Canvas.Top="234" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32"/>
+                        <Ellipse Canvas.Left="851" Canvas.Top="84" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32"/>
+                        <Ellipse Canvas.Left="766" Canvas.Top="234" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32"/>
+                        <Ellipse Canvas.Left="241" Canvas.Top="534" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32"/>
+                        <Ellipse Canvas.Left="851" Canvas.Top="534" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32"/>
+                        <Ellipse Canvas.Left="310" Canvas.Top="300" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32"/>
+                        <Ellipse Canvas.Left="782" Canvas.Top="300" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32"/>
+                    </Canvas>
+
+                    <Canvas x:Name="ConnectionLineLayer" IsHitTestVisible="False">
+                        <Canvas.Resources>
+                            <Style x:Key="BaseConnectionLineStyle" TargetType="Line">
+                                <Setter Property="Stroke" Value="{DynamicResource CoreLineBrush}"/>
+                                <Setter Property="StrokeThickness" Value="1.35"/>
+                                <Setter Property="Opacity" Value="0.30"/>
+                                <Setter Property="StrokeStartLineCap" Value="Round"/>
+                                <Setter Property="StrokeEndLineCap" Value="Round"/>
+                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                            </Style>
+                            <Style x:Key="ActiveConnectionLineStyle" TargetType="Line">
+                                <Setter Property="Stroke" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter Property="StrokeThickness" Value="2.25"/>
+                                <Setter Property="Opacity" Value="0"/>
+                                <Setter Property="StrokeDashArray" Value="140,500"/>
+                                <Setter Property="StrokeDashOffset" Value="140"/>
+                                <Setter Property="StrokeDashCap" Value="Round"/>
+                                <Setter Property="StrokeStartLineCap" Value="Round"/>
+                                <Setter Property="StrokeEndLineCap" Value="Round"/>
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="14" ShadowDepth="0" Opacity="0.55" Color="#4AA9FF"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Canvas.Resources>
+
+                        <Line X1="550" Y1="116" X2="550" Y2="284" Style="{StaticResource BaseConnectionLineStyle}"/>
+                        <Line X1="340" Y1="207" X2="482" Y2="317" Style="{StaticResource BaseConnectionLineStyle}"/>
+                        <Line X1="340" Y1="427" X2="467" Y2="392" Style="{StaticResource BaseConnectionLineStyle}"/>
+                        <Line X1="550" Y1="512" X2="550" Y2="456" Style="{StaticResource BaseConnectionLineStyle}"/>
+                        <Line X1="760" Y1="207" X2="618" Y2="317" Style="{StaticResource BaseConnectionLineStyle}"/>
+                        <Line X1="760" Y1="427" X2="633" Y2="392" Style="{StaticResource BaseConnectionLineStyle}"/>
+
+                        <Line x:Name="WindowsSetupActiveLine" X1="550" Y1="116" X2="550" Y2="284" Style="{StaticResource ActiveConnectionLineStyle}"/>
+                        <Line x:Name="SystemParametersActiveLine" X1="340" Y1="207" X2="482" Y2="317" Style="{StaticResource ActiveConnectionLineStyle}"/>
+                        <Line x:Name="StorageActiveLine" X1="340" Y1="427" X2="467" Y2="392" Style="{StaticResource ActiveConnectionLineStyle}"/>
+                        <Line x:Name="NetworkActiveLine" X1="550" Y1="512" X2="550" Y2="456" Style="{StaticResource ActiveConnectionLineStyle}"/>
+                        <Line x:Name="ResourcesActiveLine" X1="760" Y1="207" X2="618" Y2="317" Style="{StaticResource ActiveConnectionLineStyle}"/>
+                        <Line x:Name="DevicesActiveLine" X1="760" Y1="427" X2="633" Y2="392" Style="{StaticResource ActiveConnectionLineStyle}"/>
+                    </Canvas>
+
+                    <controls:SystemCoreControl x:Name="MainCore"
+                                                 Canvas.Left="432"
+                                                 Canvas.Top="252"
+                                                 Width="236"
+                                                 Height="236"
+                                                 Cursor="Hand"
+                                                 PreviewMouseLeftButtonUp="MainCore_MouseLeftButtonUp"
+                                                 MouseEnter="MainCore_MouseEnter"
+                                                 MouseLeave="MainCore_MouseLeave"/>
+
+                    <controls:CoreModuleNodeControl x:Name="WindowsSetupNode" Canvas.Left="410" Canvas.Top="38" Width="280" Height="78" MouseLeftButtonUp="ModuleNode_MouseLeftButtonUp"
+                                                    MouseEnter="ModuleNode_MouseEnter"
+                                                    MouseLeave="ModuleNode_MouseLeave"/>
+                    <controls:CoreModuleNodeControl x:Name="SystemParametersNode" Canvas.Left="58" Canvas.Top="168" Width="282" Height="78" MouseLeftButtonUp="ModuleNode_MouseLeftButtonUp"
+                                                    MouseEnter="ModuleNode_MouseEnter"
+                                                    MouseLeave="ModuleNode_MouseLeave"/>
+                    <controls:CoreModuleNodeControl x:Name="StorageNode" Canvas.Left="58" Canvas.Top="388" Width="282" Height="78" MouseLeftButtonUp="ModuleNode_MouseLeftButtonUp"
+                                                    MouseEnter="ModuleNode_MouseEnter"
+                                                    MouseLeave="ModuleNode_MouseLeave"/>
+                    <controls:CoreModuleNodeControl x:Name="NetworkNode" Canvas.Left="410" Canvas.Top="512" Width="280" Height="78" MouseLeftButtonUp="ModuleNode_MouseLeftButtonUp"
+                                                    MouseEnter="ModuleNode_MouseEnter"
+                                                    MouseLeave="ModuleNode_MouseLeave"/>
+                    <controls:CoreModuleNodeControl x:Name="ResourcesNode" Canvas.Left="760" Canvas.Top="168" Width="282" Height="78" MouseLeftButtonUp="ModuleNode_MouseLeftButtonUp"
+                                                    MouseEnter="ModuleNode_MouseEnter"
+                                                    MouseLeave="ModuleNode_MouseLeave"/>
+                    <controls:CoreModuleNodeControl x:Name="DevicesNode" Canvas.Left="760" Canvas.Top="388" Width="282" Height="78" MouseLeftButtonUp="ModuleNode_MouseLeftButtonUp"
+                                                    MouseEnter="ModuleNode_MouseEnter"
+                                                    MouseLeave="ModuleNode_MouseLeave"/>
+                </Canvas>
+            </Viewbox>
+
+            <Border x:Name="TemperatureDock"
+                    Grid.Row="1"
+                    HorizontalAlignment="Center"
+                    Margin="0,8,0,0"
+                    MaxWidth="760"
+                    MinWidth="420"
+                    Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="18"
+                    Padding="18,10"
+                    Opacity="0.96">
+                <TextBlock x:Name="TemperatureDockTextBlock"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           Foreground="{DynamicResource WindowForeground}"/>
+            </Border>
+
+            <Grid x:Name="CoreDetailsLayer"
+                  Grid.RowSpan="2"
+                  Visibility="Collapsed"
+                  Opacity="0"
+                  RenderTransformOrigin="0.5,0.52">
+                <Grid.RenderTransform>
+                    <ScaleTransform x:Name="CoreDetailsScale" ScaleX="0.84" ScaleY="0.84"/>
+                </Grid.RenderTransform>
+
+                <Border Background="{DynamicResource WindowBackground}" Opacity="0.84"/>
+
+                <Viewbox Stretch="Uniform" MaxWidth="1140" MaxHeight="730" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Canvas Width="1100" Height="720">
+                        <Ellipse Canvas.Left="355" Canvas.Top="175" Width="390" Height="390" Stroke="{DynamicResource CoreLineActiveBrush}" StrokeThickness="1" StrokeDashArray="11,9" Opacity="0.36"/>
+                        <Ellipse Canvas.Left="410" Canvas.Top="230" Width="280" Height="280" Stroke="{DynamicResource CoreLineActiveBrush}" StrokeThickness="1" Opacity="0.50"/>
+                        <Line X1="550" Y1="150" X2="550" Y2="230" Stroke="{DynamicResource CoreLineActiveBrush}" StrokeThickness="1.3" Opacity="0.50"/>
+                        <Line X1="550" Y1="510" X2="550" Y2="535" Stroke="{DynamicResource CoreLineActiveBrush}" StrokeThickness="1.3" Opacity="0.50"/>
+                        <Line X1="420" Y1="375" X2="190" Y2="220" Stroke="{DynamicResource CoreLineActiveBrush}" StrokeThickness="1.1" Opacity="0.48"/>
+                        <Line X1="680" Y1="375" X2="910" Y2="220" Stroke="{DynamicResource CoreLineActiveBrush}" StrokeThickness="1.1" Opacity="0.48"/>
+
+                        <controls:SystemCoreControl x:Name="ExpandedCore"
+                                                     Canvas.Left="410"
+                                                     Canvas.Top="230"
+                                                     Width="280"
+                                                     Height="280"
+                                                     Cursor="Hand"
+                                                     PreviewMouseLeftButtonUp="ExpandedCore_MouseLeftButtonUp"/>
+
+                        <Border Canvas.Left="40" Canvas.Top="95" Width="285" MinHeight="120" Background="{DynamicResource CoreNodeBackgroundBrush}" BorderBrush="{DynamicResource CoreNodeBorderBrush}" BorderThickness="1" CornerRadius="16" Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="Состояние" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource WindowForeground}"/>
+                                <TextBlock x:Name="CoreSignalTextBlock" Margin="0,12,0,0" FontSize="13" LineHeight="19" TextWrapping="Wrap" Opacity="0.78" Foreground="{DynamicResource WindowForeground}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Canvas.Left="775" Canvas.Top="95" Width="285" MinHeight="120" Background="{DynamicResource CoreNodeBackgroundBrush}" BorderBrush="{DynamicResource CoreNodeBorderBrush}" BorderThickness="1" CornerRadius="16" Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="Влияние" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource WindowForeground}"/>
+                                <TextBlock x:Name="CoreImpactTextBlock" Margin="0,12,0,0" FontSize="13" LineHeight="19" TextWrapping="Wrap" Opacity="0.78" Foreground="{DynamicResource WindowForeground}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border x:Name="TemperatureDetailsCard" Canvas.Left="260" Canvas.Top="535" Width="580" MinHeight="136" Background="{DynamicResource CoreNodeBackgroundBrush}" BorderBrush="{DynamicResource CoreNodeBorderBrush}" BorderThickness="1" CornerRadius="18" Padding="18" MouseEnter="TemperatureDetailsCard_MouseEnter" MouseLeave="TemperatureDetailsCard_MouseLeave">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="Температуры" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource WindowForeground}"/>
+                                        <TextBlock x:Name="TemperatureDetailsTextBlock" Margin="0,8,44,0" FontSize="13" LineHeight="19" TextWrapping="Wrap" Opacity="0.78" Foreground="{DynamicResource WindowForeground}"/>
+                                    </StackPanel>
+                                    <Button x:Name="TemperatureEditButton" Width="34" Height="30" HorizontalAlignment="Right" VerticalAlignment="Top" FontFamily="Segoe MDL2 Assets" Content="&#xE70F;" Opacity="0" Style="{StaticResource CorePanelButtonStyle}" Padding="0" Click="TemperatureEditButton_Click" ToolTip="Настроить показатели"/>
+                                </Grid>
+
+                                <ItemsControl x:Name="TemperatureDetailsItemsControl" Margin="0,12,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10,6" Margin="0,0,8,8">
+                                                <TextBlock Foreground="{DynamicResource WindowForeground}" FontSize="12" FontWeight="SemiBold">
+                                                    <Run Text="{Binding Title}"/><Run Text="  "/><Run Text="{Binding DisplayValue}"/>
+                                                </TextBlock>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <StackPanel x:Name="TemperatureOptionsPanel" Margin="0,8,0,0" Visibility="Collapsed" Opacity="0">
+                                    <TextBlock Text="На главном экране:" FontSize="12" FontWeight="SemiBold" Opacity="0.72" Foreground="{DynamicResource WindowForeground}"/>
+                                    <UniformGrid Columns="5" Margin="0,6,0,0">
+                                        <CheckBox x:Name="ShowCpuTemperatureCheckBox" Content="CPU" Style="{StaticResource TemperatureToggleStyle}" Checked="TemperatureToggle_Changed" Unchecked="TemperatureToggle_Changed"/>
+                                        <CheckBox x:Name="ShowGpuTemperatureCheckBox" Content="GPU" Style="{StaticResource TemperatureToggleStyle}" Checked="TemperatureToggle_Changed" Unchecked="TemperatureToggle_Changed"/>
+                                        <CheckBox x:Name="ShowStorageTemperatureCheckBox" Content="Диски" Style="{StaticResource TemperatureToggleStyle}" Checked="TemperatureToggle_Changed" Unchecked="TemperatureToggle_Changed"/>
+                                        <CheckBox x:Name="ShowMotherboardTemperatureCheckBox" Content="Плата" Style="{StaticResource TemperatureToggleStyle}" Checked="TemperatureToggle_Changed" Unchecked="TemperatureToggle_Changed"/>
+                                        <CheckBox x:Name="ShowOtherTemperatureCheckBox" Content="Прочее" Style="{StaticResource TemperatureToggleStyle}" Checked="TemperatureToggle_Changed" Unchecked="TemperatureToggle_Changed"/>
+                                    </UniformGrid>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Canvas>
+                </Viewbox>
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>

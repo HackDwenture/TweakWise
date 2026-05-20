@@ -27,12 +27,12 @@ namespace TweakWise.Search
 
             var index = new List<GlobalSearchIndexEntry>
             {
-                new GlobalSearchIndexEntry
+                new()
                 {
                     Title = "Главная",
                     ResultTypeText = "Раздел",
                     PathText = "Раздел приложения",
-                    SearchBlob = BuildSearchBlob("Главная", "Раздел приложения", "dashboard home templates overview"),
+                    SearchBlob = BuildSearchBlob("Главная", "Раздел приложения", "dashboard home"),
                     DefaultRank = 0,
                     IsDefaultSuggestion = true,
                     NavigationTarget = new GlobalSearchNavigationTarget
@@ -47,7 +47,6 @@ namespace TweakWise.Search
             index.AddRange(BuildSubsectionEntries(categories));
             index.AddRange(BuildTweakEntries(tweaks));
             index.AddRange(BuildTemplateEntries(templates, tweakMap));
-            index.AddRange(BuildActionEntries());
 
             _index = index;
         }
@@ -112,7 +111,6 @@ namespace TweakWise.Search
 
             foreach (var category in categories)
             {
-                string categoryTitle = category.Title;
                 string pageKey = GetPageKey(category.Id);
 
                 foreach (var subsection in category.Subcategories)
@@ -121,8 +119,8 @@ namespace TweakWise.Search
                     {
                         Title = subsection,
                         ResultTypeText = "Секция",
-                        PathText = $"{categoryTitle} → {subsection}",
-                        SearchBlob = BuildSearchBlob(subsection, categoryTitle, $"{categoryTitle} {subsection}"),
+                        PathText = $"{category.Title} → {subsection}",
+                        SearchBlob = BuildSearchBlob(subsection, category.Title),
                         DefaultRank = rank++,
                         NavigationTarget = new GlobalSearchNavigationTarget
                         {
@@ -216,55 +214,6 @@ namespace TweakWise.Search
                     }
                 };
             }
-        }
-
-        private static IEnumerable<GlobalSearchIndexEntry> BuildActionEntries()
-        {
-            return new List<GlobalSearchIndexEntry>
-            {
-                new()
-                {
-                    Title = "Открыть настройки программы",
-                    ResultTypeText = "Действие",
-                    PathText = "Программа → Быстрые действия",
-                    SearchBlob = BuildSearchBlob("Открыть настройки программы", "настройки theme app preferences"),
-                    DefaultRank = 20,
-                    IsDefaultSuggestion = true,
-                    NavigationTarget = new GlobalSearchNavigationTarget
-                    {
-                        ActionKey = "OpenSettings",
-                        ResultKind = GlobalSearchResultKind.Action
-                    }
-                },
-                new()
-                {
-                    Title = "Проверить наличие обновлений",
-                    ResultTypeText = "Действие",
-                    PathText = "Программа → Быстрые действия",
-                    SearchBlob = BuildSearchBlob("Проверить наличие обновлений", "updates release latest"),
-                    DefaultRank = 21,
-                    IsDefaultSuggestion = true,
-                    NavigationTarget = new GlobalSearchNavigationTarget
-                    {
-                        ActionKey = "CheckUpdates",
-                        ResultKind = GlobalSearchResultKind.Action
-                    }
-                },
-                new()
-                {
-                    Title = "Открыть уведомления",
-                    ResultTypeText = "Действие",
-                    PathText = "Программа → Быстрые действия",
-                    SearchBlob = BuildSearchBlob("Открыть уведомления", "notifications alerts inbox"),
-                    DefaultRank = 22,
-                    IsDefaultSuggestion = true,
-                    NavigationTarget = new GlobalSearchNavigationTarget
-                    {
-                        ActionKey = "OpenNotifications",
-                        ResultKind = GlobalSearchResultKind.Action
-                    }
-                }
-            };
         }
 
         private static GlobalSearchResultViewModel MapToViewModel(GlobalSearchIndexEntry entry)

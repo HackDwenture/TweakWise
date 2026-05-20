@@ -14,12 +14,21 @@
         <Setter Property="Margin" Value="0,0,0,16"/>
     </Style>
 
+    <Style x:Key="CatalogTemplateCardBorderStyle" TargetType="Border" BasedOn="{StaticResource CatalogCardBorderStyle}">
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+
     <Style x:Key="CatalogSubtlePanelStyle" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="Padding" Value="12"/>
+    </Style>
+
+    <Style x:Key="CatalogSectionHeaderPanelStyle" TargetType="Border" BasedOn="{StaticResource CatalogSubtlePanelStyle}">
+        <Setter Property="Padding" Value="14,12"/>
+        <Setter Property="Margin" Value="0,0,0,14"/>
     </Style>
 
     <Style x:Key="CatalogBadgeBorderStyle" TargetType="Border">
@@ -53,6 +62,20 @@
         <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Padding" Value="0"/>
+    </Style>
+
+    <Style x:Key="CatalogPrimaryActionButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ButtonForeground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Padding" Value="16,8"/>
+    </Style>
+
+    <Style x:Key="CatalogSecondaryActionButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+        <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Padding" Value="14,7"/>
     </Style>
 
     <Style x:Key="CatalogListItemTextStyle"
