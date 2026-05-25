@@ -26,6 +26,7 @@ namespace TweakWise.Pages
         private readonly Dictionary<string, Border> _zones = new Dictionary<string, Border>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, FrameworkElement> _glows = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Line> _routes = new Dictionary<string, Line>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _animatedNodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private List<BoardFinding> _findings = new List<BoardFinding>();
         private string _selectedNodeKey = "Cpu";
         private string _hoverNodeKey = string.Empty;
@@ -68,7 +69,7 @@ namespace TweakWise.Pages
             AddElement(_routes, "Cooling", CoolingRouteLine);
 
             foreach (var zone in _zones.Values)
-                EnsureScaleTransform(zone);
+                EnsurePartTransforms(zone, out _, out _);
         }
 
         private static void AddElement<T>(Dictionary<string, T> map, string key, T element)
@@ -110,6 +111,7 @@ namespace TweakWise.Pages
                 App.ComputerHealthService.HealthStatusChanged -= HealthService_HealthStatusChanged;
 
             _diagnosticsTimer.Stop();
+            StopAllNodeMicroAnimations();
             _temperatureService?.Dispose();
             _temperatureService = null;
         }
@@ -135,6 +137,12 @@ namespace TweakWise.Pages
         private void HealthService_HealthStatusChanged(object sender, EventArgs e)
         {
             Dispatcher.Invoke(UpdateModuleStatus);
+        }
+
+        private void BackButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Application.Current.MainWindow is MainWindow mainWindow)
+                mainWindow.NavigateToCoreHome();
         }
 
         private void Component_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
@@ -311,8 +319,8 @@ namespace TweakWise.Pages
                 {
                     NodeKey = "Cooling",
                     Level = HealthLevel.Warning,
-                    Title = "Термоконтур перегружен",
-                    Description = $"Самый горячий датчик показывает {HardwareTemperatureService.FormatTemperature(hottestPerformanceTemp)}. Стоит проверить кривую вентиляторов, пыль и режим питания."
+                    Title = "Система сильно нагревается",
+                    Description = $"Самый горячий датчик показывает {HardwareTemperatureService.FormatTemperature(hottestPerformanceTemp)}. Проверьте вентиляцию, пыль в корпусе и текущий режим питания."
                 });
             }
             else if (hottestPerformanceTemp >= 78)
@@ -321,8 +329,8 @@ namespace TweakWise.Pages
                 {
                     NodeKey = "Cooling",
                     Level = HealthLevel.Normal,
-                    Title = "Есть запас для настройки охлаждения",
-                    Description = $"Пик по датчикам: {HardwareTemperatureService.FormatTemperature(hottestPerformanceTemp)}. Можно поднять вентиляцию до включения тяжёлых профилей."
+                    Title = "Охлаждение близко к высокой нагрузке",
+                    Description = $"Пик по датчикам: {HardwareTemperatureService.FormatTemperature(hottestPerformanceTemp)}. Перед тяжёлыми задачами стоит убедиться, что вентиляторы работают нормально."
                 });
             }
         }
@@ -387,8 +395,8 @@ namespace TweakWise.Pages
                     {
                         NodeKey = "Ram",
                         Level = HealthLevel.Warning,
-                        Title = "RAM почти заполнена",
-                        Description = $"Занято {memory.dwMemoryLoad}% оперативной памяти. Это может снижать отзывчивость и вызывать сброс частот в тяжёлых задачах."
+                        Title = "Оперативная память почти заполнена",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Система может медленнее реагировать, особенно при запуске игр, браузера или тяжёлых программ."
                     });
                 }
                 else if (memory.dwMemoryLoad >= 78)
@@ -397,8 +405,8 @@ namespace TweakWise.Pages
                     {
                         NodeKey = "Ram",
                         Level = HealthLevel.Normal,
-                        Title = "Высокая нагрузка на RAM",
-                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Стоит проверить профиль памяти и тяжёлые процессы перед включением производительных твиков."
+                        Title = "Оперативная память сильно загружена",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Перед включением производительных настроек лучше закрыть лишние тяжёлые приложения."
                     });
                 }
             }
@@ -527,32 +535,32 @@ namespace TweakWise.Pages
             return nodeKey switch
             {
                 "Power" => new BoardCalloutLayout(
-                    new WindowsPoint(258, 184),
-                    new WindowsPoint(48, 52 + safeIndex * 106),
-                    284,
+                    new WindowsPoint(395, 226),
+                    new WindowsPoint(62, 120 + safeIndex * 108),
+                    238,
                     new Vector(-18, -8)),
 
                 "Ram" => new BoardCalloutLayout(
-                    new WindowsPoint(846, 174),
-                    new WindowsPoint(872, 52 + safeIndex * 106),
-                    270,
+                    new WindowsPoint(854, 326),
+                    new WindowsPoint(966, 112 + safeIndex * 116),
+                    238,
                     new Vector(18, -8)),
 
                 "Gpu" => new BoardCalloutLayout(
-                    new WindowsPoint(318, 510),
-                    new WindowsPoint(48, 548 - safeIndex * 106),
-                    300,
+                    new WindowsPoint(505, 552),
+                    new WindowsPoint(62, 390 - safeIndex * 106),
+                    292,
                     new Vector(-18, 8)),
 
                 "Cooling" => new BoardCalloutLayout(
-                    new WindowsPoint(900, 452),
-                    new WindowsPoint(862, 434 + safeIndex * 86),
-                    284,
+                    new WindowsPoint(905, 552),
+                    new WindowsPoint(970, 360 + safeIndex * 112),
+                    238,
                     new Vector(18, 8)),
 
                 _ => new BoardCalloutLayout(
-                    new WindowsPoint(590, 344),
-                    new WindowsPoint(434 + (safeIndex % 2) * 320, 560 - (safeIndex / 2) * 104),
+                    new WindowsPoint(610, 340),
+                    new WindowsPoint(450 + (safeIndex % 2) * 324, 586 - (safeIndex / 2) * 102),
                     310,
                     new Vector(0, 18))
             };
@@ -615,8 +623,213 @@ namespace TweakWise.Pages
             {
                 bool isHover = string.Equals(pair.Key, _hoverNodeKey, StringComparison.OrdinalIgnoreCase);
                 bool isSelected = string.Equals(pair.Key, _selectedNodeKey, StringComparison.OrdinalIgnoreCase);
-                AnimateScale(pair.Value, isHover ? 1.035 : isSelected && _isDetailsOpen ? 1.022 : isSelected ? 1.012 : 1);
+                double targetScale = isHover ? 1.035 : isSelected && _isDetailsOpen ? 1.022 : isSelected ? 1.01 : 1;
+                double targetLift = isHover ? -7 : isSelected && _isDetailsOpen ? -4 : 0;
+                AnimatePart(pair.Value, targetScale, targetLift);
             }
+
+            UpdateNodeMicroAnimations();
+        }
+
+        private void UpdateNodeMicroAnimations()
+        {
+            string activeNode = !string.IsNullOrWhiteSpace(_hoverNodeKey)
+                ? _hoverNodeKey
+                : _isDetailsOpen ? _selectedNodeKey : string.Empty;
+
+            foreach (string key in _nodes.Keys)
+                SetNodeMicroAnimation(key, string.Equals(key, activeNode, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private void SetNodeMicroAnimation(string key, bool active)
+        {
+            bool alreadyActive = _animatedNodes.Contains(key);
+
+            if (active && alreadyActive)
+                return;
+
+            if (!active && !alreadyActive)
+                return;
+
+            if (active)
+            {
+                _animatedNodes.Add(key);
+                StartNodeMicroAnimation(key);
+            }
+            else
+            {
+                _animatedNodes.Remove(key);
+                StopNodeMicroAnimation(key);
+            }
+        }
+
+        private void StartNodeMicroAnimation(string key)
+        {
+            switch (key)
+            {
+                case "Power":
+                    StartPowerAnimation();
+                    break;
+                case "Cpu":
+                    StartCpuAnimation();
+                    break;
+                case "Gpu":
+                    StartGpuAnimation();
+                    break;
+                case "Ram":
+                    StartRamAnimation();
+                    break;
+                case "Cooling":
+                    StartCoolingAnimation();
+                    break;
+            }
+        }
+
+        private void StopNodeMicroAnimation(string key)
+        {
+            switch (key)
+            {
+                case "Power":
+                    StopPowerAnimation();
+                    break;
+                case "Cpu":
+                    StopCpuAnimation();
+                    break;
+                case "Gpu":
+                    StopGpuAnimation();
+                    break;
+                case "Ram":
+                    StopRamAnimation();
+                    break;
+                case "Cooling":
+                    StopCoolingAnimation();
+                    break;
+            }
+        }
+
+        private void StopAllNodeMicroAnimations()
+        {
+            foreach (string key in _animatedNodes.ToList())
+                StopNodeMicroAnimation(key);
+
+            _animatedNodes.Clear();
+        }
+
+        private void StartPowerAnimation()
+        {
+            BeginOpacityPulse(PowerPhaseA, 0.30, 0.68, 0);
+            BeginOpacityPulse(PowerPhaseB, 0.42, 0.82, 110);
+            BeginOpacityPulse(PowerPhaseC, 0.30, 0.68, 220);
+        }
+
+        private void StopPowerAnimation()
+        {
+            ResetOpacity(PowerPhaseA, 0.30);
+            ResetOpacity(PowerPhaseB, 0.42);
+            ResetOpacity(PowerPhaseC, 0.30);
+        }
+
+        private void StartCpuAnimation()
+        {
+            BeginOpacityPulse(CpuPackageGlow, 0.78, 1.0, 0, 620);
+            BeginOpacityPulse(CpuActivityGrid, 0.62, 1.0, 80, 540);
+        }
+
+        private void StopCpuAnimation()
+        {
+            ResetOpacity(CpuPackageGlow, 0.78);
+            ResetOpacity(CpuActivityGrid, 0.72);
+        }
+
+        private void StartGpuAnimation()
+        {
+            GpuSignalTranslate.X = 0;
+            GpuSignalPulse.BeginAnimation(
+                UIElement.OpacityProperty,
+                new DoubleAnimation(0.16, 0.88, TimeSpan.FromMilliseconds(420))
+                {
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                });
+
+            GpuSignalTranslate.BeginAnimation(
+                TranslateTransform.XProperty,
+                new DoubleAnimation(0, 144, TimeSpan.FromMilliseconds(860))
+                {
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+                });
+        }
+
+        private void StopGpuAnimation()
+        {
+            GpuSignalPulse.BeginAnimation(UIElement.OpacityProperty, null);
+            GpuSignalPulse.Opacity = 0;
+            GpuSignalTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+            GpuSignalTranslate.X = 0;
+        }
+
+        private void StartRamAnimation()
+        {
+            BeginOpacityPulse(RamSlotA, 0.76, 1.0, 0, 520);
+            BeginOpacityPulse(RamSlotB, 0.66, 0.96, 120, 520);
+            BeginOpacityPulse(RamSlotC, 0.76, 1.0, 240, 520);
+            BeginOpacityPulse(RamSlotD, 0.66, 0.96, 360, 520);
+        }
+
+        private void StopRamAnimation()
+        {
+            ResetOpacity(RamSlotA, 0.76);
+            ResetOpacity(RamSlotB, 0.66);
+            ResetOpacity(RamSlotC, 0.76);
+            ResetOpacity(RamSlotD, 0.66);
+        }
+
+        private void StartCoolingAnimation()
+        {
+            CoolingFanRotate.BeginAnimation(
+                RotateTransform.AngleProperty,
+                new DoubleAnimation(0, 360, TimeSpan.FromMilliseconds(720))
+                {
+                    RepeatBehavior = RepeatBehavior.Forever
+                });
+        }
+
+        private void StopCoolingAnimation()
+        {
+            CoolingFanRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+            CoolingFanRotate.Angle = 0;
+        }
+
+        private static void BeginOpacityPulse(
+            UIElement element,
+            double from,
+            double to,
+            int beginDelayMilliseconds,
+            int durationMilliseconds = 480)
+        {
+            if (element == null)
+                return;
+
+            element.BeginAnimation(
+                UIElement.OpacityProperty,
+                new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(durationMilliseconds))
+                {
+                    BeginTime = TimeSpan.FromMilliseconds(beginDelayMilliseconds),
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
+                });
+        }
+
+        private static void ResetOpacity(UIElement element, double opacity)
+        {
+            if (element == null)
+                return;
+
+            element.BeginAnimation(UIElement.OpacityProperty, null);
+            element.Opacity = opacity;
         }
 
         private void AnimateRoutesForHover(string key)
@@ -681,26 +894,39 @@ namespace TweakWise.Pages
                 });
         }
 
-        private static void AnimateScale(Border border, double scale)
+        private static void AnimatePart(Border border, double scale, double yOffset)
         {
             if (border == null)
                 return;
 
-            var transform = EnsureScaleTransform(border);
+            EnsurePartTransforms(border, out var scaleTransform, out var translateTransform);
             var duration = TimeSpan.FromMilliseconds(170);
             var easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
-            transform.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
-            transform.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
+            translateTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(yOffset, duration) { EasingFunction = easing });
         }
 
-        private static ScaleTransform EnsureScaleTransform(Border border)
+        private static void EnsurePartTransforms(
+            Border border,
+            out ScaleTransform scaleTransform,
+            out TranslateTransform translateTransform)
         {
-            if (border.RenderTransform is ScaleTransform transform && !transform.IsFrozen)
-                return transform;
+            if (border.RenderTransform is TransformGroup group &&
+                group.Children.OfType<ScaleTransform>().FirstOrDefault() is ScaleTransform existingScale &&
+                group.Children.OfType<TranslateTransform>().FirstOrDefault() is TranslateTransform existingTranslate)
+            {
+                scaleTransform = existingScale;
+                translateTransform = existingTranslate;
+                return;
+            }
 
-            transform = new ScaleTransform(1, 1);
-            border.RenderTransform = transform;
-            return transform;
+            scaleTransform = new ScaleTransform(1, 1);
+            translateTransform = new TranslateTransform(0, 0);
+            group = new TransformGroup();
+            group.Children.Add(scaleTransform);
+            group.Children.Add(translateTransform);
+            border.RenderTransform = group;
         }
 
         private static string GetNodeKey(object sender)
@@ -773,33 +999,33 @@ namespace TweakWise.Pages
             {
                 ["Power"] = new BoardNode
                 {
-                    Title = "Питание и лимиты",
-                    Description = "Схема питания, ограничения Windows, VRM и поведение устройства от сети или батареи.",
+                    Title = "Питание",
+                    Description = "Режим питания Windows и работа устройства от сети или батареи.",
                     Actions = new List<BoardAction>
                     {
-                        new() { Title = "Схема питания", Channel = "powercfg", Description = "Внутренний переключатель профиля питания с оценкой риска и откатом, без открытия внешних настроек." },
-                        new() { Title = "Power Throttling", Channel = "реестр", Description = "Ограничения фоновой экономии энергии напрямую влияют на частоты и отзывчивость под нагрузкой." },
+                        new() { Title = "План питания", Channel = "powercfg", Description = "Профиль Windows влияет на частоты, нагрев и скорость реакции системы под нагрузкой." },
+                        new() { Title = "Экономия энергии в фоне", Channel = "реестр", Description = "Если Windows слишком активно экономит энергию, приложения могут медленнее реагировать под нагрузкой." },
                         new() { Title = "Питание ноутбука", Channel = "Windows", Description = "При работе от батареи карта показывает рекомендацию только если система реально отключена от сети." }
                     }
                 },
                 ["Cpu"] = new BoardNode
                 {
                     Title = "CPU",
-                    Description = "Планировщик, boost-поведение, тепловой запас и настройки, влияющие на частоты процессора.",
+                    Description = "Частоты процессора, автоматическое ускорение и тепловой запас под нагрузкой.",
                     Actions = new List<BoardAction>
                     {
                         new() { Title = "Приоритет нагрузки", Channel = "реестр", Description = "Параметры планировщика относятся к процессору, а не к общему разделу системы." },
-                        new() { Title = "Boost и лимиты", Channel = "powercfg", Description = "Максимальное состояние CPU и boost-режим управляют частотами, нагревом и шумом." },
+                        new() { Title = "Ускорение процессора", Channel = "powercfg", Description = "Настройки CPU влияют на скорость работы, температуру и шум охлаждения." },
                         new() { Title = "Температура CPU", Channel = "датчики", Description = "Если датчики показывают высокий нагрев, табличка появляется прямо от CPU без наведения." }
                     }
                 },
                 ["Gpu"] = new BoardNode
                 {
                     Title = "GPU",
-                    Description = "Графический стек, драйверные настройки и тепловое состояние видеоядра.",
+                    Description = "Драйвер, графический профиль приложений и нагрев видеокарты.",
                     Actions = new List<BoardAction>
                     {
-                        new() { Title = "Аппаратное планирование GPU", Channel = "реестр", Description = "Параметр относится к видеокарте и требует понятного предупреждения о перезапуске." },
+                        new() { Title = "Планирование графики", Channel = "реестр", Description = "Параметр относится к видеокарте и может потребовать перезапуск для применения." },
                         new() { Title = "Графический профиль приложений", Channel = "Windows", Description = "Параметры графики должны редактироваться прямо в TweakWise; игровые функции Windows остаются в другом разделе." },
                         new() { Title = "Температура GPU", Channel = "датчики", Description = "Высокая температура или hot spot выводятся отдельной табличкой у видеокарты." }
                     }
@@ -807,23 +1033,23 @@ namespace TweakWise.Pages
                 ["Ram"] = new BoardNode
                 {
                     Title = "Оперативная память",
-                    Description = "RAM как часть производительности: каналы, стабильность под нагрузкой и рекомендации без смешивания с дисками.",
+                    Description = "Загрузка ОЗУ, каналы памяти и стабильность под тяжёлыми задачами.",
                     Actions = new List<BoardAction>
                     {
-                        new() { Title = "Каналы и доступный объём", Channel = "диагностика", Description = "На карте RAM отвечает только за оперативную память, без дисков, файла подкачки и VRAM отдельным пунктом." },
-                        new() { Title = "Профили памяти", Channel = "BIOS/UEFI", Description = "EXPO/XMP не меняются из приложения напрямую, но могут быть показаны как ручная рекомендация." },
+                        new() { Title = "Объём и загрузка", Channel = "диагностика", Description = "Показывает, хватает ли оперативной памяти для текущих задач." },
+                        new() { Title = "Настройки памяти", Channel = "BIOS/UEFI", Description = "Профили памяти меняются в BIOS/UEFI, поэтому приложение показывает только понятную рекомендацию." },
                         new() { Title = "Стабильность", Channel = "проверка", Description = "Проблемы памяти выводятся отдельной табличкой от планок RAM." }
                     }
                 },
                 ["Cooling"] = new BoardNode
                 {
                     Title = "Охлаждение",
-                    Description = "Температуры CPU/GPU/платы, вентиляторы и тепловой запас для производительных режимов.",
+                    Description = "Вентиляторы, датчики температуры и запас охлаждения для производительных режимов.",
                     Actions = new List<BoardAction>
                     {
-                        new() { Title = "Температурные пороги", Channel = "датчики", Description = "Высокий нагрев показывает постоянную табличку у контура охлаждения." },
-                        new() { Title = "Кривая вентиляторов", Channel = "безопасный режим", Description = "Если прямое управление недоступно, показываем диагностику и ручную рекомендацию, не обещая невозможную запись." },
-                        new() { Title = "Тепловой запас", Channel = "анализ", Description = "Карта связывает питание, CPU и GPU с охлаждением, чтобы рекомендации не висели отдельно от железа." }
+                        new() { Title = "Температуры", Channel = "датчики", Description = "Высокий нагрев показывает постоянную табличку у контура охлаждения." },
+                        new() { Title = "Работа вентиляторов", Channel = "безопасный режим", Description = "Если прямое управление недоступно, приложение показывает диагностику и ручную рекомендацию." },
+                        new() { Title = "Запас охлаждения", Channel = "анализ", Description = "Карта связывает питание, CPU и GPU с охлаждением, чтобы рекомендации были понятны по месту." }
                     }
                 }
             };

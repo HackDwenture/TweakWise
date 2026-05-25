@@ -8,12 +8,46 @@
       Focusable="True"
       Background="{DynamicResource WindowBackground}">
     <Page.Resources>
-        <Style x:Key="BoardNodeStyle" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1.2"/>
-            <Setter Property="CornerRadius" Value="14"/>
-            <Setter Property="Padding" Value="16"/>
+        <Style x:Key="BackButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="38"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BoardPartHitStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
@@ -21,59 +55,114 @@
 
         <Style x:Key="BoardNodeGlowStyle" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource CoreLineActiveBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="CornerRadius" Value="16"/>
             <Setter Property="Opacity" Value="0"/>
             <Setter Property="IsHitTestVisible" Value="False"/>
         </Style>
 
-        <Style x:Key="BoardTitleTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+        <Style x:Key="BoardPartShellStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1.25"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Opacity" Value="0.97"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="16" ShadowDepth="0" Opacity="0.14" Color="#05080D"/>
+                </Setter.Value>
+            </Setter>
         </Style>
 
-        <Style x:Key="BoardSubTextStyle" TargetType="TextBlock">
-            <Setter Property="Margin" Value="0,7,0,0"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Opacity" Value="0.72"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
+        <Style x:Key="BoardLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="BoardSmallLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Opacity" Value="0.76"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="BoardTraceLineStyle" TargetType="Line">
+            <Setter Property="Stroke" Value="{DynamicResource CoreLineBrush}"/>
+            <Setter Property="StrokeThickness" Value="0.95"/>
+            <Setter Property="Opacity" Value="0.18"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <Style x:Key="BoardTracePolylineStyle" TargetType="Polyline">
+            <Setter Property="Stroke" Value="{DynamicResource CoreLineBrush}"/>
+            <Setter Property="StrokeThickness" Value="1"/>
+            <Setter Property="Opacity" Value="0.20"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <Style x:Key="BoardOutlineStyle" TargetType="Rectangle">
+            <Setter Property="Stroke" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="StrokeThickness" Value="1.15"/>
+            <Setter Property="Opacity" Value="0.28"/>
+            <Setter Property="Fill" Value="Transparent"/>
         </Style>
 
         <Style x:Key="DiagnosticCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="12"/>
             <Setter Property="Padding" Value="14,12"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.22" Color="#05080D"/>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="DetailsCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Padding" Value="14"/>
             <Setter Property="Margin" Value="0,0,0,10"/>
         </Style>
+
+        <Style x:Key="BoardToolTipStyle" TargetType="ToolTip">
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="MaxWidth" Value="300"/>
+        </Style>
     </Page.Resources>
 
-    <Grid x:Name="RootLayer"
-          Background="{DynamicResource WindowBackground}"
-          ClipToBounds="True">
+    <Grid Background="{DynamicResource WindowBackground}" ClipToBounds="True">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0"
-              Margin="28,20,28,0"
-              IsHitTestVisible="False">
-            <StackPanel HorizontalAlignment="Left">
+        <Grid Grid.Row="0" Margin="28,18,28,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="18"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0"
+                    Content="&#xE72B;"
+                    Style="{StaticResource BackButtonStyle}"
+                    ToolTip="Назад на главный экран"
+                    Click="BackButton_Click"/>
+
+            <StackPanel Grid.Column="2">
                 <StackPanel Orientation="Horizontal">
                     <Ellipse x:Name="ModuleStatusIndicator"
                              Width="9"
@@ -92,88 +181,90 @@
                            TextWrapping="Wrap"/>
             </StackPanel>
 
-            <TextBlock Text="Карта узлов питания, CPU, GPU, RAM и охлаждения"
-                       HorizontalAlignment="Right"
-                       VerticalAlignment="Top"
-                       Margin="0,28,0,0"
+            <TextBlock Grid.Column="3"
+                       Text="Схема узлов питания, CPU, GPU, RAM и охлаждения"
+                       VerticalAlignment="Center"
                        FontSize="13"
                        Opacity="0.62"/>
         </Grid>
 
-        <Grid Grid.Row="1"
-              Margin="24,0,24,18">
+        <Grid Grid.Row="1" Margin="24,0,24,18">
             <Viewbox Stretch="Uniform"
-                     MaxWidth="1260"
-                     MaxHeight="760"
+                     MaxWidth="1340"
+                     MaxHeight="790"
                      HorizontalAlignment="Center"
                      VerticalAlignment="Center">
-                <Canvas x:Name="BoardCanvas"
-                        Width="1180"
-                        Height="720">
-                    <Border Canvas.Left="56"
-                            Canvas.Top="38"
-                            Width="1068"
-                            Height="620"
+                <Canvas x:Name="BoardCanvas" Width="1220" Height="720">
+                    <Border Canvas.Left="82"
+                            Canvas.Top="50"
+                            Width="1056"
+                            Height="606"
                             Background="{DynamicResource ContentBackground}"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="26"
-                            Opacity="0.96"/>
+                            CornerRadius="22"
+                            Opacity="0.98">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.16" Color="#05080D"/>
+                        </Border.Effect>
+                    </Border>
 
-                    <Canvas x:Name="CircuitTextureLayer"
-                            IsHitTestVisible="False"
-                            Opacity="0.72">
-                        <Canvas.Resources>
-                            <Style TargetType="Line">
-                                <Setter Property="Stroke" Value="{DynamicResource CoreLineBrush}"/>
-                                <Setter Property="StrokeThickness" Value="1"/>
-                                <Setter Property="Opacity" Value="0.22"/>
-                                <Setter Property="SnapsToDevicePixels" Value="True"/>
-                            </Style>
-                            <Style TargetType="Polyline">
-                                <Setter Property="Stroke" Value="{DynamicResource CoreLineBrush}"/>
-                                <Setter Property="StrokeThickness" Value="1.1"/>
-                                <Setter Property="Opacity" Value="0.28"/>
-                                <Setter Property="SnapsToDevicePixels" Value="True"/>
-                            </Style>
-                            <Style TargetType="Ellipse">
-                                <Setter Property="Stroke" Value="{DynamicResource CoreLineBrush}"/>
-                                <Setter Property="StrokeThickness" Value="1"/>
-                                <Setter Property="Opacity" Value="0.18"/>
-                            </Style>
-                        </Canvas.Resources>
+                    <Border Canvas.Left="128"
+                            Canvas.Top="94"
+                            Width="964"
+                            Height="520"
+                            Background="{DynamicResource WindowBackground}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="18"
+                            Opacity="0.36"/>
 
-                        <Ellipse Canvas.Left="392" Canvas.Top="150" Width="396" Height="396" StrokeDashArray="12,10" Opacity="0.23"/>
-                        <Ellipse Canvas.Left="450" Canvas.Top="208" Width="280" Height="280" Opacity="0.18"/>
-                        <Rectangle Canvas.Left="104" Canvas.Top="90" Width="972" Height="506" RadiusX="18" RadiusY="18" Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="1" Opacity="0.18"/>
-                        <Rectangle Canvas.Left="160" Canvas.Top="142" Width="860" Height="402" RadiusX="14" RadiusY="14" Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="1" Opacity="0.14"/>
+                    <Canvas x:Name="MotherboardLayer" IsHitTestVisible="False">
+                        <Rectangle Canvas.Left="154" Canvas.Top="116" Width="912" Height="474" RadiusX="14" RadiusY="14" Style="{StaticResource BoardOutlineStyle}" Opacity="0.28"/>
+                        <Rectangle Canvas.Left="206" Canvas.Top="166" Width="808" Height="374" RadiusX="10" RadiusY="10" Style="{StaticResource BoardOutlineStyle}" Opacity="0.16"/>
 
-                        <Line X1="590" Y1="62" X2="590" Y2="640" Opacity="0.12"/>
-                        <Line X1="112" Y1="348" X2="1068" Y2="348" Opacity="0.12"/>
-                        <Line X1="288" Y1="92" X2="288" Y2="596" Opacity="0.10"/>
-                        <Line X1="890" Y1="92" X2="890" Y2="596" Opacity="0.10"/>
+                        <Line X1="610" Y1="116" X2="610" Y2="590" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.10"/>
+                        <Line X1="154" Y1="340" X2="1066" Y2="340" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.10"/>
+                        <Line X1="395" Y1="166" X2="395" Y2="604" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.07"/>
+                        <Line X1="854" Y1="166" X2="854" Y2="604" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.07"/>
 
-                        <Polyline Points="224,168 388,168 388,270 498,270"/>
-                        <Polyline Points="948,168 792,168 792,270 682,270"/>
-                        <Polyline Points="260,514 402,514 402,418 498,418"/>
-                        <Polyline Points="920,510 776,510 776,420 682,420"/>
-                        <Polyline Points="590,178 590,252"/>
-                        <Polyline Points="590,442 590,588"/>
-                        <Polyline Points="174,286 320,286 320,330 498,330"/>
-                        <Polyline Points="1006,286 860,286 860,330 682,330"/>
+                        <Rectangle Canvas.Left="292" Canvas.Top="158" Width="206" Height="134" RadiusX="12" RadiusY="12" Style="{StaticResource BoardOutlineStyle}" Opacity="0.20"/>
+                        <Rectangle Canvas.Left="512" Canvas.Top="242" Width="196" Height="196" RadiusX="16" RadiusY="16" Style="{StaticResource BoardOutlineStyle}" Opacity="0.22"/>
+                        <Rectangle Canvas.Left="752" Canvas.Top="158" Width="204" Height="298" RadiusX="12" RadiusY="12" Style="{StaticResource BoardOutlineStyle}" Opacity="0.20"/>
+                        <Rectangle Canvas.Left="292" Canvas.Top="492" Width="426" Height="120" RadiusX="12" RadiusY="12" Style="{StaticResource BoardOutlineStyle}" Opacity="0.20"/>
+                        <Rectangle Canvas.Left="782" Canvas.Top="492" Width="246" Height="120" RadiusX="12" RadiusY="12" Style="{StaticResource BoardOutlineStyle}" Opacity="0.20"/>
 
-                        <Ellipse Canvas.Left="220" Canvas.Top="164" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" StrokeThickness="0" Opacity="0.32"/>
-                        <Ellipse Canvas.Left="944" Canvas.Top="164" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" StrokeThickness="0" Opacity="0.32"/>
-                        <Ellipse Canvas.Left="256" Canvas.Top="510" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" StrokeThickness="0" Opacity="0.32"/>
-                        <Ellipse Canvas.Left="916" Canvas.Top="506" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" StrokeThickness="0" Opacity="0.32"/>
+                        <Polyline Points="490,226 506,226 506,300 520,300" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.28"/>
+                        <Polyline Points="490,252 506,252 506,338 520,338" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.20"/>
+                        <Polyline Points="700,306 736,306 736,304 760,304" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.28"/>
+                        <Polyline Points="700,340 736,340 736,334 760,334" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.22"/>
+                        <Polyline Points="610,430 610,476 505,476 505,500" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.28"/>
+                        <Polyline Points="640,430 640,476 905,476 905,500" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.22"/>
+
+                        <Rectangle Canvas.Left="184" Canvas.Top="206" Width="70" Height="246" RadiusX="8" RadiusY="8" Style="{StaticResource BoardOutlineStyle}" Opacity="0.16"/>
+                        <Rectangle Canvas.Left="198" Canvas.Top="224" Width="42" Height="30" RadiusX="3" RadiusY="3" Style="{StaticResource BoardOutlineStyle}" Opacity="0.14"/>
+                        <Rectangle Canvas.Left="198" Canvas.Top="270" Width="42" Height="30" RadiusX="3" RadiusY="3" Style="{StaticResource BoardOutlineStyle}" Opacity="0.14"/>
+                        <Rectangle Canvas.Left="198" Canvas.Top="316" Width="42" Height="30" RadiusX="3" RadiusY="3" Style="{StaticResource BoardOutlineStyle}" Opacity="0.14"/>
+                        <Rectangle Canvas.Left="198" Canvas.Top="362" Width="42" Height="30" RadiusX="3" RadiusY="3" Style="{StaticResource BoardOutlineStyle}" Opacity="0.14"/>
+                        <Rectangle Canvas.Left="198" Canvas.Top="408" Width="42" Height="26" RadiusX="3" RadiusY="3" Style="{StaticResource BoardOutlineStyle}" Opacity="0.14"/>
+
+                        <Rectangle Canvas.Left="588" Canvas.Top="144" Width="52" Height="18" RadiusX="2" RadiusY="2" Style="{StaticResource BoardOutlineStyle}" Opacity="0.16"/>
+                        <Rectangle Canvas.Left="716" Canvas.Top="144" Width="62" Height="18" RadiusX="2" RadiusY="2" Style="{StaticResource BoardOutlineStyle}" Opacity="0.16"/>
+                        <Rectangle Canvas.Left="978" Canvas.Top="224" Width="24" Height="112" RadiusX="3" RadiusY="3" Style="{StaticResource BoardOutlineStyle}" Opacity="0.14"/>
+                        <Rectangle Canvas.Left="1010" Canvas.Top="224" Width="18" Height="112" RadiusX="3" RadiusY="3" Style="{StaticResource BoardOutlineStyle}" Opacity="0.12"/>
+
+                        <Polyline Points="254,552 292,552 292,604" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.16"/>
+                        <Polyline Points="1028,552 1066,552 1066,470" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.16"/>
+                        <Ellipse Canvas.Left="558" Canvas.Top="452" Width="72" Height="72" Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="1" Opacity="0.12"/>
+                        <Line X1="594" Y1="452" X2="594" Y2="524" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.10"/>
+                        <Line X1="558" Y1="488" X2="630" Y2="488" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.10"/>
                     </Canvas>
 
-                    <Canvas x:Name="RouteLayer"
-                            IsHitTestVisible="False">
+                    <Canvas x:Name="RouteLayer" IsHitTestVisible="False">
                         <Canvas.Resources>
                             <Style x:Key="BoardRouteLineStyle" TargetType="Line">
                                 <Setter Property="Stroke" Value="{DynamicResource CoreLineActiveBrush}"/>
-                                <Setter Property="StrokeThickness" Value="2.6"/>
+                                <Setter Property="StrokeThickness" Value="2.5"/>
                                 <Setter Property="StrokeDashArray" Value="1,8"/>
                                 <Setter Property="StrokeStartLineCap" Value="Round"/>
                                 <Setter Property="StrokeEndLineCap" Value="Round"/>
@@ -186,204 +277,196 @@
                             </Style>
                         </Canvas.Resources>
 
-                        <Line x:Name="PowerRouteLine" X1="590" Y1="348" X2="258" Y2="184" Style="{StaticResource BoardRouteLineStyle}"/>
-                        <Line x:Name="GpuRouteLine" X1="590" Y1="348" X2="314" Y2="510" Style="{StaticResource BoardRouteLineStyle}"/>
-                        <Line x:Name="RamRouteLine" X1="590" Y1="348" X2="844" Y2="172" Style="{StaticResource BoardRouteLineStyle}"/>
-                        <Line x:Name="CoolingRouteLine" X1="590" Y1="348" X2="885" Y2="444" Style="{StaticResource BoardRouteLineStyle}"/>
+                        <Line x:Name="PowerRouteLine" X1="610" Y1="340" X2="395" Y2="226" Style="{StaticResource BoardRouteLineStyle}"/>
+                        <Line x:Name="GpuRouteLine" X1="610" Y1="340" X2="505" Y2="552" Style="{StaticResource BoardRouteLineStyle}"/>
+                        <Line x:Name="RamRouteLine" X1="610" Y1="340" X2="854" Y2="326" Style="{StaticResource BoardRouteLineStyle}"/>
+                        <Line x:Name="CoolingRouteLine" X1="610" Y1="340" X2="905" Y2="552" Style="{StaticResource BoardRouteLineStyle}"/>
                     </Canvas>
 
-                    <Border x:Name="CpuGlow" Canvas.Left="468" Canvas.Top="230" Width="244" Height="226" Style="{StaticResource BoardNodeGlowStyle}"/>
-                    <Border x:Name="PowerGlow" Canvas.Left="134" Canvas.Top="104" Width="298" Height="164" Style="{StaticResource BoardNodeGlowStyle}"/>
-                    <Border x:Name="RamGlow" Canvas.Left="752" Canvas.Top="102" Width="308" Height="156" Style="{StaticResource BoardNodeGlowStyle}"/>
-                    <Border x:Name="GpuGlow" Canvas.Left="132" Canvas.Top="426" Width="370" Height="132" Style="{StaticResource BoardNodeGlowStyle}"/>
-                    <Border x:Name="CoolingGlow" Canvas.Left="732" Canvas.Top="382" Width="332" Height="178" Style="{StaticResource BoardNodeGlowStyle}"/>
-
-                    <Border x:Name="CpuZone"
-                            Tag="Cpu"
-                            Canvas.Left="492"
-                            Canvas.Top="252"
-                            Width="196"
-                            Height="182"
-                            Style="{StaticResource BoardNodeStyle}"
-                            MouseEnter="Component_MouseEnter"
-                            MouseLeave="Component_MouseLeave"
-                            MouseLeftButtonUp="Component_MouseLeftButtonUp">
-                        <Grid>
-                            <Border Background="{DynamicResource CoreOrbShadowBrush}"
-                                    BorderBrush="{DynamicResource CoreLineActiveBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="12"
-                                    Margin="13"
-                                    Opacity="0.46"/>
-                            <Grid Margin="28">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Rectangle Grid.Row="0" Grid.Column="0" Fill="{DynamicResource CoreLineBrush}" Opacity="0.20" Margin="2"/>
-                                <Rectangle Grid.Row="0" Grid.Column="1" Fill="{DynamicResource CoreLineBrush}" Opacity="0.30" Margin="2"/>
-                                <Rectangle Grid.Row="0" Grid.Column="2" Fill="{DynamicResource CoreLineBrush}" Opacity="0.18" Margin="2"/>
-                                <Rectangle Grid.Row="0" Grid.Column="3" Fill="{DynamicResource CoreLineBrush}" Opacity="0.26" Margin="2"/>
-                                <Rectangle Grid.Row="1" Grid.Column="0" Fill="{DynamicResource CoreLineBrush}" Opacity="0.28" Margin="2"/>
-                                <Rectangle Grid.Row="1" Grid.Column="1" Fill="{DynamicResource CoreLineBrush}" Opacity="0.20" Margin="2"/>
-                                <Rectangle Grid.Row="1" Grid.Column="2" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32" Margin="2"/>
-                                <Rectangle Grid.Row="1" Grid.Column="3" Fill="{DynamicResource CoreLineBrush}" Opacity="0.22" Margin="2"/>
-                                <Rectangle Grid.Row="2" Grid.Column="0" Fill="{DynamicResource CoreLineBrush}" Opacity="0.17" Margin="2"/>
-                                <Rectangle Grid.Row="2" Grid.Column="1" Fill="{DynamicResource CoreLineBrush}" Opacity="0.26" Margin="2"/>
-                                <Rectangle Grid.Row="2" Grid.Column="2" Fill="{DynamicResource CoreLineBrush}" Opacity="0.19" Margin="2"/>
-                                <Rectangle Grid.Row="2" Grid.Column="3" Fill="{DynamicResource CoreLineBrush}" Opacity="0.30" Margin="2"/>
-                                <Rectangle Grid.Row="3" Grid.Column="0" Fill="{DynamicResource CoreLineBrush}" Opacity="0.24" Margin="2"/>
-                                <Rectangle Grid.Row="3" Grid.Column="1" Fill="{DynamicResource CoreLineBrush}" Opacity="0.18" Margin="2"/>
-                                <Rectangle Grid.Row="3" Grid.Column="2" Fill="{DynamicResource CoreLineBrush}" Opacity="0.28" Margin="2"/>
-                                <Rectangle Grid.Row="3" Grid.Column="3" Fill="{DynamicResource CoreLineBrush}" Opacity="0.21" Margin="2"/>
-                            </Grid>
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <TextBlock Text="CPU"
-                                           FontSize="21"
-                                           FontWeight="SemiBold"
-                                           HorizontalAlignment="Center"/>
-                                <TextBlock Text="планировщик, boost"
-                                           Margin="0,6,0,0"
-                                           FontSize="11"
-                                           Opacity="0.74"
-                                           HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
+                    <Border x:Name="PowerGlow" Canvas.Left="300" Canvas.Top="166" Width="190" Height="118" Style="{StaticResource BoardNodeGlowStyle}"/>
+                    <Border x:Name="CpuGlow" Canvas.Left="520" Canvas.Top="250" Width="180" Height="180" Style="{StaticResource BoardNodeGlowStyle}"/>
+                    <Border x:Name="RamGlow" Canvas.Left="760" Canvas.Top="166" Width="188" Height="282" Style="{StaticResource BoardNodeGlowStyle}"/>
+                    <Border x:Name="GpuGlow" Canvas.Left="300" Canvas.Top="500" Width="410" Height="104" Style="{StaticResource BoardNodeGlowStyle}"/>
+                    <Border x:Name="CoolingGlow" Canvas.Left="790" Canvas.Top="500" Width="230" Height="104" Style="{StaticResource BoardNodeGlowStyle}"/>
 
                     <Border x:Name="PowerZone"
                             Tag="Power"
-                            Canvas.Left="152"
-                            Canvas.Top="122"
-                            Width="262"
-                            Height="128"
-                            Style="{StaticResource BoardNodeStyle}"
+                            Canvas.Left="300"
+                            Canvas.Top="166"
+                            Width="190"
+                            Height="118"
+                            Style="{StaticResource BoardPartHitStyle}"
                             MouseEnter="Component_MouseEnter"
                             MouseLeave="Component_MouseLeave"
                             MouseLeftButtonUp="Component_MouseLeftButtonUp">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="Питание и лимиты" Style="{StaticResource BoardTitleTextStyle}"/>
-                            <TextBlock Grid.Row="1" Text="power plan, throttling, VRM" Style="{StaticResource BoardSubTextStyle}"/>
-                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
-                                <Rectangle Width="18" Height="42" Fill="{DynamicResource CoreLineBrush}" Opacity="0.30" Margin="0,0,7,0"/>
-                                <Rectangle Width="18" Height="56" Fill="{DynamicResource CoreLineBrush}" Opacity="0.42" Margin="0,0,7,0"/>
-                                <Rectangle Width="18" Height="34" Fill="{DynamicResource CoreLineBrush}" Opacity="0.26"/>
-                            </StackPanel>
-                        </Grid>
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Питание" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Показывает, какой режим питания влияет на частоты, нагрев и работу от сети или батареи." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Canvas>
+                            <Border Canvas.Left="0" Canvas.Top="0" Width="190" Height="118" Style="{StaticResource BoardPartShellStyle}"/>
+                            <TextBlock Canvas.Left="18" Canvas.Top="16" Text="Питание" Style="{StaticResource BoardLabelStyle}"/>
+                            <TextBlock Canvas.Left="18" Canvas.Top="44" Width="112" Text="режим питания" Style="{StaticResource BoardSmallLabelStyle}"/>
+                            <Ellipse Canvas.Left="20" Canvas.Top="82" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32"/>
+                            <Ellipse Canvas.Left="42" Canvas.Top="82" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.26"/>
+                            <Ellipse Canvas.Left="64" Canvas.Top="82" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32"/>
+                            <Rectangle x:Name="PowerPhaseA" Canvas.Left="112" Canvas.Top="42" Width="18" Height="52" RadiusX="2" RadiusY="2" Fill="{DynamicResource CoreLineBrush}" Opacity="0.30"/>
+                            <Rectangle x:Name="PowerPhaseB" Canvas.Left="140" Canvas.Top="32" Width="18" Height="72" RadiusX="2" RadiusY="2" Fill="{DynamicResource CoreLineBrush}" Opacity="0.42"/>
+                            <Rectangle x:Name="PowerPhaseC" Canvas.Left="168" Canvas.Top="42" Width="18" Height="52" RadiusX="2" RadiusY="2" Fill="{DynamicResource CoreLineBrush}" Opacity="0.30"/>
+                        </Canvas>
+                    </Border>
+
+                    <Border x:Name="CpuZone"
+                            Tag="Cpu"
+                            Canvas.Left="520"
+                            Canvas.Top="250"
+                            Width="180"
+                            Height="180"
+                            Style="{StaticResource BoardPartHitStyle}"
+                            MouseEnter="Component_MouseEnter"
+                            MouseLeave="Component_MouseLeave"
+                            MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Процессор" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Здесь собраны параметры, которые влияют на скорость CPU, автоматическое ускорение и нагрев под нагрузкой." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Canvas>
+                            <Border Canvas.Left="0" Canvas.Top="0" Width="180" Height="180" Style="{StaticResource BoardPartShellStyle}" Opacity="0.92"/>
+                            <Rectangle x:Name="CpuPackageGlow" Canvas.Left="16" Canvas.Top="16" Width="148" Height="148" RadiusX="14" RadiusY="14" Stroke="{DynamicResource CoreLineActiveBrush}" StrokeThickness="1.8" Fill="{DynamicResource ContentBackground}" Opacity="0.82"/>
+                            <Rectangle Canvas.Left="42" Canvas.Top="42" Width="96" Height="96" RadiusX="10" RadiusY="10" Stroke="{DynamicResource BorderBrush}" StrokeThickness="1.2" Fill="{DynamicResource WindowBackground}" Opacity="0.98"/>
+                            <UniformGrid x:Name="CpuActivityGrid" Canvas.Left="58" Canvas.Top="58" Width="64" Height="64" Columns="3" Rows="3" Opacity="0.72">
+                                <Rectangle Fill="{DynamicResource CoreLineBrush}" Margin="3" Opacity="0.28"/>
+                                <Rectangle Fill="{DynamicResource CoreLineBrush}" Margin="3" Opacity="0.38"/>
+                                <Rectangle Fill="{DynamicResource CoreLineBrush}" Margin="3" Opacity="0.26"/>
+                                <Rectangle Fill="{DynamicResource CoreLineBrush}" Margin="3" Opacity="0.34"/>
+                                <Rectangle Fill="{DynamicResource CoreLineBrush}" Margin="3" Opacity="0.46"/>
+                                <Rectangle Fill="{DynamicResource CoreLineBrush}" Margin="3" Opacity="0.30"/>
+                                <Rectangle Fill="{DynamicResource CoreLineBrush}" Margin="3" Opacity="0.24"/>
+                                <Rectangle Fill="{DynamicResource CoreLineBrush}" Margin="3" Opacity="0.33"/>
+                                <Rectangle Fill="{DynamicResource CoreLineBrush}" Margin="3" Opacity="0.22"/>
+                            </UniformGrid>
+                            <TextBlock Canvas.Left="42" Canvas.Top="76" Width="96" Text="CPU" FontSize="24" FontWeight="SemiBold" TextAlignment="Center"/>
+                            <TextBlock Canvas.Left="36" Canvas.Top="110" Width="108" Text="частоты CPU" TextAlignment="Center" Style="{StaticResource BoardSmallLabelStyle}"/>
+                        </Canvas>
                     </Border>
 
                     <Border x:Name="RamZone"
                             Tag="Ram"
-                            Canvas.Left="772"
-                            Canvas.Top="120"
-                            Width="268"
-                            Height="120"
-                            Style="{StaticResource BoardNodeStyle}"
+                            Canvas.Left="760"
+                            Canvas.Top="166"
+                            Width="188"
+                            Height="282"
+                            Style="{StaticResource BoardPartHitStyle}"
                             MouseEnter="Component_MouseEnter"
                             MouseLeave="Component_MouseLeave"
                             MouseLeftButtonUp="Component_MouseLeftButtonUp">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="RAM" Style="{StaticResource BoardTitleTextStyle}"/>
-                            <TextBlock Grid.Row="1" Text="каналы, объём, стабильность" Style="{StaticResource BoardSubTextStyle}"/>
-                            <Grid Grid.Row="1" Margin="122,10,0,0">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="7"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-                                <Border Background="{DynamicResource CoreOrbShadowBrush}" BorderBrush="{DynamicResource CoreLineBrush}" BorderThickness="1" CornerRadius="5" Opacity="0.64"/>
-                                <Border Grid.Row="2" Background="{DynamicResource CoreOrbShadowBrush}" BorderBrush="{DynamicResource CoreLineBrush}" BorderThickness="1" CornerRadius="5" Opacity="0.52"/>
-                            </Grid>
-                        </Grid>
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Оперативная память" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Показывает загрузку ОЗУ и рекомендации, если памяти становится мало для производительных режимов." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Canvas>
+                            <Border Canvas.Left="0" Canvas.Top="0" Width="188" Height="282" Style="{StaticResource BoardPartShellStyle}"/>
+                            <TextBlock Canvas.Left="18" Canvas.Top="18" Text="RAM" Style="{StaticResource BoardLabelStyle}"/>
+                            <TextBlock Canvas.Left="18" Canvas.Top="45" Width="134" Text="оперативная память" Style="{StaticResource BoardSmallLabelStyle}"/>
+                            <Rectangle Canvas.Left="26" Canvas.Top="82" Width="136" Height="2" Fill="{DynamicResource CoreLineBrush}" Opacity="0.28"/>
+                            <Rectangle x:Name="RamSlotA" Canvas.Left="28" Canvas.Top="96" Width="18" Height="160" RadiusX="3" RadiusY="3" Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="1.4" Fill="{DynamicResource WindowBackground}" Opacity="0.76"/>
+                            <Rectangle x:Name="RamSlotB" Canvas.Left="68" Canvas.Top="96" Width="18" Height="160" RadiusX="3" RadiusY="3" Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="1.4" Fill="{DynamicResource WindowBackground}" Opacity="0.66"/>
+                            <Rectangle x:Name="RamSlotC" Canvas.Left="108" Canvas.Top="96" Width="18" Height="160" RadiusX="3" RadiusY="3" Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="1.4" Fill="{DynamicResource WindowBackground}" Opacity="0.76"/>
+                            <Rectangle x:Name="RamSlotD" Canvas.Left="148" Canvas.Top="96" Width="18" Height="160" RadiusX="3" RadiusY="3" Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="1.4" Fill="{DynamicResource WindowBackground}" Opacity="0.66"/>
+                        </Canvas>
                     </Border>
 
                     <Border x:Name="GpuZone"
                             Tag="Gpu"
-                            Canvas.Left="152"
-                            Canvas.Top="444"
-                            Width="332"
-                            Height="96"
-                            Style="{StaticResource BoardNodeStyle}"
+                            Canvas.Left="300"
+                            Canvas.Top="500"
+                            Width="410"
+                            Height="104"
+                            Style="{StaticResource BoardPartHitStyle}"
                             MouseEnter="Component_MouseEnter"
                             MouseLeave="Component_MouseLeave"
                             MouseLeftButtonUp="Component_MouseLeftButtonUp">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="82"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="GPU" Style="{StaticResource BoardTitleTextStyle}"/>
-                                <TextBlock Text="драйвер, графический стек, температура" Style="{StaticResource BoardSubTextStyle}"/>
-                            </StackPanel>
-                            <Grid Grid.Column="1" Width="74" Height="48" VerticalAlignment="Center">
-                                <Ellipse Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="2" Opacity="0.38"/>
-                                <Line X1="37" Y1="5" X2="37" Y2="43" Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="1.6" Opacity="0.36"/>
-                                <Line X1="10" Y1="24" X2="64" Y2="24" Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="1.6" Opacity="0.36"/>
-                            </Grid>
-                        </Grid>
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Видеокарта" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Отвечает за графические параметры, состояние драйвера и температуру GPU во время нагрузки." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Canvas>
+                            <Border Canvas.Left="0" Canvas.Top="0" Width="410" Height="104" Style="{StaticResource BoardPartShellStyle}"/>
+                            <TextBlock Canvas.Left="20" Canvas.Top="18" Text="GPU" Style="{StaticResource BoardLabelStyle}"/>
+                            <TextBlock Canvas.Left="20" Canvas.Top="45" Width="166" Text="видеокарта" Style="{StaticResource BoardSmallLabelStyle}"/>
+                            <Rectangle Canvas.Left="190" Canvas.Top="48" Width="190" Height="12" RadiusX="2" RadiusY="2" Fill="{DynamicResource CoreLineBrush}" Opacity="0.20"/>
+                            <Rectangle Canvas.Left="178" Canvas.Top="42" Width="8" Height="24" RadiusX="2" RadiusY="2" Fill="{DynamicResource CoreLineBrush}" Opacity="0.34"/>
+                            <Rectangle Canvas.Left="190" Canvas.Top="75" Width="190" Height="3" Fill="{DynamicResource CoreLineBrush}" Opacity="0.16"/>
+                            <Rectangle x:Name="GpuSignalPulse" Canvas.Left="194" Canvas.Top="50" Width="42" Height="8" RadiusX="4" RadiusY="4" Fill="{DynamicResource CoreLineActiveBrush}" Opacity="0">
+                                <Rectangle.RenderTransform>
+                                    <TranslateTransform x:Name="GpuSignalTranslate" X="0"/>
+                                </Rectangle.RenderTransform>
+                            </Rectangle>
+                        </Canvas>
                     </Border>
 
                     <Border x:Name="CoolingZone"
                             Tag="Cooling"
-                            Canvas.Left="752"
-                            Canvas.Top="402"
-                            Width="292"
-                            Height="138"
-                            Style="{StaticResource BoardNodeStyle}"
+                            Canvas.Left="790"
+                            Canvas.Top="500"
+                            Width="230"
+                            Height="104"
+                            Style="{StaticResource BoardPartHitStyle}"
                             MouseEnter="Component_MouseEnter"
                             MouseLeave="Component_MouseLeave"
                             MouseLeftButtonUp="Component_MouseLeftButtonUp">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="82"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Охлаждение" Style="{StaticResource BoardTitleTextStyle}"/>
-                                <TextBlock Text="датчики, вентиляторы, термоконтур" Style="{StaticResource BoardSubTextStyle}"/>
-                            </StackPanel>
-                            <Grid Grid.Column="1" Width="76" Height="76" VerticalAlignment="Center">
-                                <Ellipse Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="2" Opacity="0.42"/>
-                                <Ellipse Width="18" Height="18" Fill="{DynamicResource CoreLineBrush}" Opacity="0.45" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <Path Fill="{DynamicResource CoreLineBrush}" Opacity="0.34" Data="M38,10 C52,12 57,23 48,32 C44,35 39,36 36,32 Z"/>
-                                <Path Fill="{DynamicResource CoreLineBrush}" Opacity="0.28" Data="M66,38 C64,52 53,57 44,48 C41,44 40,39 44,36 Z"/>
-                                <Path Fill="{DynamicResource CoreLineBrush}" Opacity="0.34" Data="M38,66 C24,64 19,53 28,44 C32,41 37,40 40,44 Z"/>
-                                <Path Fill="{DynamicResource CoreLineBrush}" Opacity="0.28" Data="M10,38 C12,24 23,19 32,28 C35,32 36,37 32,40 Z"/>
-                            </Grid>
-                        </Grid>
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Охлаждение" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Здесь видны температуры и рекомендации по вентиляторам, если системе не хватает охлаждения." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Canvas>
+                            <Border Canvas.Left="0" Canvas.Top="0" Width="230" Height="104" Style="{StaticResource BoardPartShellStyle}"/>
+                            <TextBlock Canvas.Left="20" Canvas.Top="18" Text="Охлаждение" Style="{StaticResource BoardLabelStyle}"/>
+                            <TextBlock Canvas.Left="20" Canvas.Top="47" Width="112" Text="температуры" Style="{StaticResource BoardSmallLabelStyle}"/>
+                            <Ellipse Canvas.Left="24" Canvas.Top="78" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.30"/>
+                            <Ellipse Canvas.Left="46" Canvas.Top="78" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.24"/>
+                            <Ellipse Canvas.Left="68" Canvas.Top="78" Width="8" Height="8" Fill="{DynamicResource CoreLineBrush}" Opacity="0.30"/>
+                            <Canvas x:Name="CoolingFanRotor" Canvas.Left="142" Canvas.Top="15" Width="74" Height="74" RenderTransformOrigin="0.5,0.5">
+                                <Canvas.RenderTransform>
+                                    <RotateTransform x:Name="CoolingFanRotate" Angle="0"/>
+                                </Canvas.RenderTransform>
+                                <Ellipse Width="74" Height="74" Stroke="{DynamicResource CoreLineBrush}" StrokeThickness="2" Opacity="0.54"/>
+                                <Path Fill="{DynamicResource CoreLineBrush}" Opacity="0.34" Data="M37,7 C52,9 58,22 48,32 C44,36 39,36 35,32 Z"/>
+                                <Path Fill="{DynamicResource CoreLineBrush}" Opacity="0.28" Data="M67,37 C65,52 52,58 42,48 C39,44 39,39 43,35 Z"/>
+                                <Path Fill="{DynamicResource CoreLineBrush}" Opacity="0.34" Data="M37,67 C22,65 16,52 26,42 C30,39 35,39 39,43 Z"/>
+                                <Path Fill="{DynamicResource CoreLineBrush}" Opacity="0.28" Data="M7,37 C9,22 22,16 32,26 C36,30 36,35 32,39 Z"/>
+                            </Canvas>
+                            <Ellipse Canvas.Left="170" Canvas.Top="43" Width="18" Height="18" Fill="{DynamicResource CoreLineBrush}" Opacity="0.48"/>
+                        </Canvas>
                     </Border>
 
-                    <Canvas x:Name="CalloutLayer"
-                            IsHitTestVisible="False"/>
+                    <Canvas x:Name="CalloutLayer" IsHitTestVisible="False"/>
                 </Canvas>
             </Viewbox>
         </Grid>
 
-        <Grid x:Name="NodeDetailsLayer"
-              Grid.RowSpan="2"
-              Visibility="Collapsed"
-              Opacity="0">
-            <Border x:Name="DetailsScrim"
-                    Background="{DynamicResource WindowBackground}"
-                    Opacity="0.80"
-                    MouseLeftButtonDown="DetailsScrim_MouseLeftButtonDown"/>
+        <Grid x:Name="NodeDetailsLayer" Grid.RowSpan="2" Visibility="Collapsed" Opacity="0">
+            <Border Background="{DynamicResource WindowBackground}" Opacity="0.80" MouseLeftButtonDown="DetailsScrim_MouseLeftButtonDown"/>
 
             <Border x:Name="NodeDetailsPanel"
                     Width="408"
@@ -407,68 +490,31 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel>
-                        <TextBlock Text="Выбранный узел"
-                                   FontSize="12"
-                                   FontWeight="SemiBold"
-                                   Opacity="0.62"/>
-                        <TextBlock x:Name="SelectedTitleTextBlock"
-                                   Margin="0,7,0,0"
-                                   FontSize="24"
-                                   FontWeight="SemiBold"
-                                   TextWrapping="Wrap"/>
-                        <TextBlock x:Name="SelectedDescriptionTextBlock"
-                                   Margin="0,9,0,0"
-                                   FontSize="13"
-                                   LineHeight="19"
-                                   Opacity="0.78"
-                                   TextWrapping="Wrap"/>
-                        <TextBlock x:Name="SelectedFindingSummaryTextBlock"
-                                   Margin="0,14,0,0"
-                                   FontSize="13"
-                                   FontWeight="SemiBold"
-                                   TextWrapping="Wrap"/>
+                        <TextBlock Text="Выбранный узел" FontSize="12" FontWeight="SemiBold" Opacity="0.62"/>
+                        <TextBlock x:Name="SelectedTitleTextBlock" Margin="0,7,0,0" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="SelectedDescriptionTextBlock" Margin="0,9,0,0" FontSize="13" LineHeight="19" Opacity="0.78" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="SelectedFindingSummaryTextBlock" Margin="0,14,0,0" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
                     </StackPanel>
 
-                    <ScrollViewer Grid.Row="1"
-                                  Margin="0,18,0,0"
-                                  VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
-                            <TextBlock Text="Проблемы и рекомендации"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"/>
-                            <TextBlock x:Name="SelectedFindingsEmptyText"
-                                       Text="По этому узлу сейчас нет активных проблем или рекомендаций."
-                                       Margin="0,8,0,0"
-                                       FontSize="12"
-                                       Opacity="0.70"
-                                       TextWrapping="Wrap"/>
-                            <ItemsControl x:Name="SelectedFindingsItemsControl"
-                                          Margin="0,10,0,8">
+                            <TextBlock Text="Проблемы и рекомендации" FontSize="15" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="SelectedFindingsEmptyText" Text="По этому узлу сейчас нет активных проблем или рекомендаций." Margin="0,8,0,0" FontSize="12" Opacity="0.70" TextWrapping="Wrap"/>
+                            <ItemsControl x:Name="SelectedFindingsItemsControl" Margin="0,10,0,8">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Style="{StaticResource DetailsCardStyle}">
                                             <StackPanel>
-                                                <TextBlock Text="{Binding Title}"
-                                                           FontWeight="SemiBold"
-                                                           TextWrapping="Wrap"/>
-                                                <TextBlock Text="{Binding Description}"
-                                                           Margin="0,7,0,0"
-                                                           FontSize="12"
-                                                           LineHeight="18"
-                                                           Opacity="0.78"
-                                                           TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Description}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.78" TextWrapping="Wrap"/>
                                             </StackPanel>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <TextBlock Text="Параметры"
-                                       Margin="0,8,0,0"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"/>
-                            <ItemsControl x:Name="ActionItemsControl"
-                                          Margin="0,12,0,0">
+                            <TextBlock Text="Параметры" Margin="0,8,0,0" FontSize="15" FontWeight="SemiBold"/>
+                            <ItemsControl x:Name="ActionItemsControl" Margin="0,12,0,0">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Style="{StaticResource DetailsCardStyle}">
@@ -478,28 +524,12 @@
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="{Binding Title}"
-                                                               FontWeight="SemiBold"
-                                                               TextWrapping="Wrap"/>
-                                                    <Border Grid.Column="1"
-                                                            Background="{DynamicResource ContentBackground}"
-                                                            BorderBrush="{DynamicResource BorderBrush}"
-                                                            BorderThickness="1"
-                                                            CornerRadius="10"
-                                                            Padding="7,2"
-                                                            Margin="10,0,0,0">
-                                                        <TextBlock Text="{Binding Channel}"
-                                                                   FontSize="11"
-                                                                   FontWeight="SemiBold"
-                                                                   Opacity="0.74"/>
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                    <Border Grid.Column="1" Background="{DynamicResource CoreNodeBackgroundBrush}" BorderBrush="{DynamicResource CoreNodeBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="7,2" Margin="10,0,0,0">
+                                                        <TextBlock Text="{Binding Channel}" FontSize="11" FontWeight="SemiBold" Opacity="0.74"/>
                                                     </Border>
                                                 </Grid>
-                                                <TextBlock Text="{Binding Description}"
-                                                           Margin="0,7,0,0"
-                                                           FontSize="12"
-                                                           LineHeight="18"
-                                                           Opacity="0.78"
-                                                           TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Description}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.78" TextWrapping="Wrap"/>
                                             </StackPanel>
                                         </Border>
                                     </DataTemplate>
