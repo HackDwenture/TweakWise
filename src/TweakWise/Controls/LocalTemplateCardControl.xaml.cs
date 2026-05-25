@@ -68,7 +68,8 @@ namespace TweakWise.Controls
             }
 
             if (templateId.Contains("monitor-", StringComparison.OrdinalIgnoreCase) ||
-                scopeText.Contains("Мониторинг", StringComparison.OrdinalIgnoreCase))
+                scopeText.Contains("Мониторинг", StringComparison.OrdinalIgnoreCase) ||
+                scopeText.Contains("Производительность", StringComparison.OrdinalIgnoreCase))
             {
                 return "MonitoringPerformance";
             }

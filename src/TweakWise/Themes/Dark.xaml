@@ -50,4 +50,18 @@
     <SolidColorBrush x:Key="CorePlasmaPrimaryBrush" Color="#F4FAFF"/>
     <SolidColorBrush x:Key="CorePlasmaSecondaryBrush" Color="#A9D9FF"/>
     <SolidColorBrush x:Key="CorePlasmaHazeBrush" Color="#75BFFF"/>
+    <SolidColorBrush x:Key="PerformanceBoardBackgroundBrush" Color="#181C20"/>
+    <SolidColorBrush x:Key="PerformanceBoardSurfaceBrush" Color="#20282F"/>
+    <SolidColorBrush x:Key="PerformanceBoardBorderBrush" Color="#33424D"/>
+    <SolidColorBrush x:Key="PerformanceTraceBrush" Color="#8AA3B7"/>
+    <SolidColorBrush x:Key="PerformanceRouteBrush" Color="#5CB3FF"/>
+    <SolidColorBrush x:Key="PerformanceComponentBrush" Color="#222D37"/>
+    <SolidColorBrush x:Key="PerformanceComponentBorderBrush" Color="#4B6273"/>
+    <SolidColorBrush x:Key="PerformanceComponentHoverBrush" Color="#314A59"/>
+    <SolidColorBrush x:Key="PerformanceHighlightBrush" Color="#F3FAFF"/>
+    <SolidColorBrush x:Key="PerformancePanelBrush" Color="#242A2F"/>
+    <SolidColorBrush x:Key="PerformanceCalloutBrush" Color="#242E36"/>
+    <SolidColorBrush x:Key="PerformanceCalloutBorderBrush" Color="#526675"/>
+    <SolidColorBrush x:Key="PerformanceCalloutLineBrush" Color="#8FBDE0"/>
+    <SolidColorBrush x:Key="PerformanceChipBrush" Color="#182127"/>
 </ResourceDictionary>

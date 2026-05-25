@@ -1,5 +1,18 @@
 using System;
-using System.Drawing;
+using System.Collections.Generic;
+using System.Diagnostics;
+using DrawingBitmap = System.Drawing.Bitmap;
+using DrawingBrush = System.Drawing.Brush;
+using DrawingColor = System.Drawing.Color;
+using DrawingFont = System.Drawing.Font;
+using DrawingFontStyle = System.Drawing.FontStyle;
+using DrawingGraphics = System.Drawing.Graphics;
+using DrawingGraphicsUnit = System.Drawing.GraphicsUnit;
+using DrawingIcon = System.Drawing.Icon;
+using DrawingRectangleF = System.Drawing.RectangleF;
+using DrawingSolidBrush = System.Drawing.SolidBrush;
+using DrawingStringAlignment = System.Drawing.StringAlignment;
+using DrawingStringFormat = System.Drawing.StringFormat;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -15,20 +28,28 @@ namespace TweakWise.Managers
         private readonly Computer _computer;
         private readonly DispatcherTimer _timer;
         private readonly Forms.NotifyIcon _notifyIcon;
+        private readonly HashSet<string> _faultedHardwareKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly bool _suppressHardwareBackend;
         private bool _enabled;
         private bool _showTemperature;
-        private Icon _currentIcon;
+        private bool _isOpen;
+        private DrawingIcon _currentIcon;
 
         public TrayTemperatureManager()
         {
+            _suppressHardwareBackend = ShouldSuppressLibreHardwareMonitor();
             _computer = new Computer
             {
                 IsCpuEnabled = true,
                 IsGpuEnabled = true,
-                IsMotherboardEnabled = true,
-                IsStorageEnabled = true
+                IsMotherboardEnabled = false,
+                IsStorageEnabled = false,
+                IsMemoryEnabled = false,
+                IsControllerEnabled = false,
+                IsNetworkEnabled = false,
+                IsPsuEnabled = false,
+                IsBatteryEnabled = false
             };
-            _computer.Open();
 
             var menu = new Forms.ContextMenuStrip();
             menu.Items.Add("Открыть", null, (_, _) => RestoreMainWindow());
@@ -99,21 +120,26 @@ namespace TweakWise.Managers
             if (!_enabled)
                 return;
 
-            if (!_showTemperature)
+            if (!_showTemperature || _suppressHardwareBackend || !EnsureComputerOpened())
             {
                 UpdateIcon("TW");
-                _notifyIcon.Text = "TweakWise работает в трее";
+                _notifyIcon.Text = _showTemperature
+                    ? "TweakWise работает в трее | датчики недоступны"
+                    : "TweakWise работает в трее";
                 _notifyIcon.Visible = true;
                 return;
             }
 
-            foreach (var hardware in _computer.Hardware)
+            var hardwareItems = GetRootHardware();
+
+            foreach (var hardware in hardwareItems)
                 UpdateHardwareRecursive(hardware);
 
-            var sensors = _computer.Hardware
+            var sensors = hardwareItems
                 .SelectMany(FlattenHardware)
                 .SelectMany(GetSensors)
-                .Where(sensor => sensor.SensorType == SensorType.Temperature && sensor.Value.HasValue)
+                .Where(sensor => sensor != null && TryGetSensorType(sensor, out var type) && type == SensorType.Temperature)
+                .Where(sensor => TryGetSensorValue(sensor, out _))
                 .ToList();
 
             string cpuText = BuildPreferredTemperatureText(sensors, "CPU", "Package", "Tctl/Tdie", "CCD", "Core");
@@ -125,25 +151,67 @@ namespace TweakWise.Managers
             _notifyIcon.Visible = true;
         }
 
+        private bool EnsureComputerOpened()
+        {
+            if (_isOpen)
+                return true;
+
+            if (_suppressHardwareBackend)
+                return false;
+
+            try
+            {
+                _computer.Open();
+                _isOpen = true;
+                return true;
+            }
+            catch
+            {
+                _isOpen = false;
+                return false;
+            }
+        }
+
+        private static bool ShouldSuppressLibreHardwareMonitor()
+        {
+            string allowDebugTelemetry = Environment.GetEnvironmentVariable("TW_ALLOW_HARDWARE_DEBUG") ?? string.Empty;
+            if (string.Equals(allowDebugTelemetry, "1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(allowDebugTelemetry, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+#if DEBUG
+            return Debugger.IsAttached;
+#else
+            return false;
+#endif
+        }
+
         private static string BuildPreferredTemperatureText(
-            System.Collections.Generic.List<ISensor> sensors,
+            List<ISensor> sensors,
             string hardwareToken,
             params string[] preferredNames)
         {
-            var filtered = sensors.Where(sensor =>
-                    sensor.Hardware?.Name?.IndexOf(hardwareToken, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    sensor.Hardware?.HardwareType.ToString().IndexOf(hardwareToken, StringComparison.OrdinalIgnoreCase) >= 0)
+            var filtered = sensors
+                .Where(sensor => sensor != null)
+                .Where(sensor =>
+                {
+                    var hardware = GetSensorHardware(sensor);
+                    string source = $"{GetHardwareName(hardware)} {GetHardwareTypeName(hardware)}";
+                    return source.IndexOf(hardwareToken, StringComparison.OrdinalIgnoreCase) >= 0;
+                })
                 .ToList();
 
             foreach (var name in preferredNames)
             {
-                var match = filtered.FirstOrDefault(sensor => sensor.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
-                if (match?.Value != null)
-                    return $"{Math.Round(match.Value.Value):0}";
+                var match = filtered.FirstOrDefault(sensor => GetSensorName(sensor).IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
+                if (match != null && TryGetSensorValue(match, out float value))
+                    return $"{Math.Round(value):0}";
             }
 
-            var fallback = filtered.FirstOrDefault(sensor => sensor.Value != null);
-            return fallback?.Value != null ? $"{Math.Round(fallback.Value.Value):0}" : "--";
+            var fallback = filtered.FirstOrDefault(sensor => TryGetSensorValue(sensor, out _));
+            return fallback != null && TryGetSensorValue(fallback, out float fallbackValue) ? $"{Math.Round(fallbackValue):0}" : "--";
         }
 
         private void UpdateIcon(string text)
@@ -153,30 +221,30 @@ namespace TweakWise.Managers
             _notifyIcon.Icon = _currentIcon;
         }
 
-        private static Icon CreateIcon(string text)
+        private static DrawingIcon CreateIcon(string text)
         {
-            using var bitmap = new Bitmap(16, 16);
-            using var graphics = Graphics.FromImage(bitmap);
-            graphics.Clear(Color.Transparent);
+            using var bitmap = new DrawingBitmap(16, 16);
+            using var graphics = DrawingGraphics.FromImage(bitmap);
+            graphics.Clear(DrawingColor.Transparent);
             graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.SingleBitPerPixelGridFit;
 
-            using var backgroundBrush = new SolidBrush(Color.FromArgb(35, 35, 35));
-            using var foregroundBrush = new SolidBrush(Color.White);
-            using var font = new System.Drawing.Font("Segoe UI", text.Length > 2 ? 5.5f : 7f, System.Drawing.FontStyle.Bold, GraphicsUnit.Pixel);
+            using var backgroundBrush = new DrawingSolidBrush(DrawingColor.FromArgb(35, 35, 35));
+            using var foregroundBrush = new DrawingSolidBrush(DrawingColor.White);
+            using var font = new DrawingFont("Segoe UI", text.Length > 2 ? 5.5f : 7f, DrawingFontStyle.Bold, DrawingGraphicsUnit.Pixel);
 
-            graphics.FillRoundedRectangle(backgroundBrush, new RectangleF(0, 0, 16, 16), 3);
-            var rect = new RectangleF(0, 2, 16, 12);
-            var format = new StringFormat
+            graphics.FillRoundedRectangle(backgroundBrush, new DrawingRectangleF(0, 0, 16, 16), 3);
+            var rect = new DrawingRectangleF(0, 2, 16, 12);
+            var format = new DrawingStringFormat
             {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center
+                Alignment = DrawingStringAlignment.Center,
+                LineAlignment = DrawingStringAlignment.Center
             };
             graphics.DrawString(text, font, foregroundBrush, rect, format);
 
             IntPtr hIcon = bitmap.GetHicon();
             try
             {
-                return (Icon)Icon.FromHandle(hIcon).Clone();
+                return (DrawingIcon)DrawingIcon.FromHandle(hIcon).Clone();
             }
             finally
             {
@@ -184,36 +252,233 @@ namespace TweakWise.Managers
             }
         }
 
-        private static System.Collections.Generic.IEnumerable<IHardware> FlattenHardware(IHardware hardware)
+        private IReadOnlyList<IHardware> GetRootHardware()
         {
+            try
+            {
+                return (_computer.Hardware ?? Array.Empty<IHardware>())
+                    .Where(hardware => hardware != null)
+                    .ToArray();
+            }
+            catch
+            {
+                return Array.Empty<IHardware>();
+            }
+        }
+
+        private IEnumerable<IHardware> FlattenHardware(IHardware hardware)
+        {
+            if (hardware == null)
+                yield break;
+
             yield return hardware;
 
-            foreach (var child in hardware.SubHardware)
+            foreach (var child in GetSafeSubHardware(hardware))
             {
                 foreach (var nested in FlattenHardware(child))
                     yield return nested;
             }
         }
 
-        private static System.Collections.Generic.IEnumerable<ISensor> GetSensors(IHardware hardware)
+        private static IEnumerable<ISensor> GetSensors(IHardware hardware)
         {
-            return hardware.Sensors.Concat(hardware.SubHardware.SelectMany(GetSensors));
+            if (hardware == null)
+                return Enumerable.Empty<ISensor>();
+
+            return GetSafeSensors(hardware)
+                .Concat(GetSafeSubHardware(hardware).SelectMany(GetSensors));
         }
 
-        private static void UpdateHardwareRecursive(IHardware hardware)
+        private void UpdateHardwareRecursive(IHardware hardware)
         {
-            hardware.Update();
-            foreach (var child in hardware.SubHardware)
+            if (hardware == null)
+                return;
+
+            string hardwareKey = GetHardwareKey(hardware);
+
+            if (ShouldUpdateHardware(hardware) && !_faultedHardwareKeys.Contains(hardwareKey))
+            {
+                try
+                {
+                    hardware.Update();
+                }
+                catch
+                {
+                    _faultedHardwareKeys.Add(hardwareKey);
+                    return;
+                }
+            }
+
+            foreach (var child in GetSafeSubHardware(hardware))
                 UpdateHardwareRecursive(child);
+        }
+
+        private static bool ShouldUpdateHardware(IHardware hardware)
+        {
+            if (!TryGetHardwareType(hardware, out var hardwareType))
+                return false;
+
+            return hardwareType == HardwareType.Cpu ||
+                   hardwareType == HardwareType.GpuNvidia ||
+                   hardwareType == HardwareType.GpuAmd ||
+                   hardwareType == HardwareType.GpuIntel;
+        }
+
+        private static IReadOnlyList<IHardware> GetSafeSubHardware(IHardware hardware)
+        {
+            if (hardware == null)
+                return Array.Empty<IHardware>();
+
+            try
+            {
+                return (hardware.SubHardware ?? Array.Empty<IHardware>())
+                    .Where(child => child != null)
+                    .ToArray();
+            }
+            catch
+            {
+                return Array.Empty<IHardware>();
+            }
+        }
+
+        private static IReadOnlyList<ISensor> GetSafeSensors(IHardware hardware)
+        {
+            if (hardware == null)
+                return Array.Empty<ISensor>();
+
+            try
+            {
+                return (hardware.Sensors ?? Array.Empty<ISensor>())
+                    .Where(sensor => sensor != null)
+                    .ToArray();
+            }
+            catch
+            {
+                return Array.Empty<ISensor>();
+            }
+        }
+
+        private static bool TryGetHardwareType(IHardware hardware, out HardwareType hardwareType)
+        {
+            hardwareType = default;
+            if (hardware == null)
+                return false;
+
+            try
+            {
+                hardwareType = hardware.HardwareType;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryGetSensorType(ISensor sensor, out SensorType sensorType)
+        {
+            sensorType = default;
+            if (sensor == null)
+                return false;
+
+            try
+            {
+                sensorType = sensor.SensorType;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryGetSensorValue(ISensor sensor, out float value)
+        {
+            value = 0;
+            if (sensor == null)
+                return false;
+
+            try
+            {
+                if (!sensor.Value.HasValue)
+                    return false;
+
+                value = sensor.Value.Value;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static IHardware GetSensorHardware(ISensor sensor)
+        {
+            if (sensor == null)
+                return null;
+
+            try
+            {
+                return sensor.Hardware;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string GetHardwareName(IHardware hardware)
+        {
+            if (hardware == null)
+                return string.Empty;
+
+            try
+            {
+                return hardware.Name ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static string GetHardwareTypeName(IHardware hardware)
+        {
+            return TryGetHardwareType(hardware, out var hardwareType) ? hardwareType.ToString() : string.Empty;
+        }
+
+        private static string GetSensorName(ISensor sensor)
+        {
+            if (sensor == null)
+                return string.Empty;
+
+            try
+            {
+                return sensor.Name ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static string GetHardwareKey(IHardware hardware)
+        {
+            return $"{GetHardwareTypeName(hardware)}:{GetHardwareName(hardware)}";
         }
 
         public void Dispose()
         {
-            _timer.Stop();
-            _notifyIcon.Visible = false;
-            _notifyIcon.Dispose();
-            _currentIcon?.Dispose();
-            _computer.Close();
+            try { _timer.Stop(); } catch { }
+            try { _notifyIcon.Visible = false; } catch { }
+            try { _notifyIcon.Dispose(); } catch { }
+            try { _currentIcon?.Dispose(); } catch { }
+            try
+            {
+                if (_isOpen)
+                    _computer.Close();
+            }
+            catch { }
         }
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -222,7 +487,7 @@ namespace TweakWise.Managers
 
     internal static class GraphicsExtensions
     {
-        public static void FillRoundedRectangle(this Graphics graphics, Brush brush, RectangleF bounds, float radius)
+        public static void FillRoundedRectangle(this DrawingGraphics graphics, DrawingBrush brush, DrawingRectangleF bounds, float radius)
         {
             using var path = new System.Drawing.Drawing2D.GraphicsPath();
             path.AddArc(bounds.X, bounds.Y, radius, radius, 180, 90);

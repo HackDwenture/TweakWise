@@ -62,7 +62,7 @@ namespace TweakWise
 
         public void OpenModuleWorkspace(CoreModuleId moduleId)
         {
-            MainFrame.Navigate(new ModuleWorkspacePage(moduleId));
+            MainFrame.Navigate(CreateModulePage(moduleId));
             _settingsManager.CurrentSettings.LastOpenedCoreModuleId = moduleId.ToString();
             _settingsManager.SaveSettings();
         }
@@ -90,11 +90,18 @@ namespace TweakWise
             string savedModuleId = _settingsManager.CurrentSettings.LastOpenedCoreModuleId;
             if (Enum.TryParse(savedModuleId, ignoreCase: true, out CoreModuleId moduleId))
             {
-                MainFrame.Navigate(new ModuleWorkspacePage(moduleId));
+                MainFrame.Navigate(CreateModulePage(moduleId));
                 return;
             }
 
             MainFrame.Navigate(new CoreHomePage());
+        }
+
+        private static Page CreateModulePage(CoreModuleId moduleId)
+        {
+            return moduleId == CoreModuleId.Resources
+                ? new MonitoringPerformancePage()
+                : new ModuleWorkspacePage(moduleId);
         }
 
         private void NavigateToModuleFromPageKey(string pageName)

@@ -85,7 +85,7 @@ namespace TweakWise.Catalog
                 "WindowsInterface" => "Интерфейс Windows",
                 "System" => "Система",
                 "Maintenance" => "Обслуживание",
-                "MonitoringPerformance" => "Мониторинг и производительность",
+                "MonitoringPerformance" => "Производительность и охлаждение",
                 _ => categoryId
             };
         }

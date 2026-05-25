@@ -20,21 +20,40 @@ namespace TweakWise.Pages
 
         private readonly DispatcherTimer _refreshTimer;
         private readonly Computer _computer;
+        private readonly HashSet<string> _faultedHardwareKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly bool _suppressHardwareBackend;
+        private bool _isOpen;
 
         public SystemPage()
         {
             InitializeComponent();
 
+            _suppressHardwareBackend = ShouldSuppressLibreHardwareMonitor();
             _computer = new Computer
             {
                 IsCpuEnabled = true,
                 IsGpuEnabled = true,
                 IsMemoryEnabled = true,
-                IsMotherboardEnabled = true,
-                IsControllerEnabled = true,
-                IsStorageEnabled = true
+                IsMotherboardEnabled = false,
+                IsControllerEnabled = false,
+                IsStorageEnabled = false,
+                IsNetworkEnabled = false,
+                IsPsuEnabled = false,
+                IsBatteryEnabled = false
             };
-            _computer.Open();
+            if (!_suppressHardwareBackend)
+            {
+                try
+                {
+                    _computer.Open();
+                    _isOpen = true;
+                }
+                catch
+                {
+                    _isOpen = false;
+                    // Hardware telemetry is optional. Keep the page available even if a driver denies access.
+                }
+            }
 
             _refreshTimer = new DispatcherTimer
             {
@@ -57,16 +76,32 @@ namespace TweakWise.Pages
             _refreshTimer.Stop();
         }
 
+        private static bool ShouldSuppressLibreHardwareMonitor()
+        {
+            string allowDebugTelemetry = Environment.GetEnvironmentVariable("TW_ALLOW_HARDWARE_DEBUG") ?? string.Empty;
+            if (string.Equals(allowDebugTelemetry, "1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(allowDebugTelemetry, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+#if DEBUG
+            return Debugger.IsAttached;
+#else
+            return false;
+#endif
+        }
+
         private void RefreshSystemInfo()
         {
             UpdateHardwareTree();
 
             var hardware = GetHardware().ToList();
-            var allSensors = hardware.SelectMany(GetSensors).ToList();
+            var allSensors = hardware.SelectMany(GetSensors).Where(sensor => sensor != null).ToList();
             var allTemperatureSensors = allSensors
                 .Where(sensor => sensor.SensorType == SensorType.Temperature)
                 .OrderBy(sensor => GetTemperaturePriority(sensor))
-                .ThenBy(sensor => sensor.Name)
+                .ThenBy(sensor => sensor.Name ?? string.Empty)
                 .ToList();
 
             var cpuHardware = hardware.FirstOrDefault(item => item.HardwareType == HardwareType.Cpu);
@@ -125,14 +160,34 @@ namespace TweakWise.Pages
 
         private IEnumerable<IHardware> GetHardware()
         {
-            return _computer.Hardware.SelectMany(FlattenHardware);
+            return GetRootHardware().SelectMany(FlattenHardware);
+        }
+
+        private IReadOnlyList<IHardware> GetRootHardware()
+        {
+            if (_suppressHardwareBackend || !_isOpen)
+                return Array.Empty<IHardware>();
+
+            try
+            {
+                return (_computer.Hardware ?? Array.Empty<IHardware>())
+                    .Where(hardware => hardware != null)
+                    .ToArray();
+            }
+            catch
+            {
+                return Array.Empty<IHardware>();
+            }
         }
 
         private IEnumerable<IHardware> FlattenHardware(IHardware hardware)
         {
+            if (hardware == null)
+                yield break;
+
             yield return hardware;
 
-            foreach (var child in hardware.SubHardware)
+            foreach (var child in GetSafeSubHardware(hardware))
             {
                 foreach (var subHardware in FlattenHardware(child))
                     yield return subHardware;
@@ -144,22 +199,107 @@ namespace TweakWise.Pages
             if (hardware == null)
                 return Enumerable.Empty<ISensor>();
 
-            var directSensors = hardware.Sensors ?? Array.Empty<ISensor>();
-            var subSensors = hardware.SubHardware?.SelectMany(GetSensors) ?? Enumerable.Empty<ISensor>();
-            return directSensors.Concat(subSensors);
+            return GetSafeSensors(hardware)
+                .Concat(GetSafeSubHardware(hardware).SelectMany(GetSensors));
         }
 
         private void UpdateHardwareTree()
         {
-            foreach (var hardware in _computer.Hardware)
+            foreach (var hardware in GetRootHardware())
                 UpdateHardwareRecursive(hardware);
         }
 
+        [DebuggerNonUserCode]
+        [DebuggerStepThrough]
         private void UpdateHardwareRecursive(IHardware hardware)
         {
-            hardware.Update();
-            foreach (var child in hardware.SubHardware)
+            if (hardware == null || _suppressHardwareBackend)
+                return;
+
+            string hardwareKey = GetHardwareKey(hardware);
+
+            if (ShouldUpdateHardware(hardware) && !_faultedHardwareKeys.Contains(hardwareKey))
+            {
+                try
+                {
+                    hardware.Update();
+                }
+                catch
+                {
+                    _faultedHardwareKeys.Add(hardwareKey);
+                    return;
+                }
+            }
+
+            foreach (var child in GetSafeSubHardware(hardware))
                 UpdateHardwareRecursive(child);
+        }
+
+        private static bool ShouldUpdateHardware(IHardware hardware)
+        {
+            if (hardware == null)
+                return false;
+
+            try
+            {
+                return hardware.HardwareType == HardwareType.Cpu ||
+                       hardware.HardwareType == HardwareType.GpuNvidia ||
+                       hardware.HardwareType == HardwareType.GpuAmd ||
+                       hardware.HardwareType == HardwareType.GpuIntel;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string GetHardwareKey(IHardware hardware)
+        {
+            if (hardware == null)
+                return string.Empty;
+
+            try
+            {
+                return $"{hardware.HardwareType}:{hardware.Name}";
+            }
+            catch
+            {
+                return hardware.GetHashCode().ToString();
+            }
+        }
+
+        private static IReadOnlyList<IHardware> GetSafeSubHardware(IHardware hardware)
+        {
+            if (hardware == null)
+                return Array.Empty<IHardware>();
+
+            try
+            {
+                return (hardware.SubHardware ?? Array.Empty<IHardware>())
+                    .Where(child => child != null)
+                    .ToArray();
+            }
+            catch
+            {
+                return Array.Empty<IHardware>();
+            }
+        }
+
+        private static IReadOnlyList<ISensor> GetSafeSensors(IHardware hardware)
+        {
+            if (hardware == null)
+                return Array.Empty<ISensor>();
+
+            try
+            {
+                return (hardware.Sensors ?? Array.Empty<ISensor>())
+                    .Where(sensor => sensor != null)
+                    .ToArray();
+            }
+            catch
+            {
+                return Array.Empty<ISensor>();
+            }
         }
 
         private List<InfoRow> BuildSystemDetails(IHardware cpuHardware, IHardware gpuHardware, MemoryStatusEx memory)
@@ -206,11 +346,12 @@ namespace TweakWise.Pages
 
             var extraStorageTemps = allTemperatureSensors
                 .Where(IsLikelyStorageTemperature)
-                .Where(sensor => !driveRows.Any(row => row.Label.Contains(sensor.Hardware?.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase)))
+                .Where(sensor => string.IsNullOrWhiteSpace(sensor.Hardware?.Name) ||
+                                 !driveRows.Any(row => row.Label.Contains(sensor.Hardware.Name, StringComparison.OrdinalIgnoreCase)))
                 .Take(4)
                 .Select(sensor => new InfoRow
                 {
-                    Label = sensor.Hardware?.Name ?? sensor.Name,
+                    Label = sensor.Hardware?.Name ?? sensor.Name ?? "Датчик",
                     Value = $"Температура: {FormatSensorValue(sensor)}"
                 });
 
@@ -270,7 +411,7 @@ namespace TweakWise.Pages
                 .Take(6)
                 .Select(sensor => new SensorRow
                 {
-                    Label = sensor.Name,
+                    Label = sensor.Name ?? "Датчик",
                     Value = FormatSensorValue(sensor)
                 })
                 .ToList();
@@ -323,7 +464,7 @@ namespace TweakWise.Pages
                 : IsLikelyStorageTemperature(sensor) ? "Диск"
                 : "Система";
 
-            return $"{category}: {GetHardwareLabel(sensor.Hardware)} / {sensor.Name}";
+            return $"{category}: {GetHardwareLabel(sensor?.Hardware)} / {sensor?.Name ?? "Датчик"}";
         }
 
         private static int GetTemperaturePriority(ISensor sensor)
@@ -342,6 +483,9 @@ namespace TweakWise.Pages
 
         private static bool IsLikelyCpuTemperature(ISensor sensor)
         {
+            if (sensor == null)
+                return false;
+
             string source = $"{sensor.Hardware?.Name} {sensor.Name} {sensor.Hardware?.HardwareType}";
             return source.Contains("CPU", StringComparison.OrdinalIgnoreCase) ||
                    source.Contains("Package", StringComparison.OrdinalIgnoreCase) ||
@@ -351,6 +495,9 @@ namespace TweakWise.Pages
 
         private static bool IsLikelyGpuTemperature(ISensor sensor)
         {
+            if (sensor == null)
+                return false;
+
             string source = $"{sensor.Hardware?.Name} {sensor.Name} {sensor.Hardware?.HardwareType}";
             return source.Contains("GPU", StringComparison.OrdinalIgnoreCase) ||
                    source.Contains("Hot Spot", StringComparison.OrdinalIgnoreCase) ||
@@ -360,6 +507,9 @@ namespace TweakWise.Pages
 
         private static bool IsLikelyStorageTemperature(ISensor sensor)
         {
+            if (sensor == null)
+                return false;
+
             if (sensor.Hardware?.HardwareType == HardwareType.Storage)
                 return true;
 
@@ -395,11 +545,13 @@ namespace TweakWise.Pages
 
         private static ISensor GetPreferredSensor(IEnumerable<ISensor> sensors, SensorType sensorType, params string[] preferredTokens)
         {
-            var filtered = sensors?.Where(sensor => sensor.SensorType == sensorType).ToList() ?? new List<ISensor>();
+            var filtered = sensors?
+                .Where(sensor => sensor != null && sensor.SensorType == sensorType)
+                .ToList() ?? new List<ISensor>();
 
             foreach (var token in preferredTokens)
             {
-                var match = filtered.FirstOrDefault(sensor => sensor.Name.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0);
+                var match = filtered.FirstOrDefault(sensor => (sensor.Name ?? string.Empty).IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0);
                 if (match != null)
                     return match;
             }
@@ -409,7 +561,7 @@ namespace TweakWise.Pages
 
         private static string BuildGpuMemoryText(IHardware gpuHardware)
         {
-            var sensors = gpuHardware == null ? new List<ISensor>() : gpuHardware.SubHardware.SelectMany(GetSubSensors).Concat(gpuHardware.Sensors).ToList();
+            var sensors = gpuHardware == null ? new List<ISensor>() : GetSubSensors(gpuHardware).ToList();
             var used = GetPreferredSensor(sensors, SensorType.SmallData, "Memory Used", "GPU Memory Used");
             var total = GetPreferredSensor(sensors, SensorType.SmallData, "Memory Total", "GPU Memory Total");
 
@@ -427,7 +579,8 @@ namespace TweakWise.Pages
             if (hardware == null)
                 return Enumerable.Empty<ISensor>();
 
-            return hardware.Sensors.Concat(hardware.SubHardware.SelectMany(GetSubSensors));
+            return GetSafeSensors(hardware)
+                .Concat(GetSafeSubHardware(hardware).SelectMany(GetSubSensors));
         }
 
         private static string BuildStorageSummary(List<IHardware> storageHardware)
@@ -463,7 +616,7 @@ namespace TweakWise.Pages
             if (fanSensors.Count == 0)
                 return "Скорости вентиляторов: Не поддерживается";
 
-            return $"Скорости вентиляторов: {string.Join(" | ", fanSensors.Take(3).Select(sensor => $"{sensor.Name}: {FormatSensorValue(sensor)}"))}";
+            return $"Скорости вентиляторов: {string.Join(" | ", fanSensors.Take(3).Select(sensor => $"{sensor.Name ?? "Датчик"}: {FormatSensorValue(sensor)}"))}";
         }
 
         private static string BuildFanControlStatus(List<ISensor> allSensors)

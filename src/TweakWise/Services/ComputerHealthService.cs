@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Win32;
 using TweakWise.Managers;
 using TweakWise.Models;
+using WinForms = System.Windows.Forms;
 
 namespace TweakWise.Services
 {
@@ -104,6 +105,7 @@ namespace TweakWise.Services
 
             CheckSystemDrive(moduleStatuses, findings);
             CheckRestartState(moduleStatuses, findings);
+            CheckPerformanceState(moduleStatuses, findings);
             CheckNetworkState(moduleStatuses, findings);
 
             MarkUntouchedModulesAsGood(moduleStatuses);
@@ -208,7 +210,8 @@ namespace TweakWise.Services
             Dictionary<CoreModuleId, ModuleHealthStatus> moduleStatuses,
             HealthFindingAccumulator findings)
         {
-            bool pendingRestart = CheckPendingRestart();
+            var restartCheck = CheckPendingRestart();
+            bool pendingRestart = restartCheck.IsPending;
             findings.PendingRestart = pendingRestart;
 
             if (!pendingRestart)
@@ -222,7 +225,7 @@ namespace TweakWise.Services
                 moduleStatuses[CoreModuleId.SystemParameters],
                 HealthLevel.Normal,
                 recommendations: 1,
-                finding: CreatePendingRestartFinding());
+                finding: CreatePendingRestartFinding(restartCheck));
         }
 
         private static void CheckNetworkState(
@@ -257,6 +260,135 @@ namespace TweakWise.Services
                     Description = "Windows не сообщает о доступном сетевом подключении.",
                     ActionText = "Проверьте адаптер, Wi-Fi, кабель или состояние подключения."
                 });
+        }
+
+        private static void CheckPerformanceState(
+            Dictionary<CoreModuleId, ModuleHealthStatus> moduleStatuses,
+            HealthFindingAccumulator findings)
+        {
+            var target = moduleStatuses[CoreModuleId.Resources];
+            var performanceFindings = new List<ModuleHealthFinding>();
+
+            try
+            {
+                using var temperatureService = new HardwareTemperatureService();
+                var readings = temperatureService.GetTemperatures() ?? Array.Empty<TemperatureSensorReading>();
+
+                AddTemperatureFinding(
+                    performanceFindings,
+                    readings,
+                    "Cpu",
+                    "CPU нагревается",
+                    "Температура процессора приближается к зоне троттлинга.",
+                    "Проверьте охлаждение, схему питания и нагрузку перед включением тяжёлых профилей.",
+                    90,
+                    82);
+
+                AddTemperatureFinding(
+                    performanceFindings,
+                    readings,
+                    "Gpu",
+                    "GPU нагревается",
+                    "Температура видеокарты приближается к зоне снижения частот.",
+                    "Проверьте вентиляцию корпуса, драйверный профиль и тепловой запас.",
+                    87,
+                    80);
+
+                float hottestPerformanceTemp = readings
+                    .Where(item => item.Group == "Cpu" || item.Group == "Gpu" || item.Group == "Motherboard" || item.Group == "Other")
+                    .Select(item => item.ValueCelsius)
+                    .DefaultIfEmpty(0)
+                    .Max();
+
+                if (hottestPerformanceTemp >= 86)
+                {
+                    performanceFindings.Add(new ModuleHealthFinding
+                    {
+                        Level = HealthLevel.Warning,
+                        Title = "Термоконтур перегружен",
+                        Description = $"Самый горячий датчик показывает {HardwareTemperatureService.FormatTemperature(hottestPerformanceTemp)}.",
+                        ActionText = "Проверьте кривую вентиляторов, пыль и режим питания."
+                    });
+                }
+            }
+            catch
+            {
+            }
+
+            if (IsRunningOnBattery())
+            {
+                performanceFindings.Add(new ModuleHealthFinding
+                {
+                    Level = HealthLevel.Normal,
+                    Title = "Питание от батареи",
+                    Description = "Windows может ограничивать частоты и охлаждение при работе без сети.",
+                    ActionText = "Для тяжёлых задач включите питание от сети или производительный профиль."
+                });
+            }
+
+            if (performanceFindings.Count == 0)
+            {
+                SetModuleStatus(target, HealthLevel.Good);
+                return;
+            }
+
+            foreach (var finding in performanceFindings)
+            {
+                bool isProblem = finding.Level == HealthLevel.Warning || finding.Level == HealthLevel.Critical;
+                if (isProblem)
+                    findings.ProblemCount++;
+                else
+                    findings.RecommendationCount++;
+
+                if (finding.Level == HealthLevel.Critical)
+                    findings.CriticalCount++;
+
+                SetModuleStatus(
+                    target,
+                    finding.Level,
+                    problems: isProblem ? 1 : 0,
+                    recommendations: isProblem ? 0 : 1,
+                    finding: finding);
+            }
+        }
+
+        private static void AddTemperatureFinding(
+            List<ModuleHealthFinding> findings,
+            IReadOnlyList<TemperatureSensorReading> readings,
+            string group,
+            string title,
+            string description,
+            string actionText,
+            float warningThreshold,
+            float recommendationThreshold)
+        {
+            var hottest = readings
+                .Where(item => string.Equals(item.Group, group, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(item => item.ValueCelsius)
+                .FirstOrDefault();
+
+            if (hottest == null || hottest.ValueCelsius < recommendationThreshold)
+                return;
+
+            findings.Add(new ModuleHealthFinding
+            {
+                Level = hottest.ValueCelsius >= warningThreshold ? HealthLevel.Warning : HealthLevel.Normal,
+                Title = title,
+                Description = $"{description} Сейчас: {hottest.Title} {HardwareTemperatureService.FormatTemperature(hottest.ValueCelsius)}.",
+                ActionText = actionText
+            });
+        }
+
+        private static bool IsRunningOnBattery()
+        {
+            try
+            {
+                return WinForms.SystemInformation.PowerStatus.PowerLineStatus == WinForms.PowerLineStatus.Offline;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static void MarkUntouchedModulesAsGood(Dictionary<CoreModuleId, ModuleHealthStatus> moduleStatuses)
@@ -340,11 +472,25 @@ namespace TweakWise.Services
             }
         }
 
-        private static bool CheckPendingRestart()
+        private static PendingRestartCheck CheckPendingRestart()
         {
-            return RegistryKeyExists(Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending") ||
-                   RegistryKeyExists(Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired") ||
-                   RegistryValueExists(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Session Manager", "PendingFileRenameOperations");
+            var result = new PendingRestartCheck();
+
+            if (RegistryKeyExists(Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending"))
+                AddDistinct(result.RestartSources, "обслуживание компонентов Windows");
+
+            if (RegistryKeyExists(Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"))
+                AddDistinct(result.RestartSources, "Windows Update");
+
+            var pendingFileOperations = ReadRegistryMultiStringValue(
+                Registry.LocalMachine,
+                @"SYSTEM\CurrentControlSet\Control\Session Manager",
+                "PendingFileRenameOperations");
+
+            foreach (var source in ClassifyPendingFileOperationSources(pendingFileOperations))
+                AddDistinct(result.PendingFileSources, source);
+
+            return result;
         }
 
         private static bool RegistryKeyExists(RegistryKey hive, string path)
@@ -360,27 +506,124 @@ namespace TweakWise.Services
             }
         }
 
-        private static bool RegistryValueExists(RegistryKey hive, string path, string valueName)
+        private static List<string> ReadRegistryMultiStringValue(RegistryKey hive, string path, string valueName)
         {
+            var values = new List<string>();
+
             try
             {
                 using var key = hive.OpenSubKey(path, writable: false);
-                return key?.GetValue(valueName) != null;
+                var value = key?.GetValue(valueName);
+
+                if (value is string[] items)
+                {
+                    foreach (var item in items)
+                    {
+                        if (!string.IsNullOrWhiteSpace(item))
+                            values.Add(item);
+                    }
+                }
+                else if (value is string item && !string.IsNullOrWhiteSpace(item))
+                {
+                    values.Add(item);
+                }
             }
             catch
             {
-                return false;
             }
+
+            return values;
         }
 
-        private static ModuleHealthFinding CreatePendingRestartFinding()
+        private static IReadOnlyList<string> ClassifyPendingFileOperationSources(IReadOnlyList<string> pendingFileOperations)
         {
+            var sources = new List<string>();
+
+            foreach (var operation in pendingFileOperations)
+            {
+                if (ContainsPathFragment(operation, "Microsoft Office") ||
+                    ContainsPathFragment(operation, "ClickToRun") ||
+                    ContainsPathFragment(operation, "Office16") ||
+                    ContainsPathFragment(operation, "OFFSYM"))
+                {
+                    AddDistinct(sources, "Microsoft Office");
+                }
+                else if (ContainsPathFragment(operation, "Yandex") ||
+                         ContainsPathFragment(operation, "yabroupdater"))
+                {
+                    AddDistinct(sources, "Yandex Browser");
+                }
+                else if (ContainsPathFragment(operation, "GamingServices") ||
+                         ContainsPathFragment(operation, "gameplatformservices") ||
+                         ContainsPathFragment(operation, "gamingservicesproxy"))
+                {
+                    AddDistinct(sources, "Gaming Services");
+                }
+                else if (ContainsPathFragment(operation, "ChromiumTemp") ||
+                         ContainsPathFragment(operation, "service_update.exe"))
+                {
+                    AddDistinct(sources, "Chromium updater");
+                }
+                else if (ContainsPathFragment(operation, @"\Windows\SystemTemp\") ||
+                         ContainsPathFragment(operation, @"\AppData\Local\Temp\") ||
+                         ContainsPathFragment(operation, @"\Temp\") ||
+                         ContainsPathFragment(operation, ".tmp"))
+                {
+                    AddDistinct(sources, "временные файлы установщиков");
+                }
+            }
+
+            if (pendingFileOperations.Count > 0 && sources.Count == 0)
+                sources.Add("неизвестные установщики или драйверы");
+
+            return sources;
+        }
+
+        private static bool ContainsPathFragment(string value, string fragment)
+        {
+            return value?.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static void AddDistinct(List<string> values, string value)
+        {
+            if (!values.Any(item => string.Equals(item, value, StringComparison.OrdinalIgnoreCase)))
+                values.Add(value);
+        }
+
+        private static string FormatSourceList(IReadOnlyList<string> sources)
+        {
+            if (sources == null || sources.Count == 0)
+                return string.Empty;
+
+            if (sources.Count <= 6)
+                return string.Join(", ", sources);
+
+            return $"{string.Join(", ", sources.Take(6))} и ещё {sources.Count - 6}";
+        }
+
+        private static ModuleHealthFinding CreatePendingRestartFinding(PendingRestartCheck restartCheck = null)
+        {
+            var details = new List<string>();
+
+            if (restartCheck != null)
+            {
+                if (restartCheck.RestartSources.Count > 0)
+                    details.Add($"системные флаги: {FormatSourceList(restartCheck.RestartSources)}");
+
+                if (restartCheck.PendingFileSources.Count > 0)
+                    details.Add($"отложенные операции файлов: {FormatSourceList(restartCheck.PendingFileSources)}");
+            }
+
+            string description = details.Count > 0
+                ? $"Windows ожидает завершения изменений после перезагрузки. Найдено: {string.Join("; ", details)}."
+                : "Windows сообщает, что часть изменений будет завершена только после перезагрузки.";
+
             return new ModuleHealthFinding
             {
                 Level = HealthLevel.Normal,
                 Title = "Ожидается перезагрузка",
-                Description = "Windows сообщает, что часть изменений будет завершена только после перезагрузки.",
-                ActionText = "Перезагрузите компьютер, когда будет удобно."
+                Description = description,
+                ActionText = "Выполните именно «Перезагрузка». Обычное выключение с быстрым запуском может не закрыть этот флаг."
             };
         }
 
@@ -544,18 +787,17 @@ namespace TweakWise.Services
                 new()
                 {
                     Id = CoreModuleId.Resources,
-                    Title = "Производительность",
-                    ShortHint = "CPU, GPU, RAM, нагрузка, профили",
-                    Description = "Производительные узлы компьютера: процессор, видеокарта, оперативная память, нагрузка, профили и базовые проверки под нагрузкой.",
+                    Title = "Производительность и охлаждение",
+                    ShortHint = "CPU, GPU, RAM, питание, охлаждение",
+                    Description = "Узлы, которые напрямую влияют на скорость и тепловой режим: процессор, видеокарта, оперативная память, питание, лимиты и охлаждение.",
                     Sections = new List<string>
                     {
                         "Процессор",
                         "Видеокарта",
                         "Оперативная память",
-                        "Видеопамять",
-                        "Профили производительности",
-                        "Игровые функции Windows",
-                        "Базовый бенчмарк"
+                        "Питание и лимиты",
+                        "Охлаждение и датчики",
+                        "Безопасный тюнинг"
                     }
                 },
                 new()
@@ -622,6 +864,13 @@ namespace TweakWise.Services
             public int RecommendationCount { get; set; }
             public int CriticalCount { get; set; }
             public bool PendingRestart { get; set; }
+        }
+
+        private sealed class PendingRestartCheck
+        {
+            public List<string> RestartSources { get; } = new List<string>();
+            public List<string> PendingFileSources { get; } = new List<string>();
+            public bool IsPending => RestartSources.Count > 0 || PendingFileSources.Count > 0;
         }
 
         private readonly struct HealthCheckSnapshot

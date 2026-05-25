@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using LibreHardwareMonitor.Hardware;
@@ -10,40 +11,54 @@ namespace TweakWise.Services
     public sealed class HardwareTemperatureService : IDisposable
     {
         private readonly Computer _computer;
+        private readonly HashSet<string> _faultedHardwareKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly bool _suppressHardwareBackend;
         private bool _disposed;
+        private bool _isOpen;
 
         public HardwareTemperatureService()
         {
+            _suppressHardwareBackend = ShouldSuppressLibreHardwareMonitor();
             _computer = new Computer
             {
                 IsCpuEnabled = true,
                 IsGpuEnabled = true,
-                IsMotherboardEnabled = true,
-                IsStorageEnabled = true,
-                IsMemoryEnabled = true,
-                IsControllerEnabled = true
+                IsMotherboardEnabled = false,
+                IsStorageEnabled = false,
+                IsMemoryEnabled = false,
+                IsControllerEnabled = false,
+                IsNetworkEnabled = false,
+                IsPsuEnabled = false,
+                IsBatteryEnabled = false
             };
+
+            if (_suppressHardwareBackend)
+                return;
 
             try
             {
                 _computer.Open();
+                _isOpen = true;
             }
             catch
             {
+                _isOpen = false;
             }
         }
 
         public IReadOnlyList<TemperatureSensorReading> GetTemperatures()
         {
-            if (_disposed)
+            if (_disposed || _suppressHardwareBackend || !_isOpen)
                 return Array.Empty<TemperatureSensorReading>();
 
             try
             {
-                foreach (var hardware in _computer.Hardware)
+                var hardwareItems = GetRootHardware().ToList();
+
+                foreach (var hardware in hardwareItems)
                     UpdateHardwareRecursive(hardware);
 
-                return _computer.Hardware
+                return hardwareItems
                     .SelectMany(FlattenHardware)
                     .SelectMany(ReadTemperatureSensors)
                     .OrderBy(sensor => GetGroupOrder(sensor.Group))
@@ -56,27 +71,245 @@ namespace TweakWise.Services
             }
         }
 
-        private static IEnumerable<TemperatureSensorReading> ReadTemperatureSensors(IHardware hardware)
+        private static bool ShouldSuppressLibreHardwareMonitor()
         {
-            foreach (var sensor in hardware.Sensors)
+            string allowDebugTelemetry = Environment.GetEnvironmentVariable("TW_ALLOW_HARDWARE_DEBUG") ?? string.Empty;
+            if (string.Equals(allowDebugTelemetry, "1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(allowDebugTelemetry, "true", StringComparison.OrdinalIgnoreCase))
             {
-                if (sensor.SensorType != SensorType.Temperature || !sensor.Value.HasValue)
+                return false;
+            }
+
+#if DEBUG
+            return Debugger.IsAttached;
+#else
+            return false;
+#endif
+        }
+
+        private IReadOnlyList<IHardware> GetRootHardware()
+        {
+            if (_computer == null || !_isOpen)
+                return Array.Empty<IHardware>();
+
+            try
+            {
+                return (_computer.Hardware ?? Array.Empty<IHardware>())
+                    .Where(hardware => hardware != null)
+                    .ToArray();
+            }
+            catch
+            {
+                return Array.Empty<IHardware>();
+            }
+        }
+
+        private IEnumerable<IHardware> FlattenHardware(IHardware hardware)
+        {
+            if (hardware == null)
+                yield break;
+
+            yield return hardware;
+
+            foreach (var child in GetSafeSubHardware(hardware))
+            {
+                foreach (var nested in FlattenHardware(child))
+                    yield return nested;
+            }
+        }
+
+        private IEnumerable<TemperatureSensorReading> ReadTemperatureSensors(IHardware hardware)
+        {
+            if (hardware == null)
+                yield break;
+
+            string group = ClassifyGroup(hardware);
+            string hardwareName = GetHardwareName(hardware);
+
+            foreach (var sensor in GetSafeSensors(hardware))
+            {
+                if (sensor == null)
                     continue;
 
-                string group = ClassifyGroup(hardware);
-                string title = BuildTitle(group, hardware.Name, sensor.Name);
-                float value = sensor.Value.Value;
+                if (!TryGetSensorType(sensor, out var sensorType) || sensorType != SensorType.Temperature)
+                    continue;
+
+                if (!TryGetSensorValue(sensor, out float value))
+                    continue;
+
+                string sensorName = GetSensorName(sensor);
+                string title = BuildTitle(group, hardwareName, sensorName);
 
                 yield return new TemperatureSensorReading
                 {
-                    Id = BuildStableId(group, hardware.Name, sensor.Name),
+                    Id = BuildStableId(group, hardwareName, sensorName),
                     Title = title,
                     Group = group,
                     ValueCelsius = value,
-                    HardwareName = hardware.Name ?? string.Empty,
-                    SensorName = sensor.Name ?? string.Empty
+                    HardwareName = hardwareName,
+                    SensorName = sensorName
                 };
             }
+        }
+
+        private void UpdateHardwareRecursive(IHardware hardware)
+        {
+            if (hardware == null)
+                return;
+
+            string hardwareKey = GetHardwareKey(hardware);
+
+            if (ShouldUpdateHardware(hardware) && !_faultedHardwareKeys.Contains(hardwareKey))
+            {
+                try
+                {
+                    hardware.Update();
+                }
+                catch
+                {
+                    _faultedHardwareKeys.Add(hardwareKey);
+                    return;
+                }
+            }
+
+            foreach (var child in GetSafeSubHardware(hardware))
+                UpdateHardwareRecursive(child);
+        }
+
+        private static bool ShouldUpdateHardware(IHardware hardware)
+        {
+            if (!TryGetHardwareType(hardware, out var hardwareType))
+                return false;
+
+            return hardwareType == HardwareType.Cpu ||
+                   hardwareType == HardwareType.GpuNvidia ||
+                   hardwareType == HardwareType.GpuAmd ||
+                   hardwareType == HardwareType.GpuIntel;
+        }
+
+        private static IReadOnlyList<IHardware> GetSafeSubHardware(IHardware hardware)
+        {
+            if (hardware == null)
+                return Array.Empty<IHardware>();
+
+            try
+            {
+                return (hardware.SubHardware ?? Array.Empty<IHardware>())
+                    .Where(child => child != null)
+                    .ToArray();
+            }
+            catch
+            {
+                return Array.Empty<IHardware>();
+            }
+        }
+
+        private static IReadOnlyList<ISensor> GetSafeSensors(IHardware hardware)
+        {
+            if (hardware == null)
+                return Array.Empty<ISensor>();
+
+            try
+            {
+                return (hardware.Sensors ?? Array.Empty<ISensor>())
+                    .Where(sensor => sensor != null)
+                    .ToArray();
+            }
+            catch
+            {
+                return Array.Empty<ISensor>();
+            }
+        }
+
+        private static bool TryGetHardwareType(IHardware hardware, out HardwareType hardwareType)
+        {
+            hardwareType = default;
+            if (hardware == null)
+                return false;
+
+            try
+            {
+                hardwareType = hardware.HardwareType;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryGetSensorType(ISensor sensor, out SensorType sensorType)
+        {
+            sensorType = default;
+            if (sensor == null)
+                return false;
+
+            try
+            {
+                sensorType = sensor.SensorType;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryGetSensorValue(ISensor sensor, out float value)
+        {
+            value = 0;
+            if (sensor == null)
+                return false;
+
+            try
+            {
+                if (!sensor.Value.HasValue)
+                    return false;
+
+                value = sensor.Value.Value;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string GetHardwareName(IHardware hardware)
+        {
+            if (hardware == null)
+                return string.Empty;
+
+            try
+            {
+                return hardware.Name ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static string GetSensorName(ISensor sensor)
+        {
+            if (sensor == null)
+                return string.Empty;
+
+            try
+            {
+                return sensor.Name ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static string GetHardwareKey(IHardware hardware)
+        {
+            string type = TryGetHardwareType(hardware, out var hardwareType) ? hardwareType.ToString() : "Unknown";
+            string name = GetHardwareName(hardware);
+            return $"{type}:{name}";
         }
 
         private static string BuildTitle(string group, string hardwareName, string sensorName)
@@ -110,8 +343,11 @@ namespace TweakWise.Services
 
         private static string ClassifyGroup(IHardware hardware)
         {
-            string type = hardware.HardwareType.ToString();
-            string name = hardware.Name ?? string.Empty;
+            if (hardware == null)
+                return "Other";
+
+            string type = TryGetHardwareType(hardware, out var hardwareType) ? hardwareType.ToString() : string.Empty;
+            string name = GetHardwareName(hardware);
             string combined = $"{type} {name}";
 
             if (combined.IndexOf("cpu", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -144,29 +380,10 @@ namespace TweakWise.Services
             {
                 "Cpu" => 0,
                 "Gpu" => 1,
-                "Storage" => 2,
-                "Motherboard" => 3,
+                "Motherboard" => 2,
+                "Storage" => 3,
                 _ => 4
             };
-        }
-
-        private static IEnumerable<IHardware> FlattenHardware(IHardware hardware)
-        {
-            yield return hardware;
-
-            foreach (var child in hardware.SubHardware)
-            {
-                foreach (var nested in FlattenHardware(child))
-                    yield return nested;
-            }
-        }
-
-        private static void UpdateHardwareRecursive(IHardware hardware)
-        {
-            hardware.Update();
-
-            foreach (var child in hardware.SubHardware)
-                UpdateHardwareRecursive(child);
         }
 
         public static string FormatTemperature(float value)
@@ -183,7 +400,8 @@ namespace TweakWise.Services
 
             try
             {
-                _computer.Close();
+                if (_isOpen)
+                    _computer.Close();
             }
             catch
             {

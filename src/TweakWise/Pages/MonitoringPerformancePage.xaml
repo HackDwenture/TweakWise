@@ -1,43 +1,549 @@
 <Page x:Class="TweakWise.Pages.MonitoringPerformancePage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      Title="Мониторинг"
+      Loaded="Page_Loaded"
+      Unloaded="Page_Unloaded"
+      Title="Производительность и охлаждение"
       Background="{DynamicResource ContentBackground}">
-    <ScrollViewer Padding="20"
-                  VerticalScrollBarVisibility="Auto">
-        <StackPanel>
-            <Border Style="{StaticResource CatalogSectionBorderStyle}"
-                    Padding="20">
-                <StackPanel>
-                    <TextBlock Text="Мониторинг"
-                               FontSize="28"
+    <Page.Resources>
+        <Style x:Key="BoardComponentStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource PerformanceComponentBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PerformanceComponentBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1.4"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+        </Style>
+
+        <Style x:Key="BoardGlowStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource PerformanceComponentHoverBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PerformanceHighlightBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+        </Style>
+
+        <Style x:Key="BoardTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="BoardSubTextStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,7,0,0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Opacity" Value="0.72"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="BoardCalloutStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource PerformanceCalloutBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PerformanceCalloutBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="13,11"/>
+        </Style>
+
+        <Style x:Key="BoardActionRowStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource PerformancePanelBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+    </Page.Resources>
+
+    <Grid Background="{DynamicResource ContentBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="{DynamicResource MenuBackground}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="24,17">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="22"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Content="Назад"
+                        Padding="14,8"
+                        VerticalAlignment="Center"
+                        Click="BackButton_Click"/>
+
+                <StackPanel Grid.Column="2"
+                            VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse x:Name="ModuleStatusIndicator"
+                                 Width="10"
+                                 Height="10"
+                                 VerticalAlignment="Center"
+                                 Margin="0,1,10,0"/>
+                        <TextBlock x:Name="ModuleStatusTextBlock"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Opacity="0.78"/>
+                    </StackPanel>
+                    <TextBlock Text="Производительность и охлаждение"
+                               Margin="0,9,0,0"
+                               FontSize="25"
                                FontWeight="SemiBold"
                                TextWrapping="Wrap"/>
-                    <TextBlock Text="Здесь будут состояние системы, показатели железа и профили производительности."
-                               Margin="0,10,0,0"
-                               Opacity="0.84"
-                               TextWrapping="Wrap"/>
+                    <TextBlock Text="Карта узлов, которые реально влияют на скорость, тепловые лимиты и питание системы."
+                               Margin="0,7,0,0"
+                               FontSize="14"
+                               Opacity="0.76"
+                               TextWrapping="Wrap"
+                               MaxWidth="820"/>
                 </StackPanel>
-            </Border>
 
-            <ItemsControl x:Name="SectionsItemsControl">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Style="{StaticResource CatalogSectionBorderStyle}">
+                <Border Grid.Column="3"
+                        Background="{DynamicResource PerformancePanelBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="18,12"
+                        VerticalAlignment="Center">
+                    <StackPanel>
+                        <TextBlock Text="Режим"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Opacity="0.64"/>
+                        <TextBlock Text="Карта диагностики"
+                                   Margin="0,4,0,0"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="26">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="26"/>
+                    <ColumnDefinition Width="360"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Background="{DynamicResource PerformanceBoardBackgroundBrush}"
+                        BorderBrush="{DynamicResource PerformanceBoardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="14"
+                        Padding="16">
+                    <Grid>
+                        <Viewbox Stretch="Uniform">
+                            <Canvas Width="1100"
+                                    Height="680">
+                                <Border Canvas.Left="95"
+                                        Canvas.Top="45"
+                                        Width="910"
+                                        Height="555"
+                                        Background="{DynamicResource PerformanceBoardSurfaceBrush}"
+                                        BorderBrush="{DynamicResource PerformanceBoardBorderBrush}"
+                                        BorderThickness="1.2"
+                                        CornerRadius="24"/>
+
+                                <Rectangle Canvas.Left="130" Canvas.Top="82" Width="840" Height="486" RadiusX="18" RadiusY="18" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="1" Opacity="0.26"/>
+                                <Rectangle Canvas.Left="182" Canvas.Top="130" Width="736" Height="390" RadiusX="12" RadiusY="12" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="1" Opacity="0.18"/>
+                                <Line X1="550" Y1="70" X2="550" Y2="585" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="1" Opacity="0.20"/>
+                                <Line X1="130" Y1="340" X2="970" Y2="340" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="1" Opacity="0.20"/>
+                                <Line X1="205" Y1="190" X2="455" Y2="190" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="1.4" Opacity="0.28"/>
+                                <Line X1="650" Y1="190" X2="905" Y2="190" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="1.4" Opacity="0.28"/>
+                                <Line X1="220" Y1="485" X2="470" Y2="485" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="1.4" Opacity="0.28"/>
+                                <Line X1="645" Y1="485" X2="895" Y2="485" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="1.4" Opacity="0.28"/>
+
+                                <Polyline Points="210,235 338,235 338,300 455,300" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="2" Opacity="0.24"/>
+                                <Polyline Points="890,230 760,230 760,300 645,300" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="2" Opacity="0.24"/>
+                                <Polyline Points="260,435 370,435 370,380 455,380" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="2" Opacity="0.24"/>
+                                <Polyline Points="850,430 735,430 735,380 645,380" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="2" Opacity="0.24"/>
+
+                                <Line x:Name="PowerRouteLine" X1="550" Y1="330" X2="285" Y2="190" Stroke="{DynamicResource PerformanceRouteBrush}" StrokeThickness="3" StrokeDashArray="1,8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity="0"/>
+                                <Line x:Name="GpuRouteLine" X1="550" Y1="330" X2="300" Y2="465" Stroke="{DynamicResource PerformanceRouteBrush}" StrokeThickness="3" StrokeDashArray="1,8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity="0"/>
+                                <Line x:Name="RamRouteLine" X1="550" Y1="330" X2="770" Y2="160" Stroke="{DynamicResource PerformanceRouteBrush}" StrokeThickness="3" StrokeDashArray="1,8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity="0"/>
+                                <Line x:Name="CoolingRouteLine" X1="550" Y1="330" X2="815" Y2="390" Stroke="{DynamicResource PerformanceRouteBrush}" StrokeThickness="3" StrokeDashArray="1,8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity="0"/>
+
+                                <Border x:Name="PowerGlow" Canvas.Left="162" Canvas.Top="105" Width="260" Height="154" Style="{StaticResource BoardGlowStyle}"/>
+                                <Border x:Name="CpuGlow" Canvas.Left="438" Canvas.Top="226" Width="224" Height="208" Style="{StaticResource BoardGlowStyle}"/>
+                                <Border x:Name="GpuGlow" Canvas.Left="150" Canvas.Top="388" Width="340" Height="118" Style="{StaticResource BoardGlowStyle}"/>
+                                <Border x:Name="RamGlow" Canvas.Left="663" Canvas.Top="98" Width="270" Height="132" Style="{StaticResource BoardGlowStyle}"/>
+                                <Border x:Name="CoolingGlow" Canvas.Left="695" Canvas.Top="306" Width="274" Height="176" Style="{StaticResource BoardGlowStyle}"/>
+
+                                <Border x:Name="PowerZone"
+                                        Tag="Power"
+                                        Canvas.Left="175"
+                                        Canvas.Top="118"
+                                        Width="234"
+                                        Height="128"
+                                        Style="{StaticResource BoardComponentStyle}"
+                                        MouseEnter="Component_MouseEnter"
+                                        MouseLeave="Component_MouseLeave"
+                                        MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="Питание"
+                                                   Style="{StaticResource BoardTitleTextStyle}"/>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="Power plan, VRM, лимиты"
+                                                   Style="{StaticResource BoardSubTextStyle}"/>
+                                        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                                            <Rectangle Width="18" Height="42" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.34" Margin="0,0,7,0"/>
+                                            <Rectangle Width="18" Height="54" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.42" Margin="0,0,7,0"/>
+                                            <Rectangle Width="18" Height="36" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.30"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <Border x:Name="CpuZone"
+                                        Tag="Cpu"
+                                        Canvas.Left="460"
+                                        Canvas.Top="248"
+                                        Width="180"
+                                        Height="164"
+                                        Style="{StaticResource BoardComponentStyle}"
+                                        MouseEnter="Component_MouseEnter"
+                                        MouseLeave="Component_MouseLeave"
+                                        MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                                    <Grid>
+                                        <Border Background="{DynamicResource PerformanceChipBrush}"
+                                                BorderBrush="{DynamicResource PerformanceHighlightBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="10"
+                                                Margin="14"/>
+                                        <Grid Margin="28">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*"/>
+                                                <RowDefinition Height="*"/>
+                                                <RowDefinition Height="*"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Rectangle Grid.Row="0" Grid.Column="0" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.20" Margin="2"/>
+                                            <Rectangle Grid.Row="0" Grid.Column="1" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.30" Margin="2"/>
+                                            <Rectangle Grid.Row="0" Grid.Column="2" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.18" Margin="2"/>
+                                            <Rectangle Grid.Row="0" Grid.Column="3" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.26" Margin="2"/>
+                                            <Rectangle Grid.Row="1" Grid.Column="0" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.28" Margin="2"/>
+                                            <Rectangle Grid.Row="1" Grid.Column="1" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.20" Margin="2"/>
+                                            <Rectangle Grid.Row="1" Grid.Column="2" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.32" Margin="2"/>
+                                            <Rectangle Grid.Row="1" Grid.Column="3" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.22" Margin="2"/>
+                                            <Rectangle Grid.Row="2" Grid.Column="0" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.17" Margin="2"/>
+                                            <Rectangle Grid.Row="2" Grid.Column="1" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.26" Margin="2"/>
+                                            <Rectangle Grid.Row="2" Grid.Column="2" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.19" Margin="2"/>
+                                            <Rectangle Grid.Row="2" Grid.Column="3" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.30" Margin="2"/>
+                                            <Rectangle Grid.Row="3" Grid.Column="0" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.24" Margin="2"/>
+                                            <Rectangle Grid.Row="3" Grid.Column="1" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.18" Margin="2"/>
+                                            <Rectangle Grid.Row="3" Grid.Column="2" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.28" Margin="2"/>
+                                            <Rectangle Grid.Row="3" Grid.Column="3" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.21" Margin="2"/>
+                                        </Grid>
+                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                            <TextBlock Text="CPU"
+                                                       FontSize="20"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"/>
+                                            <TextBlock Text="планировщик, boost"
+                                                       Margin="0,6,0,0"
+                                                       FontSize="11"
+                                                       Opacity="0.74"
+                                                       HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <Border x:Name="GpuZone"
+                                        Tag="Gpu"
+                                        Canvas.Left="165"
+                                        Canvas.Top="402"
+                                        Width="310"
+                                        Height="90"
+                                        Style="{StaticResource BoardComponentStyle}"
+                                        MouseEnter="Component_MouseEnter"
+                                        MouseLeave="Component_MouseLeave"
+                                        MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="GPU"
+                                                       Style="{StaticResource BoardTitleTextStyle}"/>
+                                            <TextBlock Text="драйвер, графический стек, лимиты"
+                                                       Style="{StaticResource BoardSubTextStyle}"/>
+                                        </StackPanel>
+                                        <Grid Grid.Column="1" Width="74" Height="48" Margin="14,0,0,0">
+                                            <Ellipse Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="2" Opacity="0.38"/>
+                                            <Line X1="37" Y1="5" X2="37" Y2="43" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="1.6" Opacity="0.36"/>
+                                            <Line X1="10" Y1="24" X2="64" Y2="24" Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="1.6" Opacity="0.36"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+
+                                <Border x:Name="RamZone"
+                                        Tag="Ram"
+                                        Canvas.Left="676"
+                                        Canvas.Top="112"
+                                        Width="244"
+                                        Height="104"
+                                        Style="{StaticResource BoardComponentStyle}"
+                                        MouseEnter="Component_MouseEnter"
+                                        MouseLeave="Component_MouseLeave"
+                                        MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="RAM"
+                                                       Style="{StaticResource BoardTitleTextStyle}"/>
+                                            <TextBlock Text="  channels"
+                                                       FontSize="12"
+                                                       Opacity="0.64"
+                                                       VerticalAlignment="Bottom"/>
+                                        </StackPanel>
+                                        <Grid Grid.Row="1" Margin="0,12,0,0">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*"/>
+                                                <RowDefinition Height="7"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                            <Border Background="{DynamicResource PerformanceChipBrush}" BorderBrush="{DynamicResource PerformanceTraceBrush}" BorderThickness="1" CornerRadius="5" Opacity="0.84"/>
+                                            <Border Grid.Row="2" Background="{DynamicResource PerformanceChipBrush}" BorderBrush="{DynamicResource PerformanceTraceBrush}" BorderThickness="1" CornerRadius="5" Opacity="0.70"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+
+                                <Border x:Name="CoolingZone"
+                                        Tag="Cooling"
+                                        Canvas.Left="710"
+                                        Canvas.Top="320"
+                                        Width="244"
+                                        Height="148"
+                                        Style="{StaticResource BoardComponentStyle}"
+                                        MouseEnter="Component_MouseEnter"
+                                        MouseLeave="Component_MouseLeave"
+                                        MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="82"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Охлаждение"
+                                                       Style="{StaticResource BoardTitleTextStyle}"/>
+                                            <TextBlock Text="датчики, вентиляторы, термоконтур"
+                                                       Style="{StaticResource BoardSubTextStyle}"/>
+                                        </StackPanel>
+                                        <Grid Grid.Column="1" Width="76" Height="76" VerticalAlignment="Center">
+                                            <Ellipse Stroke="{DynamicResource PerformanceTraceBrush}" StrokeThickness="2" Opacity="0.42"/>
+                                            <Ellipse Width="18" Height="18" Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.45" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <Path Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.34" Data="M38,10 C52,12 57,23 48,32 C44,35 39,36 36,32 Z"/>
+                                            <Path Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.28" Data="M66,38 C64,52 53,57 44,48 C41,44 40,39 44,36 Z"/>
+                                            <Path Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.34" Data="M38,66 C24,64 19,53 28,44 C32,41 37,40 40,44 Z"/>
+                                            <Path Fill="{DynamicResource PerformanceTraceBrush}" Opacity="0.28" Data="M10,38 C12,24 23,19 32,28 C35,32 36,37 32,40 Z"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+
+                                <Line x:Name="PowerCalloutLine" X1="285" Y1="190" X2="124" Y2="92" Stroke="{DynamicResource PerformanceCalloutLineBrush}" StrokeThickness="1.4" Opacity="0.9" Visibility="Collapsed"/>
+                                <Ellipse x:Name="PowerCalloutDot" Canvas.Left="279" Canvas.Top="184" Width="12" Height="12" Fill="{DynamicResource PerformanceCalloutLineBrush}" Visibility="Collapsed"/>
+                                <Border x:Name="PowerCalloutCard" Canvas.Left="30" Canvas.Top="58" Width="250" Style="{StaticResource BoardCalloutStyle}" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <TextBlock x:Name="PowerCalloutTitleTextBlock" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="PowerCalloutDescriptionTextBlock" Margin="0,6,0,0" FontSize="12" Opacity="0.78" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Line x:Name="CoolingCalloutLine" X1="815" Y1="390" X2="945" Y2="110" Stroke="{DynamicResource PerformanceCalloutLineBrush}" StrokeThickness="1.4" Opacity="0.9" Visibility="Collapsed"/>
+                                <Ellipse x:Name="CoolingCalloutDot" Canvas.Left="809" Canvas.Top="384" Width="12" Height="12" Fill="{DynamicResource PerformanceCalloutLineBrush}" Visibility="Collapsed"/>
+                                <Border x:Name="CoolingCalloutCard" Canvas.Left="802" Canvas.Top="58" Width="268" Style="{StaticResource BoardCalloutStyle}" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <TextBlock x:Name="CoolingCalloutTitleTextBlock" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="CoolingCalloutDescriptionTextBlock" Margin="0,6,0,0" FontSize="12" Opacity="0.78" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Line x:Name="CpuCalloutLine" X1="550" Y1="330" X2="560" Y2="590" Stroke="{DynamicResource PerformanceCalloutLineBrush}" StrokeThickness="1.4" Opacity="0.9" Visibility="Collapsed"/>
+                                <Ellipse x:Name="CpuCalloutDot" Canvas.Left="544" Canvas.Top="324" Width="12" Height="12" Fill="{DynamicResource PerformanceCalloutLineBrush}" Visibility="Collapsed"/>
+                                <Border x:Name="CpuCalloutCard" Canvas.Left="410" Canvas.Top="560" Width="280" Style="{StaticResource BoardCalloutStyle}" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <TextBlock x:Name="CpuCalloutTitleTextBlock" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="CpuCalloutDescriptionTextBlock" Margin="0,6,0,0" FontSize="12" Opacity="0.78" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Line x:Name="GpuCalloutLine" X1="300" Y1="465" X2="118" Y2="594" Stroke="{DynamicResource PerformanceCalloutLineBrush}" StrokeThickness="1.4" Opacity="0.9" Visibility="Collapsed"/>
+                                <Ellipse x:Name="GpuCalloutDot" Canvas.Left="294" Canvas.Top="459" Width="12" Height="12" Fill="{DynamicResource PerformanceCalloutLineBrush}" Visibility="Collapsed"/>
+                                <Border x:Name="GpuCalloutCard" Canvas.Left="35" Canvas.Top="548" Width="274" Style="{StaticResource BoardCalloutStyle}" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <TextBlock x:Name="GpuCalloutTitleTextBlock" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="GpuCalloutDescriptionTextBlock" Margin="0,6,0,0" FontSize="12" Opacity="0.78" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Line x:Name="RamCalloutLine" X1="770" Y1="160" X2="948" Y2="570" Stroke="{DynamicResource PerformanceCalloutLineBrush}" StrokeThickness="1.4" Opacity="0.9" Visibility="Collapsed"/>
+                                <Ellipse x:Name="RamCalloutDot" Canvas.Left="764" Canvas.Top="154" Width="12" Height="12" Fill="{DynamicResource PerformanceCalloutLineBrush}" Visibility="Collapsed"/>
+                                <Border x:Name="RamCalloutCard" Canvas.Left="812" Canvas.Top="540" Width="258" Style="{StaticResource BoardCalloutStyle}" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <TextBlock x:Name="RamCalloutTitleTextBlock" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="RamCalloutDescriptionTextBlock" Margin="0,6,0,0" FontSize="12" Opacity="0.78" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border x:Name="NoFindingsBadge"
+                                        Canvas.Left="410"
+                                        Canvas.Top="612"
+                                        Width="280"
+                                        Background="{DynamicResource PerformancePanelBrush}"
+                                        BorderBrush="{DynamicResource PerformanceBoardBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="18"
+                                        Padding="18,10">
+                                    <TextBlock Text="Активных рекомендаций по плате нет"
+                                               HorizontalAlignment="Center"
+                                               FontWeight="SemiBold"
+                                               Opacity="0.78"/>
+                                </Border>
+                            </Canvas>
+                        </Viewbox>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2"
+                        Background="{DynamicResource MenuBackground}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="18">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel>
+                            <TextBlock Text="Выбранный узел"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.62"/>
+                            <TextBlock x:Name="SelectedTitleTextBlock"
+                                       Margin="0,6,0,0"
+                                       FontSize="22"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap"/>
+                            <TextBlock x:Name="SelectedDescriptionTextBlock"
+                                       Margin="0,8,0,0"
+                                       FontSize="13"
+                                       Opacity="0.78"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <Button x:Name="OpenNativeSettingsButton"
+                                Grid.Row="1"
+                                Margin="0,16,0,16"
+                                Padding="14,8"
+                                HorizontalAlignment="Stretch"
+                                Click="OpenNativeSettingsButton_Click"
+                                Visibility="Collapsed"/>
+
+                        <ScrollViewer Grid.Row="2"
+                                      VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <TextBlock Text="{Binding Title}"
-                                           FontSize="20"
-                                           FontWeight="SemiBold"
-                                           TextWrapping="Wrap"/>
-                                <TextBlock Text="Настройки будут добавлены позже."
+                                <TextBlock Text="Точки настройки"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"/>
+                                <ItemsControl x:Name="ActionItemsControl"
+                                              Margin="0,12,0,6">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource BoardActionRowStyle}">
+                                                <StackPanel>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Title}"
+                                                                   FontWeight="SemiBold"
+                                                                   TextWrapping="Wrap"/>
+                                                        <Border Grid.Column="1"
+                                                                Background="{DynamicResource ContentBackground}"
+                                                                BorderBrush="{DynamicResource BorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="10"
+                                                                Padding="7,2"
+                                                                Margin="10,0,0,0">
+                                                            <TextBlock Text="{Binding Channel}"
+                                                                       FontSize="11"
+                                                                       FontWeight="SemiBold"
+                                                                       Opacity="0.74"/>
+                                                        </Border>
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Description}"
+                                                               Margin="0,7,0,0"
+                                                               FontSize="12"
+                                                               Opacity="0.78"
+                                                               TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBlock Text="Диагностика"
+                                           Margin="0,10,0,0"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock x:Name="SelectedFindingsEmptyText"
+                                           Text="По этому узлу сейчас нет активных проблем или рекомендаций."
                                            Margin="0,8,0,0"
-                                           Opacity="0.82"
+                                           FontSize="12"
+                                           Opacity="0.70"
                                            TextWrapping="Wrap"/>
+                                <ItemsControl x:Name="SelectedFindingsItemsControl"
+                                              Margin="0,10,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource BoardActionRowStyle}">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}"
+                                                               FontWeight="SemiBold"
+                                                               TextWrapping="Wrap"/>
+                                                    <TextBlock Text="{Binding Description}"
+                                                               Margin="0,7,0,0"
+                                                               FontSize="12"
+                                                               Opacity="0.78"
+                                                               TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </StackPanel>
-    </ScrollViewer>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
 </Page>
