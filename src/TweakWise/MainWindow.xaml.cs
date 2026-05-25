@@ -50,7 +50,7 @@ namespace TweakWise
             LoadSavedSettings();
             UpdateBadge();
             UpdateNotificationsState();
-            NavigateToSavedScreen();
+            NavigateToCoreHome();
         }
 
         public void NavigateToCoreHome()
@@ -83,18 +83,6 @@ namespace TweakWise
             }
 
             NavigateToModuleFromPageKey(result.NavigationTarget.PageKey);
-        }
-
-        private void NavigateToSavedScreen()
-        {
-            string savedModuleId = _settingsManager.CurrentSettings.LastOpenedCoreModuleId;
-            if (Enum.TryParse(savedModuleId, ignoreCase: true, out CoreModuleId moduleId))
-            {
-                MainFrame.Navigate(CreateModulePage(moduleId));
-                return;
-            }
-
-            MainFrame.Navigate(new CoreHomePage());
         }
 
         private static Page CreateModulePage(CoreModuleId moduleId)

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -14,6 +13,7 @@ using TweakWise.Models;
 using TweakWise.Services;
 using Application = System.Windows.Application;
 using Border = System.Windows.Controls.Border;
+using WindowsPoint = System.Windows.Point;
 using WinForms = System.Windows.Forms;
 
 namespace TweakWise.Pages
@@ -23,12 +23,13 @@ namespace TweakWise.Pages
         private HardwareTemperatureService _temperatureService;
         private readonly DispatcherTimer _diagnosticsTimer = new DispatcherTimer();
         private readonly Dictionary<string, BoardNode> _nodes;
-        private Dictionary<string, Border> _zones = new Dictionary<string, Border>(StringComparer.OrdinalIgnoreCase);
-        private Dictionary<string, FrameworkElement> _glows = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase);
-        private Dictionary<string, Line> _routes = new Dictionary<string, Line>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Border> _zones = new Dictionary<string, Border>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, FrameworkElement> _glows = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Line> _routes = new Dictionary<string, Line>(StringComparer.OrdinalIgnoreCase);
         private List<BoardFinding> _findings = new List<BoardFinding>();
         private string _selectedNodeKey = "Cpu";
         private string _hoverNodeKey = string.Empty;
+        private bool _isDetailsOpen;
         private bool _isInitialized;
 
         public MonitoringPerformancePage()
@@ -42,7 +43,7 @@ namespace TweakWise.Pages
             InitializeMaps();
             _temperatureService = CreateTemperatureService();
             _isInitialized = true;
-            SelectNode(_selectedNodeKey);
+            SelectNode(_selectedNodeKey, openDetails: false);
             UpdateModuleStatus();
             RefreshDiagnostics();
         }
@@ -91,6 +92,11 @@ namespace TweakWise.Pages
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            Focus();
+
+            if (_temperatureService == null)
+                _temperatureService = CreateTemperatureService();
+
             if (App.ComputerHealthService != null)
                 App.ComputerHealthService.HealthStatusChanged += HealthService_HealthStatusChanged;
 
@@ -105,17 +111,30 @@ namespace TweakWise.Pages
 
             _diagnosticsTimer.Stop();
             _temperatureService?.Dispose();
+            _temperatureService = null;
+        }
+
+        private void Page_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape && _isDetailsOpen)
+            {
+                HideNodeDetails();
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.BrowserBack || e.Key == Key.Back)
+            {
+                if (Application.Current.MainWindow is MainWindow mainWindow)
+                    mainWindow.NavigateToCoreHome();
+
+                e.Handled = true;
+            }
         }
 
         private void HealthService_HealthStatusChanged(object sender, EventArgs e)
         {
             Dispatcher.Invoke(UpdateModuleStatus);
-        }
-
-        private void BackButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (Application.Current.MainWindow is MainWindow mainWindow)
-                mainWindow.NavigateToCoreHome();
         }
 
         private void Component_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
@@ -142,21 +161,17 @@ namespace TweakWise.Pages
             if (string.IsNullOrWhiteSpace(key))
                 return;
 
-            SelectNode(key);
+            SelectNode(key, openDetails: true);
             e.Handled = true;
         }
 
-        private void OpenNativeSettingsButton_Click(object sender, RoutedEventArgs e)
+        private void DetailsScrim_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            App.DialogManager?.Show(
-                Application.Current.MainWindow,
-                "Производительность и охлаждение",
-                "Настройки открываются внутри TweakWise",
-                "Этот раздел не переводит пользователя во внешние окна Windows. Для каждого узла будут добавляться собственные переключатели, риск, предпросмотр и откат.",
-                AppDialogKind.Info);
+            HideNodeDetails();
+            e.Handled = true;
         }
 
-        private void SelectNode(string key)
+        private void SelectNode(string key, bool openDetails)
         {
             if (!_isInitialized)
                 return;
@@ -165,20 +180,73 @@ namespace TweakWise.Pages
                 return;
 
             _selectedNodeKey = key;
+
             if (SelectedTitleTextBlock != null)
                 SelectedTitleTextBlock.Text = node.Title;
+
             if (SelectedDescriptionTextBlock != null)
                 SelectedDescriptionTextBlock.Text = node.Description;
+
             if (ActionItemsControl != null)
                 ActionItemsControl.ItemsSource = node.Actions;
 
-            if (OpenNativeSettingsButton != null)
+            UpdateSelectedFindings();
+            UpdateHighlights();
+
+            if (openDetails)
+                ShowNodeDetails();
+        }
+
+        private void ShowNodeDetails()
+        {
+            _isDetailsOpen = true;
+
+            if (NodeDetailsLayer.Visibility != Visibility.Visible)
             {
-                OpenNativeSettingsButton.Visibility = Visibility.Collapsed;
-                OpenNativeSettingsButton.Content = "Внутренние настройки";
+                NodeDetailsLayer.Visibility = Visibility.Visible;
+                NodeDetailsLayer.Opacity = 0;
             }
 
-            UpdateSelectedFindings();
+            NodeDetailsTranslate.X = 44;
+            AnimateOpacity(NodeDetailsLayer, 1, 210);
+            NodeDetailsTranslate.BeginAnimation(
+                TranslateTransform.XProperty,
+                new DoubleAnimation(0, TimeSpan.FromMilliseconds(240))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                });
+
+            StopRouteAnimations();
+            UpdateHighlights();
+        }
+
+        private void HideNodeDetails()
+        {
+            if (!_isDetailsOpen)
+                return;
+
+            _isDetailsOpen = false;
+
+            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(170))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            };
+
+            fade.Completed += (sender, args) =>
+            {
+                if (!_isDetailsOpen)
+                    NodeDetailsLayer.Visibility = Visibility.Collapsed;
+            };
+
+            NodeDetailsLayer.BeginAnimation(UIElement.OpacityProperty, fade);
+            NodeDetailsTranslate.BeginAnimation(
+                TranslateTransform.XProperty,
+                new DoubleAnimation(44, TimeSpan.FromMilliseconds(170))
+                {
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                });
+
+            StopRouteAnimations();
             UpdateHighlights();
         }
 
@@ -341,38 +409,163 @@ namespace TweakWise.Pages
 
         private void ApplyCallouts()
         {
-            ApplyCallout(_findings.FirstOrDefault(item => item.NodeKey == "Power"), PowerCalloutCard, PowerCalloutLine, PowerCalloutDot, PowerCalloutTitleTextBlock, PowerCalloutDescriptionTextBlock);
-            ApplyCallout(_findings.FirstOrDefault(item => item.NodeKey == "Cooling"), CoolingCalloutCard, CoolingCalloutLine, CoolingCalloutDot, CoolingCalloutTitleTextBlock, CoolingCalloutDescriptionTextBlock);
-            ApplyCallout(_findings.FirstOrDefault(item => item.NodeKey == "Cpu"), CpuCalloutCard, CpuCalloutLine, CpuCalloutDot, CpuCalloutTitleTextBlock, CpuCalloutDescriptionTextBlock);
-            ApplyCallout(_findings.FirstOrDefault(item => item.NodeKey == "Gpu"), GpuCalloutCard, GpuCalloutLine, GpuCalloutDot, GpuCalloutTitleTextBlock, GpuCalloutDescriptionTextBlock);
-            ApplyCallout(_findings.FirstOrDefault(item => item.NodeKey == "Ram"), RamCalloutCard, RamCalloutLine, RamCalloutDot, RamCalloutTitleTextBlock, RamCalloutDescriptionTextBlock);
+            if (CalloutLayer == null)
+                return;
 
-            if (NoFindingsBadge != null)
-                NoFindingsBadge.Visibility = _findings.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            CalloutLayer.Children.Clear();
+
+            var nodeCounters = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var finding in _findings)
+            {
+                nodeCounters.TryGetValue(finding.NodeKey, out int index);
+                nodeCounters[finding.NodeKey] = index + 1;
+                AddCallout(finding, index);
+            }
         }
 
-        private static void ApplyCallout(BoardFinding finding, Border card, Line line, Ellipse dot, TextBlock title, TextBlock description)
+        private void AddCallout(BoardFinding finding, int index)
         {
-            if (card == null || line == null || dot == null || title == null || description == null)
-                return;
-
-            bool visible = finding != null;
-            var visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-
-            card.Visibility = visibility;
-            line.Visibility = visibility;
-            dot.Visibility = visibility;
-
-            if (!visible)
-                return;
-
-            title.Text = finding.Title;
-            description.Text = finding.Description;
-
+            var layout = GetCalloutLayout(finding.NodeKey, index);
+            var lineEnd = GetCalloutLineEnd(layout);
             string brushKey = GetStatusBrushKey(finding.Level);
-            card.SetResourceReference(Border.BorderBrushProperty, brushKey);
+
+            var line = new Line
+            {
+                X1 = layout.Source.X,
+                Y1 = layout.Source.Y,
+                X2 = lineEnd.X,
+                Y2 = lineEnd.Y,
+                StrokeThickness = 1.35,
+                Opacity = 0,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round
+            };
             line.SetResourceReference(Shape.StrokeProperty, brushKey);
+
+            var dot = new Ellipse
+            {
+                Width = 10,
+                Height = 10,
+                Opacity = 0
+            };
             dot.SetResourceReference(Shape.FillProperty, brushKey);
+            Canvas.SetLeft(dot, layout.Source.X - 5);
+            Canvas.SetTop(dot, layout.Source.Y - 5);
+
+            var card = new Border
+            {
+                Width = layout.CardWidth,
+                MinHeight = 74,
+                Style = FindResource("DiagnosticCardStyle") as Style,
+                Opacity = 0,
+                RenderTransform = new TranslateTransform(layout.EntranceOffset.X, layout.EntranceOffset.Y)
+            };
+            card.SetResourceReference(Border.BorderBrushProperty, brushKey);
+
+            var panel = new StackPanel();
+            var header = new TextBlock
+            {
+                Text = GetFindingKindText(finding.Level),
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                Opacity = 0.72
+            };
+            header.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+
+            var title = new TextBlock
+            {
+                Text = finding.Title,
+                Margin = new Thickness(0, 5, 0, 0),
+                FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap
+            };
+
+            var description = new TextBlock
+            {
+                Text = finding.Description,
+                Margin = new Thickness(0, 6, 0, 0),
+                FontSize = 12,
+                LineHeight = 18,
+                Opacity = 0.78,
+                TextWrapping = TextWrapping.Wrap
+            };
+
+            panel.Children.Add(header);
+            panel.Children.Add(title);
+            panel.Children.Add(description);
+            card.Child = panel;
+
+            Canvas.SetLeft(card, layout.Card.X);
+            Canvas.SetTop(card, layout.Card.Y);
+
+            CalloutLayer.Children.Add(line);
+            CalloutLayer.Children.Add(dot);
+            CalloutLayer.Children.Add(card);
+
+            AnimateOpacity(line, 0.88, 170 + index * 40);
+            AnimateOpacity(dot, 1, 180 + index * 40);
+            AnimateOpacity(card, 1, 210 + index * 40);
+
+            if (card.RenderTransform is TranslateTransform translate)
+            {
+                translate.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(260))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                });
+                translate.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(260))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                });
+            }
+        }
+
+        private static BoardCalloutLayout GetCalloutLayout(string nodeKey, int index)
+        {
+            int safeIndex = Math.Min(index, 3);
+
+            return nodeKey switch
+            {
+                "Power" => new BoardCalloutLayout(
+                    new WindowsPoint(258, 184),
+                    new WindowsPoint(48, 52 + safeIndex * 106),
+                    284,
+                    new Vector(-18, -8)),
+
+                "Ram" => new BoardCalloutLayout(
+                    new WindowsPoint(846, 174),
+                    new WindowsPoint(872, 52 + safeIndex * 106),
+                    270,
+                    new Vector(18, -8)),
+
+                "Gpu" => new BoardCalloutLayout(
+                    new WindowsPoint(318, 510),
+                    new WindowsPoint(48, 548 - safeIndex * 106),
+                    300,
+                    new Vector(-18, 8)),
+
+                "Cooling" => new BoardCalloutLayout(
+                    new WindowsPoint(900, 452),
+                    new WindowsPoint(862, 434 + safeIndex * 86),
+                    284,
+                    new Vector(18, 8)),
+
+                _ => new BoardCalloutLayout(
+                    new WindowsPoint(590, 344),
+                    new WindowsPoint(434 + (safeIndex % 2) * 320, 560 - (safeIndex / 2) * 104),
+                    310,
+                    new Vector(0, 18))
+            };
+        }
+
+        private static WindowsPoint GetCalloutLineEnd(BoardCalloutLayout layout)
+        {
+            double x = layout.Card.X > layout.Source.X
+                ? layout.Card.X
+                : layout.Card.X + layout.CardWidth;
+
+            double y = layout.Card.Y + 28;
+            return new WindowsPoint(x, y);
         }
 
         private void UpdateSelectedFindings()
@@ -386,6 +579,26 @@ namespace TweakWise.Pages
 
             SelectedFindingsItemsControl.ItemsSource = selected;
             SelectedFindingsEmptyText.Visibility = selected.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            if (SelectedFindingSummaryTextBlock == null)
+                return;
+
+            if (selected.Count == 0)
+            {
+                SelectedFindingSummaryTextBlock.Text = "Активных сигналов нет";
+                SelectedFindingSummaryTextBlock.SetResourceReference(TextBlock.ForegroundProperty, "CoreGoodBrush");
+                return;
+            }
+
+            int problemCount = selected.Count(item => item.Level == HealthLevel.Warning || item.Level == HealthLevel.Critical);
+            int recommendationCount = selected.Count - problemCount;
+            var highestLevel = selected.OrderByDescending(item => GetSeverity(item.Level)).First().Level;
+
+            SelectedFindingSummaryTextBlock.Text = problemCount > 0
+                ? $"{problemCount} проблем · {recommendationCount} рекомендаций"
+                : $"{recommendationCount} рекомендаций";
+
+            SelectedFindingSummaryTextBlock.SetResourceReference(TextBlock.ForegroundProperty, GetStatusBrushKey(highestLevel));
         }
 
         private void UpdateHighlights()
@@ -394,7 +607,7 @@ namespace TweakWise.Pages
             {
                 bool isHover = string.Equals(pair.Key, _hoverNodeKey, StringComparison.OrdinalIgnoreCase);
                 bool isSelected = string.Equals(pair.Key, _selectedNodeKey, StringComparison.OrdinalIgnoreCase);
-                double targetOpacity = isHover ? 0.86 : isSelected ? 0.35 : 0;
+                double targetOpacity = isHover ? 0.18 : isSelected && _isDetailsOpen ? 0.14 : isSelected ? 0.08 : 0;
                 AnimateOpacity(pair.Value, targetOpacity, 170);
             }
 
@@ -402,13 +615,13 @@ namespace TweakWise.Pages
             {
                 bool isHover = string.Equals(pair.Key, _hoverNodeKey, StringComparison.OrdinalIgnoreCase);
                 bool isSelected = string.Equals(pair.Key, _selectedNodeKey, StringComparison.OrdinalIgnoreCase);
-                AnimateScale(pair.Value, isHover ? 1.035 : isSelected ? 1.015 : 1);
+                AnimateScale(pair.Value, isHover ? 1.035 : isSelected && _isDetailsOpen ? 1.022 : isSelected ? 1.012 : 1);
             }
         }
 
         private void AnimateRoutesForHover(string key)
         {
-            StopRouteAnimations();
+            StopRouteAnimations(clearSelected: true);
 
             if (string.Equals(key, "Cpu", StringComparison.OrdinalIgnoreCase))
             {
@@ -423,7 +636,10 @@ namespace TweakWise.Pages
 
         private static void AnimateRoute(Line line, bool fromCore)
         {
-            line.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0.92, TimeSpan.FromMilliseconds(120)));
+            if (line == null)
+                return;
+
+            line.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0.90, TimeSpan.FromMilliseconds(120)));
             line.BeginAnimation(
                 Shape.StrokeDashOffsetProperty,
                 new DoubleAnimation
@@ -435,26 +651,44 @@ namespace TweakWise.Pages
                 });
         }
 
-        private void StopRouteAnimations()
+        private void StopRouteAnimations(bool clearSelected = false)
         {
-            foreach (var line in _routes.Values)
+            foreach (var pair in _routes)
             {
+                var line = pair.Value;
                 line.BeginAnimation(Shape.StrokeDashOffsetProperty, null);
-                line.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(150)));
+
+                bool keepSelected = !clearSelected &&
+                                    _isDetailsOpen &&
+                                    string.Equals(pair.Key, _selectedNodeKey, StringComparison.OrdinalIgnoreCase);
+
+                line.BeginAnimation(
+                    UIElement.OpacityProperty,
+                    new DoubleAnimation(keepSelected ? 0.48 : 0, TimeSpan.FromMilliseconds(150)));
             }
         }
 
         private static void AnimateOpacity(UIElement element, double opacity, int milliseconds)
         {
-            element.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(opacity, TimeSpan.FromMilliseconds(milliseconds)) { EasingFunction = new QuadraticEase() });
+            if (element == null)
+                return;
+
+            element.BeginAnimation(
+                UIElement.OpacityProperty,
+                new DoubleAnimation(opacity, TimeSpan.FromMilliseconds(milliseconds))
+                {
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                });
         }
 
         private static void AnimateScale(Border border, double scale)
         {
-            var transform = EnsureScaleTransform(border);
+            if (border == null)
+                return;
 
+            var transform = EnsureScaleTransform(border);
             var duration = TimeSpan.FromMilliseconds(170);
-            var easing = new QuadraticEase();
+            var easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
             transform.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
             transform.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
         }
@@ -496,6 +730,17 @@ namespace TweakWise.Pages
             };
         }
 
+        private static string GetFindingKindText(HealthLevel status)
+        {
+            return status switch
+            {
+                HealthLevel.Critical => "КРИТИЧНО",
+                HealthLevel.Warning => "ПРОБЛЕМА",
+                HealthLevel.Attention => "ВНИМАНИЕ",
+                _ => "РЕКОМЕНДАЦИЯ"
+            };
+        }
+
         private static string GetStatusBrushKey(HealthLevel status)
         {
             return status switch
@@ -506,6 +751,19 @@ namespace TweakWise.Pages
                 HealthLevel.Warning => "CoreWarningBrush",
                 HealthLevel.Critical => "CoreCriticalBrush",
                 _ => "CoreUnknownBrush"
+            };
+        }
+
+        private static int GetSeverity(HealthLevel level)
+        {
+            return level switch
+            {
+                HealthLevel.Critical => 5,
+                HealthLevel.Warning => 4,
+                HealthLevel.Attention => 3,
+                HealthLevel.Normal => 2,
+                HealthLevel.Good => 1,
+                _ => 0
             };
         }
 
@@ -592,8 +850,6 @@ namespace TweakWise.Pages
         {
             public string Title { get; set; } = string.Empty;
             public string Description { get; set; } = string.Empty;
-            public string NativeSettingsUri { get; set; } = string.Empty;
-            public string NativeSettingsButtonText { get; set; } = string.Empty;
             public List<BoardAction> Actions { get; set; } = new List<BoardAction>();
         }
 
@@ -610,6 +866,22 @@ namespace TweakWise.Pages
             public HealthLevel Level { get; set; } = HealthLevel.Normal;
             public string Title { get; set; } = string.Empty;
             public string Description { get; set; } = string.Empty;
+        }
+
+        private readonly struct BoardCalloutLayout
+        {
+            public BoardCalloutLayout(WindowsPoint source, WindowsPoint card, double cardWidth, Vector entranceOffset)
+            {
+                Source = source;
+                Card = card;
+                CardWidth = cardWidth;
+                EntranceOffset = entranceOffset;
+            }
+
+            public WindowsPoint Source { get; }
+            public WindowsPoint Card { get; }
+            public double CardWidth { get; }
+            public Vector EntranceOffset { get; }
         }
     }
 }
