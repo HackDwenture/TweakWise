@@ -25,11 +25,11 @@ namespace TweakWise.Managers
 {
     public sealed class TrayTemperatureManager : IDisposable
     {
-        private readonly Computer _computer;
         private readonly DispatcherTimer _timer;
         private readonly Forms.NotifyIcon _notifyIcon;
         private readonly HashSet<string> _faultedHardwareKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly bool _suppressHardwareBackend;
+        private Computer _computer;
         private bool _enabled;
         private bool _showTemperature;
         private bool _isOpen;
@@ -38,18 +38,6 @@ namespace TweakWise.Managers
         public TrayTemperatureManager()
         {
             _suppressHardwareBackend = ShouldSuppressLibreHardwareMonitor();
-            _computer = new Computer
-            {
-                IsCpuEnabled = true,
-                IsGpuEnabled = true,
-                IsMotherboardEnabled = false,
-                IsStorageEnabled = false,
-                IsMemoryEnabled = false,
-                IsControllerEnabled = false,
-                IsNetworkEnabled = false,
-                IsPsuEnabled = false,
-                IsBatteryEnabled = false
-            };
 
             var menu = new Forms.ContextMenuStrip();
             menu.Items.Add("Открыть", null, (_, _) => RestoreMainWindow());
@@ -78,14 +66,23 @@ namespace TweakWise.Managers
             {
                 _timer.Stop();
                 _notifyIcon.Visible = false;
+                CloseComputer();
+                return;
+            }
+
+            if (!_showTemperature)
+            {
+                _timer.Stop();
+                CloseComputer();
+                Refresh();
+                _notifyIcon.Visible = true;
                 return;
             }
 
             Refresh();
             _notifyIcon.Visible = true;
-            _timer.IsEnabled = _showTemperature;
-            if (!_showTemperature)
-                _timer.Stop();
+            if (!_timer.IsEnabled)
+                _timer.Start();
         }
 
         public void RestoreMainWindow()
@@ -161,6 +158,7 @@ namespace TweakWise.Managers
 
             try
             {
+                _computer ??= CreateComputer();
                 _computer.Open();
                 _isOpen = true;
                 return true;
@@ -170,6 +168,22 @@ namespace TweakWise.Managers
                 _isOpen = false;
                 return false;
             }
+        }
+
+        private static Computer CreateComputer()
+        {
+            return new Computer
+            {
+                IsCpuEnabled = true,
+                IsGpuEnabled = true,
+                IsMotherboardEnabled = false,
+                IsStorageEnabled = false,
+                IsMemoryEnabled = false,
+                IsControllerEnabled = false,
+                IsNetworkEnabled = false,
+                IsPsuEnabled = false,
+                IsBatteryEnabled = false
+            };
         }
 
         private static bool ShouldSuppressLibreHardwareMonitor()
@@ -254,6 +268,9 @@ namespace TweakWise.Managers
 
         private IReadOnlyList<IHardware> GetRootHardware()
         {
+            if (_computer == null)
+                return Array.Empty<IHardware>();
+
             try
             {
                 return (_computer.Hardware ?? Array.Empty<IHardware>())
@@ -467,18 +484,32 @@ namespace TweakWise.Managers
             return $"{GetHardwareTypeName(hardware)}:{GetHardwareName(hardware)}";
         }
 
+        private void CloseComputer()
+        {
+            try
+            {
+                if (_isOpen)
+                    _computer?.Close();
+            }
+            catch
+            {
+            }
+            finally
+            {
+                _isOpen = false;
+                _computer = null;
+                _faultedHardwareKeys.Clear();
+            }
+        }
+
         public void Dispose()
         {
             try { _timer.Stop(); } catch { }
             try { _notifyIcon.Visible = false; } catch { }
+            try { _notifyIcon.ContextMenuStrip?.Dispose(); } catch { }
             try { _notifyIcon.Dispose(); } catch { }
             try { _currentIcon?.Dispose(); } catch { }
-            try
-            {
-                if (_isOpen)
-                    _computer.Close();
-            }
-            catch { }
+            CloseComputer();
         }
 
         [DllImport("user32.dll", SetLastError = true)]

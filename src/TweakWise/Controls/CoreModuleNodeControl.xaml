@@ -19,7 +19,7 @@
             BorderBrush="{DynamicResource CoreNodeBorderBrush}"
             BorderThickness="1.2"
             CornerRadius="23"
-            Padding="18,12">
+            Padding="18,10">
         <Border.Effect>
             <DropShadowEffect BlurRadius="18"
                               ShadowDepth="0"
@@ -50,17 +50,17 @@
                 <TextBlock x:Name="TitleTextBlock"
                            FontSize="14"
                            FontWeight="SemiBold"
-                           LineHeight="18"
+                           LineHeight="17"
                            TextWrapping="Wrap"
                            TextTrimming="CharacterEllipsis"
-                           MaxHeight="38"/>
+                           MaxHeight="34"/>
 
                 <TextBlock x:Name="HintTextBlock"
                            Visibility="Collapsed"/>
 
                 <TextBlock Grid.Row="1"
                            x:Name="StatusTextBlock"
-                           Margin="0,7,0,0"
+                           Margin="0,4,0,0"
                            FontSize="12"
                            FontWeight="SemiBold"
                            Opacity="0.82"

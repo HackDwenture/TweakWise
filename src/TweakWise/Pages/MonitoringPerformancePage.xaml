@@ -8,6 +8,8 @@
       Focusable="True"
       Background="{DynamicResource WindowBackground}">
     <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
         <Style x:Key="BackButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="38"/>
             <Setter Property="Height" Value="34"/>
@@ -140,6 +142,362 @@
             <Setter Property="Padding" Value="12,10"/>
             <Setter Property="MaxWidth" Value="300"/>
         </Style>
+
+        <Style x:Key="PerformanceSettingCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="12" ShadowDepth="0" Opacity="0.12" Color="#05080D"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PerformanceBadgeStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="7,3"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+        </Style>
+
+        <Style x:Key="PerformanceSearchBoxStyle" TargetType="TextBox">
+            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="Padding" Value="34,7,34,7"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ScrollViewer x:Name="PART_ContentHost"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PerformanceLoadingSquareStyle" TargetType="Border">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Background" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNormalBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="14" ShadowDepth="0" Opacity="0.42" Color="#3CC7B7"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PerformanceActionButtonStyle" TargetType="Button">
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PerformancePrimaryActionButtonStyle" TargetType="Button" BasedOn="{StaticResource PerformanceActionButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource CoreOrbForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+        </Style>
+
+        <Style x:Key="PerformanceComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Root"
+                                                MinHeight="34"
+                                                Background="{DynamicResource CoreNodeBackgroundBrush}"
+                                                BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="9"
+                                                Padding="10,6">
+                                            <Grid>
+                                                <TextBlock Margin="0,0,22,0"
+                                                           HorizontalAlignment="Left"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource WindowForeground}"
+                                                           Text="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="&#xE70D;"
+                                                           FontFamily="Segoe MDL2 Assets"
+                                                           FontSize="10"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center"
+                                                           Opacity="0.72"/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="Root" Property="Opacity" Value="0.48"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Fade">
+                                <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="260"
+                                        Background="{DynamicResource ContentBackground}"
+                                        BorderBrush="{DynamicResource CoreLineActiveBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="4">
+                                    <ScrollViewer CanContentScroll="True">
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+                        <Setter Property="Padding" Value="10,6"/>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PerformanceToggleStyle" TargetType="CheckBox">
+            <Setter Property="Width" Value="48"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Width="48" Height="26">
+                            <Border x:Name="Track"
+                                    CornerRadius="13"
+                                    Background="{DynamicResource ButtonBackground}"
+                                    BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                                    BorderThickness="1"/>
+                            <Ellipse x:Name="Thumb"
+                                     Width="18"
+                                     Height="18"
+                                     Fill="{DynamicResource WindowForeground}"
+                                     Margin="4"
+                                     HorizontalAlignment="Left"
+                                     VerticalAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.45"/>
+                                <Setter TargetName="Thumb" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="PerformanceSettingItemTemplate">
+            <Border Style="{StaticResource PerformanceSettingCardStyle}"
+                    Loaded="PerformanceSettingCard_Loaded"
+                    Opacity="0">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding Description}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.76" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Style="{StaticResource PerformanceBadgeStyle}" Margin="10,0,0,0" VerticalAlignment="Top">
+                            <TextBlock Text="{Binding ChannelLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                        </Border>
+                    </Grid>
+
+                    <WrapPanel Margin="0,12,0,0">
+                        <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding IsPriority, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="рекомендуется" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource CoreNormalBrush}"/>
+                        </Border>
+                        <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding HasRisk, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="{Binding RiskLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                        </Border>
+                        <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding RequiresElevation, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="нужны права администратора" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource CoreAttentionBrush}"/>
+                        </Border>
+                        <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding RequiresRestart, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="после применения нужна перезагрузка" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource CoreAttentionBrush}"/>
+                        </Border>
+                        <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding CanRollback, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="есть бэкап" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource CoreGoodBrush}"/>
+                        </Border>
+                    </WrapPanel>
+
+                    <Border Margin="0,10,0,0"
+                            Padding="0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Visibility="{Binding HasCurrentValue, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="Текущее состояние" FontSize="11" FontWeight="SemiBold" Opacity="0.62"/>
+                            <TextBlock Text="{Binding CurrentValue}" Margin="0,3,0,0" FontSize="12" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="{Binding Recommendation}"
+                               Margin="0,10,0,0"
+                               FontSize="12"
+                               LineHeight="18"
+                               TextWrapping="Wrap"
+                               Opacity="0.78"
+                               Visibility="{Binding HasRecommendation, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                    <CheckBox Style="{StaticResource PerformanceToggleStyle}"
+                              Margin="0,12,0,0"
+                              IsChecked="{Binding ToggleValue, Mode=TwoWay}"
+                              IsEnabled="{Binding CanApply}"
+                              Visibility="{Binding IsToggle, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                    <ComboBox Style="{StaticResource PerformanceComboBoxStyle}"
+                              Margin="0,12,0,0"
+                              ItemsSource="{Binding Options}"
+                              SelectedItem="{Binding SelectedOption, Mode=TwoWay}"
+                              DisplayMemberPath="Label"
+                              IsEnabled="{Binding CanApply}"
+                              Visibility="{Binding IsCombo, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                    <Grid Margin="0,12,0,0" Visibility="{Binding IsSlider, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="62"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider Minimum="{Binding Minimum}"
+                                Maximum="{Binding Maximum}"
+                                TickFrequency="{Binding NumericStep}"
+                                IsSnapToTickEnabled="True"
+                                Value="{Binding NumericValue, Mode=TwoWay}"
+                                IsEnabled="{Binding CanApply}"
+                                VerticalAlignment="Center"/>
+                        <Border Grid.Column="1"
+                                Margin="10,0,0,0"
+                                Height="30"
+                                Background="{DynamicResource ContentBackground}"
+                                BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="9">
+                            <TextBlock Text="{Binding NumericValueText}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"/>
+                        </Border>
+                    </Grid>
+
+                    <Border Margin="0,12,0,0"
+                            Padding="10,8"
+                            Background="{DynamicResource CoreNodeBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{Binding StatusMessage}" FontSize="12" LineHeight="18" TextWrapping="Wrap" Opacity="0.84"/>
+                    </Border>
+
+                    <WrapPanel Margin="0,14,0,-8">
+                        <Button Content="Проверить"
+                                Style="{StaticResource PerformanceActionButtonStyle}"
+                                Click="AnalyzePerformanceSetting_Click"/>
+                        <Button Content="{Binding ApplyButtonText}"
+                                Style="{StaticResource PerformancePrimaryActionButtonStyle}"
+                                IsEnabled="{Binding CanApply}"
+                                Visibility="{Binding ShowApplyAction, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Click="ApplyPerformanceSetting_Click"/>
+                        <Button Content="Откатить"
+                                Style="{StaticResource PerformanceActionButtonStyle}"
+                                Visibility="{Binding CanRollback, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Click="RollbackPerformanceSetting_Click"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
     </Page.Resources>
 
     <Grid Background="{DynamicResource WindowBackground}" ClipToBounds="True">
@@ -469,7 +827,7 @@
             <Border Background="{DynamicResource WindowBackground}" Opacity="0.80" MouseLeftButtonDown="DetailsScrim_MouseLeftButtonDown"/>
 
             <Border x:Name="NodeDetailsPanel"
-                    Width="408"
+                    Width="472"
                     Margin="0,78,28,28"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Stretch"
@@ -496,7 +854,7 @@
                         <TextBlock x:Name="SelectedFindingSummaryTextBlock" Margin="0,14,0,0" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
                     </StackPanel>
 
-                    <ScrollViewer Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer x:Name="NodeDetailsScrollViewer" Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <TextBlock Text="Проблемы и рекомендации" FontSize="15" FontWeight="SemiBold"/>
                             <TextBlock x:Name="SelectedFindingsEmptyText" Text="По этому узлу сейчас нет активных проблем или рекомендаций." Margin="0,8,0,0" FontSize="12" Opacity="0.70" TextWrapping="Wrap"/>
@@ -513,25 +871,117 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <TextBlock Text="Параметры" Margin="0,8,0,0" FontSize="15" FontWeight="SemiBold"/>
-                            <ItemsControl x:Name="ActionItemsControl" Margin="0,12,0,0">
+                            <TextBlock Text="Параметры и действия" Margin="0,8,0,0" FontSize="15" FontWeight="SemiBold"/>
+                            <Grid Margin="0,10,0,0">
+                                <TextBox x:Name="PerformanceSearchTextBox"
+                                         Style="{StaticResource PerformanceSearchBoxStyle}"
+                                         TextChanged="PerformanceSearchTextBox_TextChanged"/>
+                                <TextBlock x:Name="PerformanceSearchPlaceholderTextBlock"
+                                           Text="Поиск по параметрам этого узла"
+                                           Margin="34,0,34,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           IsHitTestVisible="False"
+                                           Opacity="0.45"/>
+                                <TextBlock Text="&#xE721;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="13"
+                                           Margin="12,0,0,0"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Left"
+                                           Opacity="0.58"/>
+                                <Button x:Name="PerformanceSearchClearButton"
+                                        Content="&#xE711;"
+                                        FontFamily="Segoe MDL2 Assets"
+                                        Width="28"
+                                        Height="28"
+                                        Padding="0"
+                                        Margin="0,0,4,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource PerformanceActionButtonStyle}"
+                                        Visibility="Collapsed"
+                                        Click="PerformanceSearchClearButton_Click"/>
+                            </Grid>
+                            <ItemsControl x:Name="PerformanceSearchSuggestionsItemsControl"
+                                          Margin="0,8,0,0"
+                                          Visibility="Collapsed">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Style="{StaticResource DetailsCardStyle}">
+                                        <Button Style="{StaticResource PerformanceActionButtonStyle}"
+                                                Click="PerformanceSearchSuggestion_Click">
                                             <StackPanel>
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                    <Border Grid.Column="1" Background="{DynamicResource CoreNodeBackgroundBrush}" BorderBrush="{DynamicResource CoreNodeBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="7,2" Margin="10,0,0,0">
-                                                        <TextBlock Text="{Binding Channel}" FontSize="11" FontWeight="SemiBold" Opacity="0.74"/>
-                                                    </Border>
-                                                </Grid>
-                                                <TextBlock Text="{Binding Description}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.78" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding SectionTitle}" Margin="0,2,0,0" FontSize="10" Opacity="0.58" TextWrapping="Wrap"/>
                                             </StackPanel>
-                                        </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock x:Name="PerformanceSearchEmptyText"
+                                       Text="По этому запросу в текущем узле ничего не найдено."
+                                       Margin="0,8,0,0"
+                                       FontSize="12"
+                                       Opacity="0.70"
+                                       TextWrapping="Wrap"
+                                       Visibility="Collapsed"/>
+                            <TextBlock x:Name="PerformanceSettingsEmptyText"
+                                       Text="Для этого узла пока нет доступных действий."
+                                       Margin="0,8,0,0"
+                                       FontSize="12"
+                                       Opacity="0.70"
+                                       TextWrapping="Wrap"
+                                       Visibility="Collapsed"/>
+                            <Border x:Name="PerformanceSettingsLoadingPanel"
+                                    Margin="0,12,0,0"
+                                    Padding="18,20"
+                                    Background="{DynamicResource ContentBackground}"
+                                    BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Visibility="Collapsed">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <UniformGrid Rows="2" Columns="2" Width="60" Height="60" HorizontalAlignment="Center">
+                                        <Border x:Name="LoadingSquareA" Style="{StaticResource PerformanceLoadingSquareStyle}"/>
+                                        <Border x:Name="LoadingSquareB" Style="{StaticResource PerformanceLoadingSquareStyle}"/>
+                                        <Border x:Name="LoadingSquareC" Style="{StaticResource PerformanceLoadingSquareStyle}"/>
+                                        <Border x:Name="LoadingSquareD" Style="{StaticResource PerformanceLoadingSquareStyle}"/>
+                                    </UniformGrid>
+                                    <TextBlock Text="Загружаю параметры узла"
+                                               Margin="0,12,0,0"
+                                               HorizontalAlignment="Center"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Opacity="0.76"/>
+                                    <TextBlock Text="Проверки идут в фоне, интерфейс остаётся отзывчивым."
+                                               Margin="0,5,0,0"
+                                               HorizontalAlignment="Center"
+                                               FontSize="11"
+                                               Opacity="0.56"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                            <ItemsControl x:Name="PerformanceSettingsItemsControl" Margin="0,12,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="0,0,0,10">
+                                            <Border Padding="0,0,0,8"
+                                                    BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                                                    BorderThickness="0,0,0,1">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="{Binding Description}" Margin="0,4,0,0" FontSize="12" LineHeight="18" Opacity="0.68" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ItemsControl ItemsSource="{Binding Items}"
+                                                          ItemTemplate="{StaticResource PerformanceSettingItemTemplate}"
+                                                          Margin="0,10,0,0"/>
+                                        </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>

@@ -206,11 +206,12 @@ namespace TweakWise.Services
             }
         }
 
-        private static void CheckRestartState(
+        private void CheckRestartState(
             Dictionary<CoreModuleId, ModuleHealthStatus> moduleStatuses,
             HealthFindingAccumulator findings)
         {
             var restartCheck = CheckPendingRestart();
+            AddTweakWiseRestartRequest(restartCheck);
             bool pendingRestart = restartCheck.IsPending;
             findings.PendingRestart = pendingRestart;
 
@@ -226,6 +227,20 @@ namespace TweakWise.Services
                 HealthLevel.Normal,
                 recommendations: 1,
                 finding: CreatePendingRestartFinding(restartCheck));
+        }
+
+        private void AddTweakWiseRestartRequest(PendingRestartCheck restartCheck)
+        {
+            if (restartCheck == null || _settingsManager == null)
+                return;
+
+            if (!_settingsManager.HasActiveTweakWiseRestartRequest())
+                return;
+
+            string reason = _settingsManager.CurrentSettings.PendingRestartReason;
+            AddDistinct(
+                restartCheck.AppSources,
+                string.IsNullOrWhiteSpace(reason) ? "изменения TweakWise" : reason);
         }
 
         private static void CheckNetworkState(
@@ -612,6 +627,9 @@ namespace TweakWise.Services
 
                 if (restartCheck.PendingFileSources.Count > 0)
                     details.Add($"отложенные операции файлов: {FormatSourceList(restartCheck.PendingFileSources)}");
+
+                if (restartCheck.AppSources.Count > 0)
+                    details.Add($"TweakWise: {FormatSourceList(restartCheck.AppSources)}");
             }
 
             string description = details.Count > 0
@@ -870,7 +888,8 @@ namespace TweakWise.Services
         {
             public List<string> RestartSources { get; } = new List<string>();
             public List<string> PendingFileSources { get; } = new List<string>();
-            public bool IsPending => RestartSources.Count > 0 || PendingFileSources.Count > 0;
+            public List<string> AppSources { get; } = new List<string>();
+            public bool IsPending => RestartSources.Count > 0 || PendingFileSources.Count > 0 || AppSources.Count > 0;
         }
 
         private readonly struct HealthCheckSnapshot

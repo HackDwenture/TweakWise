@@ -22,12 +22,16 @@ namespace TweakWise.Pages
     public partial class CoreHomePage : Page
     {
         private readonly IComputerHealthService _healthService = App.ComputerHealthService;
-        private readonly HardwareTemperatureService _temperatureService = new HardwareTemperatureService();
+        private HardwareTemperatureService _temperatureService;
         private readonly DispatcherTimer _temperatureTimer;
         private readonly ObservableCollection<TemperatureReadingViewModel> _temperatureCards = new ObservableCollection<TemperatureReadingViewModel>();
+        private readonly object _temperatureServiceSync = new object();
         private const double ConnectionLineDashOffset = 140;
         private bool _detailsOpened;
         private bool _temperatureOptionsLoaded;
+        private bool _isPageActive;
+        private bool _temperatureRefreshRunning;
+        private int _temperatureRefreshVersion;
 
         public CoreHomePage()
         {
@@ -42,23 +46,31 @@ namespace TweakWise.Pages
             {
                 Interval = TimeSpan.FromSeconds(8)
             };
-            _temperatureTimer.Tick += (sender, args) => RefreshTemperatures();
+            _temperatureTimer.Tick += async (sender, args) => await RefreshTemperaturesAsync();
         }
 
-        private void CoreHomePage_Loaded(object sender, RoutedEventArgs e)
+        private async void CoreHomePage_Loaded(object sender, RoutedEventArgs e)
         {
+            _isPageActive = true;
             _healthService.HealthStatusChanged += HealthService_HealthStatusChanged;
             LoadTemperatureOptions();
             RenderHealthStatus();
-            RefreshTemperatures();
-            _temperatureTimer.Start();
+            await RefreshTemperaturesAsync();
+            if (_isPageActive)
+                _temperatureTimer.Start();
         }
 
         private void CoreHomePage_Unloaded(object sender, RoutedEventArgs e)
         {
+            _isPageActive = false;
+            _temperatureRefreshVersion++;
             _healthService.HealthStatusChanged -= HealthService_HealthStatusChanged;
             _temperatureTimer.Stop();
-            _temperatureService.Dispose();
+            lock (_temperatureServiceSync)
+            {
+                _temperatureService?.Dispose();
+                _temperatureService = null;
+            }
         }
 
         private void HealthService_HealthStatusChanged(object sender, EventArgs e)
@@ -199,10 +211,50 @@ namespace TweakWise.Pages
             _temperatureOptionsLoaded = true;
         }
 
-        private void RefreshTemperatures()
+        private async Task RefreshTemperaturesAsync()
         {
-            var readings = _temperatureService.GetTemperatures();
             var visibleGroups = GetVisibleTemperatureGroups();
+            int refreshVersion = ++_temperatureRefreshVersion;
+
+            if (visibleGroups.Count == 0)
+            {
+                lock (_temperatureServiceSync)
+                {
+                    _temperatureService?.Dispose();
+                    _temperatureService = null;
+                }
+
+                _temperatureCards.Clear();
+                TemperatureDockTextBlock.Text = "Температуры: отключены";
+                TemperatureDetailsTextBlock.Text = "Включите нужные группы датчиков, чтобы TweakWise начал их читать.";
+                return;
+            }
+
+            if (_temperatureRefreshRunning)
+                return;
+
+            var temperatureService = EnsureTemperatureService();
+            _temperatureRefreshRunning = true;
+
+            IReadOnlyList<TemperatureSensorReading> readings;
+            try
+            {
+                readings = await Task.Run(() =>
+                {
+                    lock (_temperatureServiceSync)
+                    {
+                        return temperatureService?.GetTemperatures() ?? Array.Empty<TemperatureSensorReading>();
+                    }
+                });
+            }
+            finally
+            {
+                _temperatureRefreshRunning = false;
+            }
+
+            if (!_isPageActive || refreshVersion != _temperatureRefreshVersion)
+                return;
+
             var visibleReadings = readings
                 .Where(item => visibleGroups.Contains(item.Group))
                 .GroupBy(item => item.Group)
@@ -229,6 +281,26 @@ namespace TweakWise.Pages
 
             TemperatureDockTextBlock.Text = "Температуры: " + string.Join(" · ", visibleReadings.Select(item => $"{GetGroupTitle(item.Group)} {HardwareTemperatureService.FormatTemperature(item.ValueCelsius)}"));
             TemperatureDetailsTextBlock.Text = "Показываются самые горячие доступные датчики по выбранным группам. Состав можно менять тумблерами ниже.";
+        }
+
+        private HardwareTemperatureService EnsureTemperatureService()
+        {
+            lock (_temperatureServiceSync)
+            {
+                if (_temperatureService != null)
+                    return _temperatureService;
+
+                try
+                {
+                    _temperatureService = new HardwareTemperatureService();
+                }
+                catch
+                {
+                    _temperatureService = null;
+                }
+
+                return _temperatureService;
+            }
         }
 
         private HashSet<string> GetVisibleTemperatureGroups()
@@ -311,7 +383,7 @@ namespace TweakWise.Pages
         private async void CheckSystemButton_Click(object sender, RoutedEventArgs e)
         {
             await _healthService.RefreshStatusAsync();
-            RefreshTemperatures();
+            await RefreshTemperaturesAsync();
         }
 
         private void CloseCoreDetailsButton_Click(object sender, RoutedEventArgs e)
@@ -488,7 +560,7 @@ namespace TweakWise.Pages
             settings.ShowCoreMotherboardTemperature = ShowMotherboardTemperatureCheckBox.IsChecked == true;
             settings.ShowCoreOtherTemperature = ShowOtherTemperatureCheckBox.IsChecked == true;
             App.SettingsManager.SaveSettings();
-            RefreshTemperatures();
+            _ = RefreshTemperaturesAsync();
         }
 
         private sealed class TemperatureReadingViewModel

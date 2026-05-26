@@ -31,24 +31,11 @@ namespace TweakWise.Services
                 IsPsuEnabled = false,
                 IsBatteryEnabled = false
             };
-
-            if (_suppressHardwareBackend)
-                return;
-
-            try
-            {
-                _computer.Open();
-                _isOpen = true;
-            }
-            catch
-            {
-                _isOpen = false;
-            }
         }
 
         public IReadOnlyList<TemperatureSensorReading> GetTemperatures()
         {
-            if (_disposed || _suppressHardwareBackend || !_isOpen)
+            if (_disposed || _suppressHardwareBackend || !EnsureComputerOpened())
                 return Array.Empty<TemperatureSensorReading>();
 
             try
@@ -68,6 +55,24 @@ namespace TweakWise.Services
             catch
             {
                 return Array.Empty<TemperatureSensorReading>();
+            }
+        }
+
+        private bool EnsureComputerOpened()
+        {
+            if (_isOpen)
+                return true;
+
+            try
+            {
+                _computer.Open();
+                _isOpen = true;
+                return true;
+            }
+            catch
+            {
+                _isOpen = false;
+                return false;
             }
         }
 

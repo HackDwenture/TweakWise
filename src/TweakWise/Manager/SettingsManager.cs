@@ -79,44 +79,62 @@ namespace TweakWise.Managers
             SaveSettings();
         }
 
-        public void SetRunOnStartup(bool enabled)
+        public void UpdateShellPreferences(
+            bool runOnStartup,
+            bool autoCheckUpdates,
+            bool showNotifications,
+            bool showTrayTemperature,
+            bool minimizeToTrayOnClose,
+            bool startMinimizedToTray)
         {
-            CurrentSettings.RunOnStartup = enabled;
-            ApplyRunOnStartup(enabled);
+            bool startupRegistrationChanged =
+                CurrentSettings.RunOnStartup != runOnStartup ||
+                CurrentSettings.StartMinimizedToTray != startMinimizedToTray;
+
+            CurrentSettings.RunOnStartup = runOnStartup;
+            CurrentSettings.AutoCheckUpdates = autoCheckUpdates;
+            CurrentSettings.ShowNotifications = showNotifications;
+            CurrentSettings.ShowTrayTemperature = showTrayTemperature;
+            CurrentSettings.MinimizeToTrayOnClose = minimizeToTrayOnClose;
+            CurrentSettings.StartMinimizedToTray = startMinimizedToTray;
+
+            if (startupRegistrationChanged)
+                ApplyRunOnStartup(runOnStartup);
+
             SaveSettings();
         }
 
-        public void SetAutoCheckUpdates(bool enabled)
+        public void MarkPendingRestart(string reason)
         {
-            CurrentSettings.AutoCheckUpdates = enabled;
+            CurrentSettings.PendingRestart = true;
+            CurrentSettings.PendingRestartMarkedAtUtc = DateTime.UtcNow;
+            CurrentSettings.PendingRestartReason = string.IsNullOrWhiteSpace(reason)
+                ? "изменения TweakWise"
+                : reason.Trim();
+
             SaveSettings();
         }
 
-        public void SetShowNotifications(bool enabled)
+        public bool HasActiveTweakWiseRestartRequest()
         {
-            CurrentSettings.ShowNotifications = enabled;
-            SaveSettings();
+            var markedAt = CurrentSettings.PendingRestartMarkedAtUtc;
+            if (!markedAt.HasValue)
+                return false;
+
+            DateTime bootUtc = DateTime.UtcNow - TimeSpan.FromMilliseconds(Environment.TickCount64);
+            if (markedAt.Value <= bootUtc)
+            {
+                ClearTweakWiseRestartRequest();
+                return false;
+            }
+
+            return true;
         }
 
-        public void SetShowTrayTemperature(bool enabled)
+        public void ClearTweakWiseRestartRequest()
         {
-            CurrentSettings.ShowTrayTemperature = enabled;
-            SaveSettings();
-        }
-
-        public void SetMinimizeToTrayOnClose(bool enabled)
-        {
-            CurrentSettings.MinimizeToTrayOnClose = enabled;
-            SaveSettings();
-        }
-
-        public void SetStartMinimizedToTray(bool enabled)
-        {
-            CurrentSettings.StartMinimizedToTray = enabled;
-
-            if (CurrentSettings.RunOnStartup)
-                ApplyRunOnStartup(true);
-
+            CurrentSettings.PendingRestartMarkedAtUtc = null;
+            CurrentSettings.PendingRestartReason = string.Empty;
             SaveSettings();
         }
 

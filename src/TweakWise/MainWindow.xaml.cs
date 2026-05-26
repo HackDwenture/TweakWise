@@ -55,16 +55,12 @@ namespace TweakWise
 
         public void NavigateToCoreHome()
         {
-            MainFrame.Navigate(new CoreHomePage());
-            _settingsManager.CurrentSettings.LastOpenedCoreModuleId = string.Empty;
-            _settingsManager.SaveSettings();
+            NavigateFresh(new CoreHomePage());
         }
 
         public void OpenModuleWorkspace(CoreModuleId moduleId)
         {
-            MainFrame.Navigate(CreateModulePage(moduleId));
-            _settingsManager.CurrentSettings.LastOpenedCoreModuleId = moduleId.ToString();
-            _settingsManager.SaveSettings();
+            NavigateFresh(CreateModulePage(moduleId));
         }
 
         public void NavigateToPage(string pageName)
@@ -90,6 +86,21 @@ namespace TweakWise
             return moduleId == CoreModuleId.Resources
                 ? new MonitoringPerformancePage()
                 : new ModuleWorkspacePage(moduleId);
+        }
+
+        private void NavigateFresh(Page page)
+        {
+            MainFrame.Navigate(page);
+
+            try
+            {
+                while (MainFrame.RemoveBackEntry() != null)
+                {
+                }
+            }
+            catch (InvalidOperationException)
+            {
+            }
         }
 
         private void NavigateToModuleFromPageKey(string pageName)
@@ -248,12 +259,13 @@ namespace TweakWise
             if (!_settingsLoaded)
                 return;
 
-            _settingsManager.SetRunOnStartup(RunOnStartupCheckBox.IsChecked == true);
-            _settingsManager.SetAutoCheckUpdates(AutoCheckUpdatesCheckBox.IsChecked == true);
-            _settingsManager.SetShowNotifications(ShowNotificationsCheckBox.IsChecked == true);
-            _settingsManager.SetShowTrayTemperature(ShowTrayTemperatureCheckBox.IsChecked == true);
-            _settingsManager.SetMinimizeToTrayOnClose(MinimizeToTrayOnCloseCheckBox.IsChecked == true);
-            _settingsManager.SetStartMinimizedToTray(StartMinimizedToTrayCheckBox.IsChecked == true);
+            _settingsManager.UpdateShellPreferences(
+                RunOnStartupCheckBox.IsChecked == true,
+                AutoCheckUpdatesCheckBox.IsChecked == true,
+                ShowNotificationsCheckBox.IsChecked == true,
+                ShowTrayTemperatureCheckBox.IsChecked == true,
+                MinimizeToTrayOnCloseCheckBox.IsChecked == true,
+                StartMinimizedToTrayCheckBox.IsChecked == true);
             ApplyTrayPreferences();
         }
 

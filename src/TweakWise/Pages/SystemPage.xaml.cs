@@ -19,9 +19,9 @@ namespace TweakWise.Pages
         private const string UnsupportedText = "Не поддерживается";
 
         private readonly DispatcherTimer _refreshTimer;
-        private readonly Computer _computer;
         private readonly HashSet<string> _faultedHardwareKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly bool _suppressHardwareBackend;
+        private Computer _computer;
         private bool _isOpen;
 
         public SystemPage()
@@ -29,35 +29,9 @@ namespace TweakWise.Pages
             InitializeComponent();
 
             _suppressHardwareBackend = ShouldSuppressLibreHardwareMonitor();
-            _computer = new Computer
-            {
-                IsCpuEnabled = true,
-                IsGpuEnabled = true,
-                IsMemoryEnabled = true,
-                IsMotherboardEnabled = false,
-                IsControllerEnabled = false,
-                IsStorageEnabled = false,
-                IsNetworkEnabled = false,
-                IsPsuEnabled = false,
-                IsBatteryEnabled = false
-            };
-            if (!_suppressHardwareBackend)
-            {
-                try
-                {
-                    _computer.Open();
-                    _isOpen = true;
-                }
-                catch
-                {
-                    _isOpen = false;
-                    // Hardware telemetry is optional. Keep the page available even if a driver denies access.
-                }
-            }
-
             _refreshTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(2)
+                Interval = TimeSpan.FromSeconds(5)
             };
             _refreshTimer.Tick += (_, _) => RefreshSystemInfo();
 
@@ -74,6 +48,7 @@ namespace TweakWise.Pages
         private void SystemPage_Unloaded(object sender, RoutedEventArgs e)
         {
             _refreshTimer.Stop();
+            CloseComputer();
         }
 
         private static bool ShouldSuppressLibreHardwareMonitor()
@@ -94,6 +69,7 @@ namespace TweakWise.Pages
 
         private void RefreshSystemInfo()
         {
+            EnsureComputerOpened();
             UpdateHardwareTree();
 
             var hardware = GetHardware().ToList();
@@ -165,7 +141,7 @@ namespace TweakWise.Pages
 
         private IReadOnlyList<IHardware> GetRootHardware()
         {
-            if (_suppressHardwareBackend || !_isOpen)
+            if (_suppressHardwareBackend || !_isOpen || _computer == null)
                 return Array.Empty<IHardware>();
 
             try
@@ -177,6 +153,58 @@ namespace TweakWise.Pages
             catch
             {
                 return Array.Empty<IHardware>();
+            }
+        }
+
+        private void EnsureComputerOpened()
+        {
+            if (_isOpen || _suppressHardwareBackend)
+                return;
+
+            try
+            {
+                _computer ??= CreateComputer();
+                _computer.Open();
+                _isOpen = true;
+            }
+            catch
+            {
+                _isOpen = false;
+                // Hardware telemetry is optional. Keep the page available even if a driver denies access.
+            }
+        }
+
+        private static Computer CreateComputer()
+        {
+            return new Computer
+            {
+                IsCpuEnabled = true,
+                IsGpuEnabled = true,
+                IsMemoryEnabled = true,
+                IsMotherboardEnabled = false,
+                IsControllerEnabled = false,
+                IsStorageEnabled = false,
+                IsNetworkEnabled = false,
+                IsPsuEnabled = false,
+                IsBatteryEnabled = false
+            };
+        }
+
+        private void CloseComputer()
+        {
+            try
+            {
+                if (_isOpen)
+                    _computer?.Close();
+            }
+            catch
+            {
+            }
+            finally
+            {
+                _isOpen = false;
+                _computer = null;
+                _faultedHardwareKeys.Clear();
             }
         }
 

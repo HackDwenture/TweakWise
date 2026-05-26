@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -21,17 +23,28 @@ namespace TweakWise.Pages
     public partial class MonitoringPerformancePage : Page
     {
         private HardwareTemperatureService _temperatureService;
+        private PerformanceTuningService _performanceTuningService;
         private readonly DispatcherTimer _diagnosticsTimer = new DispatcherTimer();
         private readonly Dictionary<string, BoardNode> _nodes;
         private readonly Dictionary<string, Border> _zones = new Dictionary<string, Border>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, FrameworkElement> _glows = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Line> _routes = new Dictionary<string, Line>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _animatedNodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, PerformanceSettingsCacheEntry> _settingsItemsCache = new Dictionary<string, PerformanceSettingsCacheEntry>(StringComparer.OrdinalIgnoreCase);
+        private readonly SemaphoreSlim _settingsLoadGate = new SemaphoreSlim(1, 1);
+        private readonly object _temperatureSync = new object();
+        private static readonly TimeSpan SettingsItemsCacheLifetime = TimeSpan.FromSeconds(40);
+        private CancellationTokenSource _settingsLoadCts;
+        private int _settingsLoadVersion;
+        private IReadOnlyList<PerformanceTuningItem> _currentPerformanceItems = Array.Empty<PerformanceTuningItem>();
+        private string _pendingSearchTargetSettingId = string.Empty;
         private List<BoardFinding> _findings = new List<BoardFinding>();
         private string _selectedNodeKey = "Cpu";
         private string _hoverNodeKey = string.Empty;
         private bool _isDetailsOpen;
         private bool _isInitialized;
+        private bool _isPageActive;
+        private bool _diagnosticsRefreshRunning;
 
         public MonitoringPerformancePage()
         {
@@ -42,11 +55,10 @@ namespace TweakWise.Pages
             _diagnosticsTimer.Tick += (sender, args) => RefreshDiagnostics();
 
             InitializeMaps();
-            _temperatureService = CreateTemperatureService();
+            _performanceTuningService = new PerformanceTuningService(App.SettingsManager, ReadCurrentTemperatures);
             _isInitialized = true;
             SelectNode(_selectedNodeKey, openDetails: false);
             UpdateModuleStatus();
-            RefreshDiagnostics();
         }
 
         private void InitializeMaps()
@@ -91,12 +103,34 @@ namespace TweakWise.Pages
             }
         }
 
+        private IReadOnlyList<TemperatureSensorReading> ReadCurrentTemperatures()
+        {
+            lock (_temperatureSync)
+            {
+                if (_temperatureService == null && _isPageActive)
+                    _temperatureService = CreateTemperatureService();
+
+                try
+                {
+                    return _temperatureService?.GetTemperatures() ?? Array.Empty<TemperatureSensorReading>();
+                }
+                catch
+                {
+                    return Array.Empty<TemperatureSensorReading>();
+                }
+            }
+        }
+
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            _isPageActive = true;
             Focus();
 
-            if (_temperatureService == null)
-                _temperatureService = CreateTemperatureService();
+            lock (_temperatureSync)
+            {
+                if (_temperatureService == null)
+                    _temperatureService = CreateTemperatureService();
+            }
 
             if (App.ComputerHealthService != null)
                 App.ComputerHealthService.HealthStatusChanged += HealthService_HealthStatusChanged;
@@ -107,13 +141,20 @@ namespace TweakWise.Pages
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
+            _isPageActive = false;
+            CancelPerformanceSettingsLoad();
+
             if (App.ComputerHealthService != null)
                 App.ComputerHealthService.HealthStatusChanged -= HealthService_HealthStatusChanged;
 
             _diagnosticsTimer.Stop();
             StopAllNodeMicroAnimations();
-            _temperatureService?.Dispose();
-            _temperatureService = null;
+
+            lock (_temperatureSync)
+            {
+                _temperatureService?.Dispose();
+                _temperatureService = null;
+            }
         }
 
         private void Page_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -179,6 +220,278 @@ namespace TweakWise.Pages
             e.Handled = true;
         }
 
+        private async void AnalyzePerformanceSetting_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryGetPerformanceItem(sender, out var item))
+                return;
+
+            await RunPerformanceOperationAsync(
+                item,
+                operationItem => _performanceTuningService?.Analyze(operationItem),
+                "Проверяю параметр...");
+        }
+
+        private async void ApplyPerformanceSetting_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryGetPerformanceItem(sender, out var item))
+                return;
+
+            var result = await RunPerformanceOperationAsync(
+                item,
+                operationItem => _performanceTuningService?.Apply(operationItem),
+                "Сначала проверяю риск и сохраняю бэкап...");
+
+            if (result == null)
+                return;
+
+            if (result.Success)
+                InvalidatePerformanceSettingsCache(_selectedNodeKey);
+
+            if (result.RequiresRestart && App.ComputerHealthService != null)
+                _ = App.ComputerHealthService.RefreshStatusAsync();
+        }
+
+        private async void RollbackPerformanceSetting_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryGetPerformanceItem(sender, out var item))
+                return;
+
+            var result = await RunPerformanceOperationAsync(
+                item,
+                operationItem => _performanceTuningService?.Rollback(operationItem),
+                "Возвращаю сохранённое значение...");
+
+            if (result == null)
+                return;
+
+            if (result.Success)
+                InvalidatePerformanceSettingsCache(_selectedNodeKey);
+
+            if (result.RequiresRestart && App.ComputerHealthService != null)
+                _ = App.ComputerHealthService.RefreshStatusAsync();
+        }
+
+        private void PerformanceSettingCard_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement element)
+                return;
+
+            var translate = new TranslateTransform(0, 10);
+            element.RenderTransform = translate;
+
+            element.Opacity = 0;
+
+            element.BeginAnimation(
+                UIElement.OpacityProperty,
+                new DoubleAnimation(1, TimeSpan.FromMilliseconds(180))
+                {
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                });
+
+            translate.BeginAnimation(
+                TranslateTransform.YProperty,
+                new DoubleAnimation(0, TimeSpan.FromMilliseconds(220))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                });
+
+            if (element.DataContext is PerformanceTuningItem item &&
+                !string.IsNullOrWhiteSpace(_pendingSearchTargetSettingId) &&
+                string.Equals(item.SettingId, _pendingSearchTargetSettingId, StringComparison.OrdinalIgnoreCase))
+            {
+                _pendingSearchTargetSettingId = string.Empty;
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    element.BringIntoView();
+                    if (element is Border border)
+                    {
+                        border.BeginAnimation(
+                            Border.OpacityProperty,
+                            new DoubleAnimation(0.72, 1, TimeSpan.FromMilliseconds(520))
+                            {
+                                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                            });
+                    }
+                }), DispatcherPriority.Background);
+            }
+        }
+
+        private void PerformanceSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ApplyPerformanceSearchFilter();
+        }
+
+        private void PerformanceSearchClearButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (PerformanceSearchTextBox == null)
+                return;
+
+            PerformanceSearchTextBox.Text = string.Empty;
+            PerformanceSearchTextBox.Focus();
+        }
+
+        private void PerformanceSearchSuggestion_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement element ||
+                element.DataContext is not PerformanceSearchSuggestion suggestion)
+            {
+                return;
+            }
+
+            _pendingSearchTargetSettingId = suggestion.SettingId;
+            if (PerformanceSearchTextBox != null)
+                PerformanceSearchTextBox.Text = suggestion.Title;
+
+            ApplyPerformanceSearchFilter();
+        }
+
+        private static bool TryGetPerformanceItem(object sender, out PerformanceTuningItem item)
+        {
+            item = null;
+
+            if (sender is FrameworkElement element && element.DataContext is PerformanceTuningItem tuningItem)
+            {
+                item = tuningItem;
+                return true;
+            }
+
+            return false;
+        }
+
+        private async Task<PerformanceTuningResult> RunPerformanceOperationAsync(
+            PerformanceTuningItem item,
+            Func<PerformanceTuningItem, PerformanceTuningResult> operation,
+            string pendingMessage)
+        {
+            if (item == null || operation == null)
+                return PerformanceTuningResult.Fail("Не удалось выполнить действие для выбранного параметра.");
+
+            bool previousCanApply = item.CanApply;
+            var operationItem = ClonePerformanceItem(item);
+
+            item.CanApply = false;
+            item.SetStatus(pendingMessage, isWarning: false);
+
+            await _settingsLoadGate.WaitAsync();
+            try
+            {
+                var result = await Task.Run(() => operation(operationItem));
+                CopyPerformanceItemState(operationItem, item);
+
+                if (result != null)
+                    item.SetStatus(result.Message, !result.Success);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                string message = $"Действие не выполнено: {ex.Message}";
+                item.SetStatus(message, isWarning: true);
+                item.CanApply = previousCanApply;
+                return PerformanceTuningResult.Fail(message);
+            }
+            finally
+            {
+                _settingsLoadGate.Release();
+            }
+        }
+
+        private static PerformanceTuningItem ClonePerformanceItem(PerformanceTuningItem source)
+        {
+            var clone = new PerformanceTuningItem
+            {
+                SettingId = source.SettingId,
+                Title = source.Title,
+                Description = source.Description,
+                ChannelLabel = source.ChannelLabel,
+                SectionTitle = source.SectionTitle,
+                SectionDescription = source.SectionDescription,
+                SearchKeywords = source.SearchKeywords,
+                Recommendation = source.Recommendation,
+                RiskLabel = source.RiskLabel,
+                ApplyButtonText = source.ApplyButtonText,
+                SensorGroup = source.SensorGroup,
+                ReadOnlyKind = source.ReadOnlyKind,
+                OperationKind = source.OperationKind,
+                PowerSubgroupAlias = source.PowerSubgroupAlias,
+                PowerSettingAlias = source.PowerSettingAlias,
+                PowerValueScale = source.PowerValueScale,
+                ValueUnit = source.ValueUnit,
+                RegistryHive = source.RegistryHive,
+                RegistryHiveName = source.RegistryHiveName,
+                RegistryPath = source.RegistryPath,
+                RegistryValueName = source.RegistryValueName,
+                EnabledValue = source.EnabledValue,
+                DisabledValue = source.DisabledValue,
+                DefaultDwordValue = source.DefaultDwordValue,
+                RegistryDeleteWhenDisabled = source.RegistryDeleteWhenDisabled,
+                EnabledText = source.EnabledText,
+                DisabledText = source.DisabledText,
+                RestartReason = source.RestartReason,
+                Order = source.Order,
+                Minimum = source.Minimum,
+                Maximum = source.Maximum,
+                NumericStep = source.NumericStep,
+                RequiresElevation = source.RequiresElevation,
+                RequiresRestart = source.RequiresRestart,
+                ShowApplyAction = source.ShowApplyAction,
+                ControlKind = source.ControlKind,
+                CurrentValue = source.CurrentValue,
+                StatusMessage = source.StatusMessage,
+                CanApply = source.CanApply,
+                CanRollback = source.CanRollback,
+                IsSupported = source.IsSupported,
+                IsPriority = source.IsPriority,
+                ToggleValue = source.ToggleValue,
+                NumericValue = source.NumericValue
+            };
+
+            foreach (var option in source.Options)
+                clone.Options.Add(new PerformanceTuningOption(option.Label, option.Value, option.Hint));
+
+            if (source.SelectedOption != null)
+            {
+                clone.SelectedOption = clone.Options.FirstOrDefault(option =>
+                    string.Equals(option.Value, source.SelectedOption.Value, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return clone;
+        }
+
+        private static void CopyPerformanceItemState(PerformanceTuningItem source, PerformanceTuningItem target)
+        {
+            target.Recommendation = source.Recommendation;
+            target.RiskLabel = source.RiskLabel;
+            target.ApplyButtonText = source.ApplyButtonText;
+            target.SectionTitle = source.SectionTitle;
+            target.SectionDescription = source.SectionDescription;
+            target.SearchKeywords = source.SearchKeywords;
+            target.Minimum = source.Minimum;
+            target.Maximum = source.Maximum;
+            target.NumericStep = source.NumericStep;
+            target.RequiresElevation = source.RequiresElevation;
+            target.RequiresRestart = source.RequiresRestart;
+            target.ShowApplyAction = source.ShowApplyAction;
+            target.IsSupported = source.IsSupported;
+            target.IsPriority = source.IsPriority;
+            target.ToggleValue = source.ToggleValue;
+            target.NumericValue = source.NumericValue;
+            target.CurrentValue = source.CurrentValue;
+            target.StatusMessage = source.StatusMessage;
+            target.CanRollback = source.CanRollback;
+
+            string selectedValue = source.SelectedOption?.Value;
+            target.Options.Clear();
+            foreach (var option in source.Options)
+                target.Options.Add(new PerformanceTuningOption(option.Label, option.Value, option.Hint));
+
+            target.SelectedOption = string.IsNullOrWhiteSpace(selectedValue)
+                ? null
+                : target.Options.FirstOrDefault(option => string.Equals(option.Value, selectedValue, StringComparison.OrdinalIgnoreCase));
+
+            target.CanApply = source.CanApply;
+        }
+
         private void SelectNode(string key, bool openDetails)
         {
             if (!_isInitialized)
@@ -195,10 +508,9 @@ namespace TweakWise.Pages
             if (SelectedDescriptionTextBlock != null)
                 SelectedDescriptionTextBlock.Text = node.Description;
 
-            if (ActionItemsControl != null)
-                ActionItemsControl.ItemsSource = node.Actions;
-
             UpdateSelectedFindings();
+            if (openDetails || _isDetailsOpen)
+                BeginPerformanceSettingsLoad();
             UpdateHighlights();
 
             if (openDetails)
@@ -271,17 +583,18 @@ namespace TweakWise.Pages
             ModuleStatusIndicator.SetResourceReference(Shape.FillProperty, GetStatusBrushKey(module.Status.Status));
         }
 
-        private void RefreshDiagnostics()
+        private async void RefreshDiagnostics()
         {
-            if (!_isInitialized)
+            if (!_isInitialized || _diagnosticsRefreshRunning)
                 return;
 
+            _diagnosticsRefreshRunning = true;
             try
             {
-                var findings = new List<BoardFinding>();
-                AddTemperatureFindings(findings);
-                AddPowerFindings(findings);
-                AddRamFindings(findings);
+                var findings = await Task.Run(BuildDiagnosticFindings);
+
+                if (!_isInitialized || !_isPageActive)
+                    return;
 
                 _findings = findings;
                 ApplyCallouts();
@@ -289,18 +602,31 @@ namespace TweakWise.Pages
             }
             catch
             {
+                if (!_isInitialized || !_isPageActive)
+                    return;
+
                 _findings = new List<BoardFinding>();
                 ApplyCallouts();
                 UpdateSelectedFindings();
             }
+            finally
+            {
+                _diagnosticsRefreshRunning = false;
+            }
+        }
+
+        private List<BoardFinding> BuildDiagnosticFindings()
+        {
+            var findings = new List<BoardFinding>();
+            AddTemperatureFindings(findings);
+            AddPowerFindings(findings);
+            AddRamFindings(findings);
+            return findings;
         }
 
         private void AddTemperatureFindings(List<BoardFinding> findings)
         {
-            if (_temperatureService == null)
-                return;
-
-            var readings = _temperatureService.GetTemperatures() ?? Array.Empty<TemperatureSensorReading>();
+            var readings = ReadCurrentTemperatures();
             if (readings.Count == 0)
                 return;
 
@@ -607,6 +933,317 @@ namespace TweakWise.Pages
                 : $"{recommendationCount} рекомендаций";
 
             SelectedFindingSummaryTextBlock.SetResourceReference(TextBlock.ForegroundProperty, GetStatusBrushKey(highestLevel));
+        }
+
+        private async void BeginPerformanceSettingsLoad(bool forceRefresh = false)
+        {
+            if (PerformanceSettingsItemsControl == null ||
+                PerformanceSettingsEmptyText == null ||
+                _performanceTuningService == null)
+            {
+                return;
+            }
+
+            string nodeKey = _selectedNodeKey;
+            int loadVersion = ResetPerformanceSettingsLoad();
+
+            if (!forceRefresh && TryApplyCachedPerformanceSettings(nodeKey))
+            {
+                CancelPerformanceSettingsLoad();
+                return;
+            }
+
+            SetPerformanceSettingsLoading(true);
+
+            var token = _settingsLoadCts.Token;
+            await _settingsLoadGate.WaitAsync();
+            try
+            {
+                if (token.IsCancellationRequested)
+                    return;
+
+                var items = await Task.Run(() => _performanceTuningService.BuildItemsForNode(nodeKey), token);
+                if (token.IsCancellationRequested ||
+                    loadVersion != _settingsLoadVersion ||
+                    !string.Equals(nodeKey, _selectedNodeKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                _settingsItemsCache[nodeKey] = new PerformanceSettingsCacheEntry(items, DateTime.UtcNow);
+                ApplyPerformanceSettingsItems(items);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                if (loadVersion == _settingsLoadVersion)
+                    ShowPerformanceSettingsLoadError(ex.Message);
+            }
+            finally
+            {
+                _settingsLoadGate.Release();
+
+                if (loadVersion == _settingsLoadVersion)
+                    SetPerformanceSettingsLoading(false);
+            }
+        }
+
+        private int ResetPerformanceSettingsLoad()
+        {
+            CancelPerformanceSettingsLoad();
+            _settingsLoadCts = new CancellationTokenSource();
+            return ++_settingsLoadVersion;
+        }
+
+        private void CancelPerformanceSettingsLoad()
+        {
+            _settingsLoadVersion++;
+
+            if (_settingsLoadCts == null)
+                return;
+
+            try
+            {
+                _settingsLoadCts.Cancel();
+                _settingsLoadCts.Dispose();
+            }
+            catch
+            {
+            }
+
+            _settingsLoadCts = null;
+        }
+
+        private bool TryApplyCachedPerformanceSettings(string nodeKey)
+        {
+            if (!_settingsItemsCache.TryGetValue(nodeKey, out var entry))
+                return false;
+
+            if (DateTime.UtcNow - entry.CreatedAtUtc > SettingsItemsCacheLifetime)
+            {
+                _settingsItemsCache.Remove(nodeKey);
+                return false;
+            }
+
+            ApplyPerformanceSettingsItems(entry.Items);
+            SetPerformanceSettingsLoading(false);
+            return true;
+        }
+
+        private void ApplyPerformanceSettingsItems(IReadOnlyList<PerformanceTuningItem> items)
+        {
+            PerformanceSettingsEmptyText.Text = "Для этого узла пока нет доступных действий.";
+            _currentPerformanceItems = items ?? Array.Empty<PerformanceTuningItem>();
+            ApplyPerformanceSearchFilter();
+        }
+
+        private void ShowPerformanceSettingsLoadError(string message)
+        {
+            _currentPerformanceItems = Array.Empty<PerformanceTuningItem>();
+            PerformanceSettingsItemsControl.ItemsSource = null;
+            PerformanceSettingsEmptyText.Text = string.IsNullOrWhiteSpace(message)
+                ? "Не удалось загрузить параметры узла. Попробуйте открыть его ещё раз."
+                : $"Не удалось загрузить параметры узла: {message}";
+            PerformanceSettingsEmptyText.Visibility = Visibility.Visible;
+            PerformanceSearchEmptyText.Visibility = Visibility.Collapsed;
+            PerformanceSearchSuggestionsItemsControl.Visibility = Visibility.Collapsed;
+        }
+
+        private void InvalidatePerformanceSettingsCache(string nodeKey)
+        {
+            if (!string.IsNullOrWhiteSpace(nodeKey))
+                _settingsItemsCache.Remove(nodeKey);
+        }
+
+        private void SetPerformanceSettingsLoading(bool isLoading)
+        {
+            if (PerformanceSettingsLoadingPanel == null)
+                return;
+
+            PerformanceSettingsLoadingPanel.Visibility = isLoading ? Visibility.Visible : Visibility.Collapsed;
+
+            if (isLoading)
+            {
+                _currentPerformanceItems = Array.Empty<PerformanceTuningItem>();
+                PerformanceSettingsItemsControl.ItemsSource = null;
+                PerformanceSettingsEmptyText.Visibility = Visibility.Collapsed;
+                PerformanceSearchEmptyText.Visibility = Visibility.Collapsed;
+                PerformanceSearchSuggestionsItemsControl.Visibility = Visibility.Collapsed;
+                StartLoadingSquares();
+            }
+            else
+            {
+                StopLoadingSquares();
+            }
+        }
+
+        private void ApplyPerformanceSearchFilter()
+        {
+            if (PerformanceSettingsItemsControl == null ||
+                PerformanceSettingsEmptyText == null ||
+                PerformanceSearchTextBox == null)
+            {
+                return;
+            }
+
+            string query = PerformanceSearchTextBox.Text?.Trim() ?? string.Empty;
+            bool hasQuery = !string.IsNullOrWhiteSpace(query);
+
+            if (PerformanceSearchPlaceholderTextBlock != null)
+                PerformanceSearchPlaceholderTextBlock.Visibility = hasQuery ? Visibility.Collapsed : Visibility.Visible;
+
+            if (PerformanceSearchClearButton != null)
+                PerformanceSearchClearButton.Visibility = hasQuery ? Visibility.Visible : Visibility.Collapsed;
+
+            var items = _currentPerformanceItems ?? Array.Empty<PerformanceTuningItem>();
+            var filtered = hasQuery
+                ? items.Where(item => MatchesPerformanceSearch(item, query)).ToList()
+                : items.ToList();
+
+            PerformanceSettingsItemsControl.ItemsSource = BuildPerformanceSections(filtered);
+
+            bool noItems = items.Count == 0;
+            bool noSearchResults = !noItems && filtered.Count == 0 && hasQuery;
+            PerformanceSettingsEmptyText.Visibility = noItems ? Visibility.Visible : Visibility.Collapsed;
+
+            if (PerformanceSearchEmptyText != null)
+                PerformanceSearchEmptyText.Visibility = noSearchResults ? Visibility.Visible : Visibility.Collapsed;
+
+            UpdatePerformanceSearchSuggestions(items, query);
+        }
+
+        private void UpdatePerformanceSearchSuggestions(IReadOnlyList<PerformanceTuningItem> items, string query)
+        {
+            if (PerformanceSearchSuggestionsItemsControl == null)
+                return;
+
+            if (items == null || string.IsNullOrWhiteSpace(query))
+            {
+                PerformanceSearchSuggestionsItemsControl.ItemsSource = null;
+                PerformanceSearchSuggestionsItemsControl.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var suggestions = items
+                .Where(item => MatchesPerformanceSearch(item, query))
+                .Take(5)
+                .Select(item => new PerformanceSearchSuggestion
+                {
+                    SettingId = item.SettingId,
+                    Title = item.Title,
+                    SectionTitle = string.IsNullOrWhiteSpace(item.SectionTitle) ? "Параметры" : item.SectionTitle
+                })
+                .ToList();
+
+            PerformanceSearchSuggestionsItemsControl.ItemsSource = suggestions;
+            PerformanceSearchSuggestionsItemsControl.Visibility = suggestions.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private static IReadOnlyList<PerformanceSettingSectionViewModel> BuildPerformanceSections(IReadOnlyList<PerformanceTuningItem> items)
+        {
+            if (items == null || items.Count == 0)
+                return Array.Empty<PerformanceSettingSectionViewModel>();
+
+            return items
+                .GroupBy(item => string.IsNullOrWhiteSpace(item.SectionTitle) ? "Параметры" : item.SectionTitle)
+                .Select(group =>
+                {
+                    var groupItems = group.OrderByDescending(item => item.IsPriority).ThenBy(item => item.Order).ToList();
+                    string description = groupItems
+                        .Select(item => item.SectionDescription)
+                        .FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)) ?? string.Empty;
+
+                    return new PerformanceSettingSectionViewModel
+                    {
+                        Title = group.Key,
+                        Description = description,
+                        Items = groupItems,
+                        FirstOrder = groupItems.Min(item => item.Order)
+                    };
+                })
+                .OrderBy(section => section.FirstOrder)
+                .ToList();
+        }
+
+        private static bool MatchesPerformanceSearch(PerformanceTuningItem item, string query)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(query))
+                return true;
+
+            string source = string.Join(" ", new[]
+            {
+                item.Title,
+                item.Description,
+                item.SectionTitle,
+                item.SectionDescription,
+                item.ChannelLabel,
+                item.CurrentValue,
+                item.Recommendation,
+                item.StatusMessage,
+                item.RiskLabel,
+                item.SearchKeywords,
+                string.Join(" ", item.Options.Select(option => $"{option.Label} {option.Hint}"))
+            });
+
+            return source.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0;
+        }
+
+        private void StartLoadingSquares()
+        {
+            FrameworkElement[] squares = { LoadingSquareA, LoadingSquareB, LoadingSquareC, LoadingSquareD };
+
+            for (int index = 0; index < squares.Length; index++)
+            {
+                var square = squares[index];
+                if (square == null)
+                    continue;
+
+                var scale = new ScaleTransform(0.86, 0.86);
+                square.RenderTransform = scale;
+                square.Opacity = 0.32;
+
+                var beginTime = TimeSpan.FromMilliseconds(index * 130);
+                var opacity = new DoubleAnimation(0.32, 1, TimeSpan.FromMilliseconds(360))
+                {
+                    BeginTime = beginTime,
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+                };
+
+                var size = new DoubleAnimation(0.86, 1.08, TimeSpan.FromMilliseconds(360))
+                {
+                    BeginTime = beginTime,
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+                };
+
+                square.BeginAnimation(UIElement.OpacityProperty, opacity);
+                scale.BeginAnimation(ScaleTransform.ScaleXProperty, size);
+                scale.BeginAnimation(ScaleTransform.ScaleYProperty, size.Clone());
+            }
+        }
+
+        private void StopLoadingSquares()
+        {
+            FrameworkElement[] squares = { LoadingSquareA, LoadingSquareB, LoadingSquareC, LoadingSquareD };
+
+            foreach (var square in squares)
+            {
+                if (square == null)
+                    continue;
+
+                square.BeginAnimation(UIElement.OpacityProperty, null);
+
+                if (square.RenderTransform is ScaleTransform scale)
+                {
+                    scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                    scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                }
+            }
         }
 
         private void UpdateHighlights()
@@ -916,9 +1553,12 @@ namespace TweakWise.Pages
                 group.Children.OfType<ScaleTransform>().FirstOrDefault() is ScaleTransform existingScale &&
                 group.Children.OfType<TranslateTransform>().FirstOrDefault() is TranslateTransform existingTranslate)
             {
-                scaleTransform = existingScale;
-                translateTransform = existingTranslate;
-                return;
+                if (!group.IsFrozen && !existingScale.IsFrozen && !existingTranslate.IsFrozen)
+                {
+                    scaleTransform = existingScale;
+                    translateTransform = existingTranslate;
+                    return;
+                }
             }
 
             scaleTransform = new ScaleTransform(1, 1);
@@ -1000,57 +1640,27 @@ namespace TweakWise.Pages
                 ["Power"] = new BoardNode
                 {
                     Title = "Питание",
-                    Description = "Режим питания Windows и работа устройства от сети или батареи.",
-                    Actions = new List<BoardAction>
-                    {
-                        new() { Title = "План питания", Channel = "powercfg", Description = "Профиль Windows влияет на частоты, нагрев и скорость реакции системы под нагрузкой." },
-                        new() { Title = "Экономия энергии в фоне", Channel = "реестр", Description = "Если Windows слишком активно экономит энергию, приложения могут медленнее реагировать под нагрузкой." },
-                        new() { Title = "Питание ноутбука", Channel = "Windows", Description = "При работе от батареи карта показывает рекомендацию только если система реально отключена от сети." }
-                    }
+                    Description = "Режим питания Windows и работа устройства от сети или батареи."
                 },
                 ["Cpu"] = new BoardNode
                 {
                     Title = "CPU",
-                    Description = "Частоты процессора, автоматическое ускорение и тепловой запас под нагрузкой.",
-                    Actions = new List<BoardAction>
-                    {
-                        new() { Title = "Приоритет нагрузки", Channel = "реестр", Description = "Параметры планировщика относятся к процессору, а не к общему разделу системы." },
-                        new() { Title = "Ускорение процессора", Channel = "powercfg", Description = "Настройки CPU влияют на скорость работы, температуру и шум охлаждения." },
-                        new() { Title = "Температура CPU", Channel = "датчики", Description = "Если датчики показывают высокий нагрев, табличка появляется прямо от CPU без наведения." }
-                    }
+                    Description = "Частоты процессора, автоматическое ускорение и тепловой запас под нагрузкой."
                 },
                 ["Gpu"] = new BoardNode
                 {
                     Title = "GPU",
-                    Description = "Драйвер, графический профиль приложений и нагрев видеокарты.",
-                    Actions = new List<BoardAction>
-                    {
-                        new() { Title = "Планирование графики", Channel = "реестр", Description = "Параметр относится к видеокарте и может потребовать перезапуск для применения." },
-                        new() { Title = "Графический профиль приложений", Channel = "Windows", Description = "Параметры графики должны редактироваться прямо в TweakWise; игровые функции Windows остаются в другом разделе." },
-                        new() { Title = "Температура GPU", Channel = "датчики", Description = "Высокая температура или hot spot выводятся отдельной табличкой у видеокарты." }
-                    }
+                    Description = "Драйвер, графический профиль приложений и нагрев видеокарты."
                 },
                 ["Ram"] = new BoardNode
                 {
                     Title = "Оперативная память",
-                    Description = "Загрузка ОЗУ, каналы памяти и стабильность под тяжёлыми задачами.",
-                    Actions = new List<BoardAction>
-                    {
-                        new() { Title = "Объём и загрузка", Channel = "диагностика", Description = "Показывает, хватает ли оперативной памяти для текущих задач." },
-                        new() { Title = "Настройки памяти", Channel = "BIOS/UEFI", Description = "Профили памяти меняются в BIOS/UEFI, поэтому приложение показывает только понятную рекомендацию." },
-                        new() { Title = "Стабильность", Channel = "проверка", Description = "Проблемы памяти выводятся отдельной табличкой от планок RAM." }
-                    }
+                    Description = "Загрузка ОЗУ, каналы памяти и стабильность под тяжёлыми задачами."
                 },
                 ["Cooling"] = new BoardNode
                 {
                     Title = "Охлаждение",
-                    Description = "Вентиляторы, датчики температуры и запас охлаждения для производительных режимов.",
-                    Actions = new List<BoardAction>
-                    {
-                        new() { Title = "Температуры", Channel = "датчики", Description = "Высокий нагрев показывает постоянную табличку у контура охлаждения." },
-                        new() { Title = "Работа вентиляторов", Channel = "безопасный режим", Description = "Если прямое управление недоступно, приложение показывает диагностику и ручную рекомендацию." },
-                        new() { Title = "Запас охлаждения", Channel = "анализ", Description = "Карта связывает питание, CPU и GPU с охлаждением, чтобы рекомендации были понятны по месту." }
-                    }
+                    Description = "Вентиляторы, датчики температуры и запас охлаждения для производительных режимов."
                 }
             };
         }
@@ -1076,14 +1686,33 @@ namespace TweakWise.Pages
         {
             public string Title { get; set; } = string.Empty;
             public string Description { get; set; } = string.Empty;
-            public List<BoardAction> Actions { get; set; } = new List<BoardAction>();
         }
 
-        private sealed class BoardAction
+        private sealed class PerformanceSettingsCacheEntry
+        {
+            public PerformanceSettingsCacheEntry(IReadOnlyList<PerformanceTuningItem> items, DateTime createdAtUtc)
+            {
+                Items = items ?? Array.Empty<PerformanceTuningItem>();
+                CreatedAtUtc = createdAtUtc;
+            }
+
+            public IReadOnlyList<PerformanceTuningItem> Items { get; }
+            public DateTime CreatedAtUtc { get; }
+        }
+
+        private sealed class PerformanceSettingSectionViewModel
         {
             public string Title { get; set; } = string.Empty;
-            public string Channel { get; set; } = string.Empty;
             public string Description { get; set; } = string.Empty;
+            public IReadOnlyList<PerformanceTuningItem> Items { get; set; } = Array.Empty<PerformanceTuningItem>();
+            public int FirstOrder { get; set; }
+        }
+
+        private sealed class PerformanceSearchSuggestion
+        {
+            public string SettingId { get; set; } = string.Empty;
+            public string Title { get; set; } = string.Empty;
+            public string SectionTitle { get; set; } = string.Empty;
         }
 
         private sealed class BoardFinding

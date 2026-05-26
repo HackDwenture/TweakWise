@@ -17,8 +17,9 @@ namespace TweakWise.Models
         public bool MinimizeToTrayOnClose { get; set; } = false;
         public bool StartMinimizedToTray { get; set; } = false;
         public bool FirstRunCompleted { get; set; } = false;
-        public string LastOpenedCoreModuleId { get; set; } = string.Empty;
         public bool PendingRestart { get; set; } = false;
+        public System.DateTime? PendingRestartMarkedAtUtc { get; set; }
+        public string PendingRestartReason { get; set; } = string.Empty;
         public string LastHealthLevel { get; set; } = "Unknown";
         public int LastHealthProblemCount { get; set; } = 0;
         public int LastHealthRecommendationCount { get; set; } = 0;
