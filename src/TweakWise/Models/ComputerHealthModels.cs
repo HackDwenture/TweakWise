@@ -45,12 +45,15 @@ namespace TweakWise.Models
         public HealthLevel Status { get; set; } = HealthLevel.Unknown;
         public int ProblemCount { get; set; }
         public int RecommendationCount { get; set; }
+        public int CriticalCount { get; set; }
         public List<ModuleHealthFinding> Findings { get; set; } = new List<ModuleHealthFinding>();
         public DateTime? LastCheckedAt { get; set; }
     }
 
     public sealed class ModuleHealthFinding
     {
+        public string Id { get; set; } = string.Empty;
+        public CoreModuleId ModuleId { get; set; }
         public HealthLevel Level { get; set; } = HealthLevel.Normal;
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;

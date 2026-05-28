@@ -22,7 +22,7 @@ namespace TweakWise.Pages
         {
             InitializeComponent();
 
-            _catalogProvider = App.TweakCatalogProvider ?? new MockTweakCatalogProvider();
+            _catalogProvider = App.TweakCatalogProvider ?? new SeedTweakCatalogProvider();
             LoadPage();
         }
 

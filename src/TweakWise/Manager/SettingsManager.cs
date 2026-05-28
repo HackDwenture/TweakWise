@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Windows;
 using Microsoft.Win32;
@@ -49,6 +50,9 @@ namespace TweakWise.Managers
 
         public void SaveSettings()
         {
+            CurrentSettings.PerformanceBackupRetentionDays = Math.Clamp(CurrentSettings.PerformanceBackupRetentionDays, 1, 30);
+            RemoveExpiredHealthSignalSuppressions(save: false);
+
             try
             {
                 string dir = Path.GetDirectoryName(_settingsPath);
@@ -63,6 +67,107 @@ namespace TweakWise.Managers
             }
 
             SettingsChanged?.Invoke();
+        }
+
+        public bool IsHealthSignalSuppressed(string signalId)
+        {
+            if (string.IsNullOrWhiteSpace(signalId))
+                return false;
+
+            RemoveExpiredHealthSignalSuppressions(save: true);
+
+            return CurrentSettings.HealthSignalSuppressions.Any(item =>
+                string.Equals(item.SignalId, signalId, StringComparison.OrdinalIgnoreCase) &&
+                (item.IsPermanent || item.SuppressedUntilUtc > DateTime.UtcNow));
+        }
+
+        public void SnoozeHealthSignal(string signalId, TimeSpan duration)
+        {
+            if (string.IsNullOrWhiteSpace(signalId))
+                return;
+
+            UpsertHealthSignalSuppression(signalId, permanent: false, DateTime.UtcNow.Add(duration));
+        }
+
+        public void DismissHealthSignal(string signalId)
+        {
+            if (string.IsNullOrWhiteSpace(signalId))
+                return;
+
+            UpsertHealthSignalSuppression(signalId, permanent: true, suppressedUntilUtc: null);
+        }
+
+        public void SnoozeHealthSignals(System.Collections.Generic.IEnumerable<string> signalIds, TimeSpan duration)
+        {
+            if (signalIds == null)
+                return;
+
+            DateTime untilUtc = DateTime.UtcNow.Add(duration);
+            foreach (string signalId in signalIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.OrdinalIgnoreCase))
+                UpsertHealthSignalSuppression(signalId, permanent: false, untilUtc, save: false);
+
+            SaveSettings();
+        }
+
+        public void DismissHealthSignals(System.Collections.Generic.IEnumerable<string> signalIds)
+        {
+            if (signalIds == null)
+                return;
+
+            foreach (string signalId in signalIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.OrdinalIgnoreCase))
+                UpsertHealthSignalSuppression(signalId, permanent: true, suppressedUntilUtc: null, save: false);
+
+            SaveSettings();
+        }
+
+        private void UpsertHealthSignalSuppression(string signalId, bool permanent, DateTime? suppressedUntilUtc, bool save = true)
+        {
+            RemoveExpiredHealthSignalSuppressions(save: false);
+
+            var existing = CurrentSettings.HealthSignalSuppressions.FirstOrDefault(item =>
+                string.Equals(item.SignalId, signalId, StringComparison.OrdinalIgnoreCase));
+
+            if (existing == null)
+            {
+                CurrentSettings.HealthSignalSuppressions.Add(new HealthSignalSuppression
+                {
+                    SignalId = signalId.Trim(),
+                    IsPermanent = permanent,
+                    SuppressedUntilUtc = suppressedUntilUtc,
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                existing.IsPermanent = permanent;
+                existing.SuppressedUntilUtc = suppressedUntilUtc;
+            }
+
+            if (save)
+                SaveSettings();
+        }
+
+        private void RemoveExpiredHealthSignalSuppressions(bool save)
+        {
+            var suppressions = CurrentSettings.HealthSignalSuppressions;
+            if (suppressions == null)
+            {
+                CurrentSettings.HealthSignalSuppressions = new System.Collections.Generic.List<HealthSignalSuppression>();
+                return;
+            }
+
+            int before = suppressions.Count;
+            DateTime nowUtc = DateTime.UtcNow;
+            CurrentSettings.HealthSignalSuppressions = suppressions
+                .Where(item => item != null &&
+                               !string.IsNullOrWhiteSpace(item.SignalId) &&
+                               (item.IsPermanent || item.SuppressedUntilUtc > nowUtc))
+                .GroupBy(item => item.SignalId, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.OrderByDescending(item => item.IsPermanent).ThenByDescending(item => item.SuppressedUntilUtc).First())
+                .ToList();
+
+            if (save && CurrentSettings.HealthSignalSuppressions.Count != before)
+                SaveSettings();
         }
 
         public void ChangeTheme(string themeName)

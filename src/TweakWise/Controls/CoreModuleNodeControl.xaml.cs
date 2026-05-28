@@ -56,7 +56,6 @@ namespace TweakWise.Controls
                 new PropertyMetadata(0, OnDisplayChanged));
 
         public event EventHandler ModuleClick;
-
         public CoreModuleNodeControl()
         {
             InitializeComponent();

@@ -66,10 +66,20 @@ namespace TweakWise
             {
                 case AppDialogButtons.YesNo:
                     SecondaryButton.Visibility = Visibility.Visible;
+                    CancelButton.Visibility = Visibility.Collapsed;
                     SecondaryButton.Content = "Нет";
                     PrimaryButton.Content = "Да";
                     break;
+                case AppDialogButtons.PostponeDismissCancel:
+                    CancelButton.Visibility = Visibility.Visible;
+                    SecondaryButton.Visibility = Visibility.Visible;
+                    SecondaryButton.Width = 190;
+                    PrimaryButton.Width = 180;
+                    SecondaryButton.Content = "Больше не показывать";
+                    PrimaryButton.Content = "Отложить на неделю";
+                    break;
                 default:
+                    CancelButton.Visibility = Visibility.Collapsed;
                     SecondaryButton.Visibility = Visibility.Collapsed;
                     PrimaryButton.Content = "OK";
                     break;
@@ -114,7 +124,8 @@ namespace TweakWise
     public enum AppDialogButtons
     {
         Ok,
-        YesNo
+        YesNo,
+        PostponeDismissCancel
     }
 
     public enum AppDialogResult

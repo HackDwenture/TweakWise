@@ -5,13 +5,13 @@ using TweakWise.Models;
 
 namespace TweakWise.Providers
 {
-    public sealed class MockTweakCatalogProvider : ITweakCatalogProvider
+    public sealed class SeedTweakCatalogProvider : ITweakCatalogProvider
     {
         private readonly List<TweakCategoryDefinition> _categories;
         private readonly List<TweakDefinition> _tweaks;
         private readonly List<TweakTemplateDefinition> _templates;
 
-        public MockTweakCatalogProvider()
+        public SeedTweakCatalogProvider()
         {
             _categories = BuildCategories();
             _tweaks = new List<TweakDefinition>();

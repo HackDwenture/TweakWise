@@ -3,6 +3,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Shapes;
+using TweakWise.Managers;
 using TweakWise.Models;
 using TweakWise.Services;
 using Application = System.Windows.Application;
@@ -63,9 +64,11 @@ namespace TweakWise.Pages
             var findings = module.Status.Findings
                 .Select(finding => new FindingRow
                 {
+                    Id = finding.Id,
                     Title = finding.Title,
                     Description = finding.Description,
                     ActionText = finding.ActionText,
+                    Level = finding.Level,
                     StatusText = GetFindingStatusText(finding.Level)
                 })
                 .ToList();
@@ -86,6 +89,23 @@ namespace TweakWise.Pages
         {
             if (Application.Current.MainWindow is MainWindow mainWindow)
                 mainWindow.NavigateToCoreHome();
+        }
+
+        private async void IgnoreFindingButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not System.Windows.Controls.Button button || button.Tag is not string id || string.IsNullOrWhiteSpace(id))
+                return;
+
+            var module = _healthService?.GetModule(_moduleId);
+            var finding = module?.Status?.Findings.FirstOrDefault(item => string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase));
+            if (finding == null)
+                return;
+
+            await HealthSignalActionHelper.PromptAndApplyAsync(
+                Window.GetWindow(this),
+                new[] { finding.Id },
+                finding.Title,
+                finding.Level == HealthLevel.Attention || finding.Level == HealthLevel.Warning || finding.Level == HealthLevel.Critical);
         }
 
         private static string GetModuleStatusText(HealthLevel status)
@@ -135,9 +155,11 @@ namespace TweakWise.Pages
 
         private sealed class FindingRow
         {
+            public string Id { get; set; } = string.Empty;
             public string Title { get; set; } = string.Empty;
             public string Description { get; set; } = string.Empty;
             public string ActionText { get; set; } = string.Empty;
+            public HealthLevel Level { get; set; }
             public string StatusText { get; set; } = string.Empty;
         }
     }

@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
@@ -20,9 +21,12 @@ namespace TweakWise.Services
     public sealed class PerformanceTuningService
     {
         private const string BackupFileName = "performance-backups.json";
+        private const int MaxBackupRecords = 80;
 
         private const string KindPowerScheme = "PowerScheme";
         private const string KindPowerAcSetting = "PowerAcSetting";
+        private const string KindPowerDcSetting = "PowerDcSetting";
+        private const string KindPowerHibernation = "PowerHibernation";
         private const string KindRegistryDword = "RegistryDword";
         private const string KindMemoryCompression = "MemoryCompression";
         private const string KindReadOnly = "ReadOnly";
@@ -34,6 +38,19 @@ namespace TweakWise.Services
         private const string SubVideo = "SUB_VIDEO";
         private const string SubSleep = "SUB_SLEEP";
         private const string SubUsb = "SUB_USB";
+        private const string SubButtons = "SUB_BUTTONS";
+        private const string SubBattery = "SUB_BATTERY";
+        private const string SubWireless = "SUB_WIFI";
+        private const string SubEnergySaver = "SUB_ENERGYSAVER";
+
+        private const string SubPciExpressGuid = "501a4d13-42af-4429-9fd1-a8218c268e20";
+        private const string SubVideoGuid = "7516b95f-f776-4464-8c53-06167f40cc99";
+        private const string SubSleepGuid = "238c9fa8-0aad-41ed-83f4-97be242c8f20";
+        private const string SubUsbGuid = "2a737441-1930-4402-8d77-b2bebba308a3";
+        private const string SubButtonsGuid = "4f971e89-eebd-4455-a8de-9e59040e7347";
+        private const string SubBatteryGuid = "e73a048d-bf27-4f12-9731-8b2076e8891f";
+        private const string SubWirelessGuid = "19cbb8fa-5279-450e-9fac-8a3d5fedd0c1";
+        private const string SubEnergySaverGuid = "de830923-a562-41af-a086-e3a2c6bad2da";
 
         private const string ProcessorMinState = "PROCTHROTTLEMIN";
         private const string ProcessorMaxState = "PROCTHROTTLEMAX";
@@ -44,13 +61,33 @@ namespace TweakWise.Services
         private const string ProcessorIdleDisable = "IDLEDISABLE";
         private const string SystemCoolingPolicy = "SYSCOOLPOL";
         private const string DiskIdle = "DISKIDLE";
-        private const string PciExpressAspm = "ASPM";
+        private const string PciExpressAspm = "ee12f906-d277-404b-b6da-e5fa1a576df5";
         private const string GpuPreferencePolicy = "GPUPREFERENCEPOLICY";
-        private const string VideoIdle = "VIDEOIDLE";
-        private const string StandbyIdle = "STANDBYIDLE";
-        private const string HibernateIdle = "HIBERNATEIDLE";
-        private const string HybridSleep = "HYBRIDSLEEP";
-        private const string UsbSelectiveSuspend = "USBSELECTIVE";
+        private const string VideoIdle = "3c0bc021-c8a8-4e07-a973-6b14cbcb2b7e";
+        private const string ConsoleLockDisplayOff = "8ec4b3a5-6868-48c2-be75-4f3044be88a7";
+        private const string StandbyIdle = "29f6c1db-86da-48c5-9fdb-f2b67b1f44da";
+        private const string HibernateIdle = "9d7815a6-7ee4-497e-8888-515a05f02364";
+        private const string HybridSleep = "94ac6d29-73ce-41a6-809f-6363ba21b47e";
+        private const string WakeTimers = "bd3b718a-0680-4d9d-8ab2-e1d2b4ac806d";
+        private const string UnattendedSleepTimeout = "7bc4a2f9-d8fc-4469-b07b-33eb785aaca0";
+        private const string AwayModePolicy = "25dfa149-5dd1-4736-b5ab-e8a37b5b8187";
+        private const string UsbSelectiveSuspend = "48e6b7a6-50f5-4782-a5d4-53bb8f07e226";
+        private const string WirelessPowerMode = "12bbebe6-58d6-4636-95bb-3217ef867c1a";
+        private const string LidCloseAction = "5ca83367-6e45-459f-a27b-476b1d01c936";
+        private const string PowerButtonAction = "7648efa3-dd9c-4e3e-b566-50f929386280";
+        private const string SleepButtonAction = "96996bc0-ad50-47ec-923b-6f41874dd9eb";
+        private const string LowBatteryLevel = "8183ba9a-e910-48da-8769-14ae6dc1170a";
+        private const string CriticalBatteryLevel = "9a66d8d7-4ff7-4ef9-b5a2-5a326ca2a469";
+        private const string LowBatteryAction = "bcded951-187b-4d05-bccc-f7e51960c258";
+        private const string CriticalBatteryAction = "637ea02f-bbcb-4015-8e2c-a1c7b9c0b546";
+
+        private const string PowerControlPath = @"SYSTEM\CurrentControlSet\Control\Power";
+        private const string PlatformAoAcOverrideValueName = "PlatformAoAcOverride";
+        private const string PowerSessionManagerPath = @"SYSTEM\CurrentControlSet\Control\Session Manager\Power";
+        private const string HibernateEnabledValueName = "HibernateEnabled";
+        private const string HiberbootEnabledValueName = "HiberbootEnabled";
+        private const string PowerThrottlingPath = @"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling";
+        private const string PowerThrottlingOffValueName = "PowerThrottlingOff";
 
         private const string GraphicsDriversPath = @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers";
         private const string HardwareSchedulingValueName = "HwSchMode";
@@ -63,6 +100,40 @@ namespace TweakWise.Services
             @"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
             RegexOptions.Compiled);
 
+        private static readonly HashSet<string> PowerNodeSubgroupGuids = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            SubVideoGuid,
+            SubSleepGuid,
+            SubUsbGuid,
+            SubPciExpressGuid,
+            SubButtonsGuid,
+            SubBatteryGuid,
+            SubWirelessGuid,
+            SubEnergySaverGuid
+        };
+
+        private static readonly HashSet<string> CuratedPowerSettingGuids = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            VideoIdle,
+            ConsoleLockDisplayOff,
+            StandbyIdle,
+            HibernateIdle,
+            HybridSleep,
+            WakeTimers,
+            UnattendedSleepTimeout,
+            AwayModePolicy,
+            UsbSelectiveSuspend,
+            PciExpressAspm,
+            WirelessPowerMode,
+            LidCloseAction,
+            PowerButtonAction,
+            SleepButtonAction,
+            LowBatteryLevel,
+            CriticalBatteryLevel,
+            LowBatteryAction,
+            CriticalBatteryAction
+        };
+
         private readonly SettingsManager _settingsManager;
         private readonly Func<IReadOnlyList<TemperatureSensorReading>> _temperatureReader;
         private readonly string _backupPath;
@@ -73,6 +144,19 @@ namespace TweakWise.Services
         private DateTime _powerPlansCacheUtc;
         private PowerPlanInfo _activePowerPlanCache;
         private DateTime _activePowerPlanCacheUtc;
+        private IReadOnlyList<DiscoveredPowerSetting> _discoveredPowerSettingsCache;
+        private DateTime _discoveredPowerSettingsCacheUtc;
+
+        static PerformanceTuningService()
+        {
+            try
+            {
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            }
+            catch
+            {
+            }
+        }
 
         public PerformanceTuningService(
             SettingsManager settingsManager,
@@ -80,10 +164,8 @@ namespace TweakWise.Services
         {
             _settingsManager = settingsManager;
             _temperatureReader = temperatureReader;
-            _backupPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "TweakWise",
-                BackupFileName);
+            _backupPath = GetBackupPath();
+            PruneBackups();
         }
 
         public IReadOnlyList<PerformanceTuningItem> BuildItemsForNode(string nodeKey)
@@ -95,19 +177,45 @@ namespace TweakWise.Services
                 case "Power":
                     items.Add(CreatePowerPlanItem());
                     items.Add(CreatePowerSourceItem());
+                    items.Add(CreateAcpiSleepStatesItem(16));
+                    items.Add(CreatePowerRequestsItem(17));
+                    items.Add(CreateWakeArmedDevicesItem(18));
                     items.Add(CreatePowerBatteryStatusItem(20));
-                    items.Add(CreateProcessorMinStateItem(30));
-                    items.Add(CreateProcessorMaxStateItem("Максимальное состояние CPU от сети", 40, false));
-                    items.Add(CreateProcessorBoostModeItem(50));
-                    items.Add(CreateProcessorEppItem(60, false));
-                    items.Add(CreateSystemCoolingPolicyItem(70));
-                    items.Add(CreatePciExpressAspmItem(80));
-                    items.Add(CreateDiskIdleItem(90));
-                    items.Add(CreateDisplayIdleItem(100));
-                    items.Add(CreateSleepIdleItem(110));
-                    items.Add(CreateHibernateIdleItem(120));
-                    items.Add(CreateHybridSleepItem(130));
-                    items.Add(CreateUsbSelectiveSuspendItem(140));
+                    items.Add(CreateHibernationMasterItem(22));
+                    items.Add(CreateFastStartupItem(24));
+                    items.Add(CreatePowerThrottlingItem(26));
+                    items.Add(CreateModernStandbyOverrideItem(28));
+                    items.Add(CreateDisplayIdleItem(30, dc: false));
+                    items.Add(CreateDisplayIdleItem(31, dc: true));
+                    items.Add(CreateConsoleLockDisplayIdleItem(40));
+                    items.Add(CreateSleepIdleItem(50, dc: false));
+                    items.Add(CreateSleepIdleItem(51, dc: true));
+                    items.Add(CreateHibernateIdleItem(60, dc: false));
+                    items.Add(CreateHibernateIdleItem(61, dc: true));
+                    items.Add(CreateHybridSleepItem(70, dc: false));
+                    items.Add(CreateHybridSleepItem(71, dc: true));
+                    items.Add(CreateWakeTimersItem(80, dc: false));
+                    items.Add(CreateWakeTimersItem(81, dc: true));
+                    items.Add(CreateUnattendedSleepTimeoutItem(90, dc: false));
+                    items.Add(CreateUnattendedSleepTimeoutItem(91, dc: true));
+                    items.Add(CreateAwayModePolicyItem(100, dc: false));
+                    items.Add(CreateLidCloseActionItem(110, dc: false));
+                    items.Add(CreateLidCloseActionItem(111, dc: true));
+                    items.Add(CreatePowerButtonActionItem(120, dc: false));
+                    items.Add(CreatePowerButtonActionItem(121, dc: true));
+                    items.Add(CreateSleepButtonActionItem(130, dc: false));
+                    items.Add(CreateSleepButtonActionItem(131, dc: true));
+                    items.Add(CreatePciExpressAspmItem(140, dc: false));
+                    items.Add(CreatePciExpressAspmItem(141, dc: true));
+                    items.Add(CreateUsbSelectiveSuspendItem(150, dc: false));
+                    items.Add(CreateUsbSelectiveSuspendItem(151, dc: true));
+                    items.Add(CreateWirelessPowerModeItem(160, dc: false));
+                    items.Add(CreateWirelessPowerModeItem(161, dc: true));
+                    items.Add(CreateLowBatteryLevelItem(170));
+                    items.Add(CreateCriticalBatteryLevelItem(180));
+                    items.Add(CreateLowBatteryActionItem(190));
+                    items.Add(CreateCriticalBatteryActionItem(200));
+                    AppendDiscoveredPowerSettings(items, 400);
                     break;
 
                 case "Cpu":
@@ -151,6 +259,8 @@ namespace TweakWise.Services
             }
 
             ApplySectionMetadata(nodeKey, items);
+            foreach (var item in items)
+                UpdateApplyState(item);
 
             return items
                 .OrderByDescending(item => item.IsPriority)
@@ -234,27 +344,74 @@ namespace TweakWise.Services
                 return;
             }
 
-            if (item.SettingId.StartsWith("cpu.", StringComparison.OrdinalIgnoreCase))
+            if (item.SettingId.Contains("acpi", StringComparison.OrdinalIgnoreCase) ||
+                item.SettingId.Contains("requests", StringComparison.OrdinalIgnoreCase) ||
+                item.SettingId.Contains("wake-armed", StringComparison.OrdinalIgnoreCase) ||
+                item.SettingId.Contains("modern-standby", StringComparison.OrdinalIgnoreCase))
             {
-                ApplySection(item, "Процессор от сети", "Границы частот, boost и энергопредпочтение CPU при питании от сети.");
-                return;
-            }
-
-            if (item.SettingId.StartsWith("cooling.", StringComparison.OrdinalIgnoreCase))
-            {
-                ApplySection(item, "Охлаждение", "Политика, которая определяет, что Windows делает сначала: повышает охлаждение или снижает частоты.");
+                ApplySection(item, "Платформа, ACPI и прошивка", "Реальные данные powercfg, ACPI/BIOS и системные политики, которые влияют на питание глубже обычных настроек Windows.");
                 return;
             }
 
             if (item.SettingId.Contains("display", StringComparison.OrdinalIgnoreCase) ||
-                item.SettingId.Contains("sleep", StringComparison.OrdinalIgnoreCase) ||
-                item.SettingId.Contains("hibernate", StringComparison.OrdinalIgnoreCase))
+                IsSubgroup(item, SubVideoGuid, SubVideo))
             {
-                ApplySection(item, "Экран, сон и гибернация", "Таймауты простоя, которые могут прерывать долгие задачи или экономить энергию.");
+                ApplySection(item, "Экран", "Таймауты дисплея и скрытые параметры экрана в текущей схеме питания.");
                 return;
             }
 
-            ApplySection(item, "Устройства и накопители", "Питание PCIe, USB и дисков в текущей схеме Windows.");
+            if (item.SettingId.Contains("sleep", StringComparison.OrdinalIgnoreCase) ||
+                item.SettingId.Contains("hibernate", StringComparison.OrdinalIgnoreCase) ||
+                item.SettingId.Contains("hiberboot", StringComparison.OrdinalIgnoreCase) ||
+                item.SettingId.Contains("fast-startup", StringComparison.OrdinalIgnoreCase) ||
+                item.SettingId.Contains("wake", StringComparison.OrdinalIgnoreCase) ||
+                item.SettingId.Contains("away", StringComparison.OrdinalIgnoreCase) ||
+                IsSubgroup(item, SubSleepGuid, SubSleep))
+            {
+                ApplySection(item, "Сон и пробуждение", "Переход в сон, гибернация, таймеры пробуждения и скрытые idle-таймауты Windows.");
+                return;
+            }
+
+            if (item.SettingId.Contains("button", StringComparison.OrdinalIgnoreCase) ||
+                item.SettingId.Contains("lid", StringComparison.OrdinalIgnoreCase) ||
+                IsSubgroup(item, SubButtonsGuid, SubButtons))
+            {
+                ApplySection(item, "Кнопки и крышка", "Действия кнопки питания, кнопки сна и крышки ноутбука.");
+                return;
+            }
+
+            if (item.SettingId.Contains("battery", StringComparison.OrdinalIgnoreCase) ||
+                IsSubgroup(item, SubBatteryGuid, SubBattery))
+            {
+                ApplySection(item, "Батарея", "Пороговые уровни и действия Windows при низком или критическом заряде.");
+                return;
+            }
+
+            if (item.SettingId.Contains("usb", StringComparison.OrdinalIgnoreCase) ||
+                item.SettingId.Contains("pcie", StringComparison.OrdinalIgnoreCase) ||
+                item.SettingId.Contains("wireless", StringComparison.OrdinalIgnoreCase) ||
+                IsSubgroup(item, SubUsbGuid, SubUsb) ||
+                IsSubgroup(item, SubPciExpressGuid, SubPciExpress) ||
+                IsSubgroup(item, SubWirelessGuid, SubWireless) ||
+                IsSubgroup(item, SubEnergySaverGuid, SubEnergySaver))
+            {
+                ApplySection(item, "Питание устройств", "Энергосбережение USB, PCI Express, беспроводного адаптера и системного Energy Saver в текущей схеме.");
+                return;
+            }
+
+            if (item.SettingId.Contains("power-throttling", StringComparison.OrdinalIgnoreCase))
+            {
+                ApplySection(item, "Скрытые политики питания", "Системные политики Windows, которые обычно меняют через реестр или гайды по производительности.");
+                return;
+            }
+
+            ApplySection(item, "Скрытые параметры питания", "Автоматически найденные powercfg-параметры текущей схемы без CPU, GPU и дисковых твиков.");
+        }
+
+        private static bool IsSubgroup(PerformanceTuningItem item, string guid, string alias)
+        {
+            return string.Equals(item.PowerSubgroupAlias, guid, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(item.PowerSubgroupAlias, alias, StringComparison.OrdinalIgnoreCase);
         }
 
         private static void ApplySection(PerformanceTuningItem item, string title, string description)
@@ -280,7 +437,7 @@ namespace TweakWise.Services
             }
 
             string message = item.ShowApplyAction
-                ? $"Проверка пройдена. Риск: {NormalizeRisk(item.RiskLabel)}. Перед применением будет сохранён бэкап текущего значения."
+                ? $"Проверка пройдена. Риск: {NormalizeRisk(item.RiskLabel)}. Точка отката будет создана только если значение действительно изменится."
                 : "Проверка выполнена. Это диагностический блок без прямого изменения.";
 
             item.SetStatus(message, isWarning: false);
@@ -292,7 +449,9 @@ namespace TweakWise.Services
             if (item == null)
                 return PerformanceTuningResult.Fail("Не удалось определить параметр для применения.");
 
+            var requestedValue = CaptureRequestedValue(item);
             RefreshItem(item);
+            RestoreRequestedValue(item, requestedValue);
 
             var validation = ValidateBeforeApply(item);
             if (!validation.Success)
@@ -305,6 +464,8 @@ namespace TweakWise.Services
             {
                 KindPowerScheme => ApplyPowerPlan(item),
                 KindPowerAcSetting => ApplyPowerAcSetting(item),
+                KindPowerDcSetting => ApplyPowerAcSetting(item),
+                KindPowerHibernation => ApplyPowerHibernation(item),
                 KindRegistryDword => ApplyRegistryDword(item),
                 KindMemoryCompression => ApplyMemoryCompression(item),
                 _ => PerformanceTuningResult.Fail("У этого блока нет прямого действия применения.")
@@ -335,6 +496,8 @@ namespace TweakWise.Services
             {
                 nameof(PerformanceBackupKind.PowerScheme) => RollbackPowerPlan(backup),
                 nameof(PerformanceBackupKind.PowerAcSetting) => RollbackPowerAcSetting(backup),
+                nameof(PerformanceBackupKind.PowerDcSetting) => RollbackPowerAcSetting(backup),
+                nameof(PerformanceBackupKind.PowerHibernation) => RollbackPowerHibernation(backup),
                 nameof(PerformanceBackupKind.RegistryDword) => RollbackRegistryDword(backup),
                 nameof(PerformanceBackupKind.MemoryCompression) => RollbackMemoryCompression(backup),
                 _ => PerformanceTuningResult.Fail("Тип бэкапа не поддерживается.")
@@ -352,6 +515,45 @@ namespace TweakWise.Services
             return result;
         }
 
+        public PerformanceTuningResult ClearBackup(PerformanceTuningItem item)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.SettingId))
+                return PerformanceTuningResult.Fail("Не удалось определить параметр для удаления бэкапа.");
+
+            if (GetBackup(item.SettingId) == null)
+            {
+                item.CanRollback = false;
+                item.SetStatus("Для этого параметра нет сохранённой точки отката.", isWarning: false);
+                return PerformanceTuningResult.Ok("Для этого параметра нет сохранённой точки отката.");
+            }
+
+            RemoveBackup(item.SettingId);
+            item.CanRollback = false;
+            item.SetStatus("Точка отката удалена. Текущие настройки не изменялись.", isWarning: false);
+            return PerformanceTuningResult.Ok("Точка отката удалена. Текущие настройки не изменялись.");
+        }
+
+        public static int DeleteAllBackups()
+        {
+            string path = GetBackupPath();
+            int count = 0;
+
+            try
+            {
+                if (File.Exists(path))
+                {
+                    string json = File.ReadAllText(path);
+                    count = JsonSerializer.Deserialize<List<PerformanceSettingBackupRecord>>(json)?.Count ?? 0;
+                    File.Delete(path);
+                }
+            }
+            catch
+            {
+            }
+
+            return count;
+        }
+
         private void RefreshItem(PerformanceTuningItem item)
         {
             if (item == null)
@@ -363,7 +565,11 @@ namespace TweakWise.Services
                     FillPowerPlanState(item);
                     break;
                 case KindPowerAcSetting:
+                case KindPowerDcSetting:
                     FillPowerAcSettingState(item);
+                    break;
+                case KindPowerHibernation:
+                    FillPowerHibernationState(item);
                     break;
                 case KindRegistryDword:
                     FillRegistryDwordState(item);
@@ -377,9 +583,72 @@ namespace TweakWise.Services
             }
 
             item.CanRollback = GetBackup(item.SettingId) != null;
+            UpdateApplyState(item);
+        }
+
+        private static void UpdateApplyState(PerformanceTuningItem item)
+        {
+            if (item == null)
+                return;
+
+            item.RequiresElevationWarning = item.RequiresElevation && !IsAdministrator();
             item.CanApply = item.ShowApplyAction &&
                             item.IsSupported &&
                             (!item.RequiresElevation || IsAdministrator());
+        }
+
+        private static RequestedPerformanceValue CaptureRequestedValue(PerformanceTuningItem item)
+        {
+            return new RequestedPerformanceValue
+            {
+                SelectedOptionValue = item.SelectedOption?.Value,
+                SelectedOptionLabel = item.SelectedOption?.Label,
+                ToggleValue = item.ToggleValue,
+                NumericValue = item.NumericValue
+            };
+        }
+
+        private static void RestoreRequestedValue(PerformanceTuningItem item, RequestedPerformanceValue requested)
+        {
+            if (item == null || requested == null)
+                return;
+
+            if (item.IsCombo && !string.IsNullOrWhiteSpace(requested.SelectedOptionValue))
+            {
+                var selected = item.Options.FirstOrDefault(option =>
+                    string.Equals(option.Value, requested.SelectedOptionValue, StringComparison.OrdinalIgnoreCase));
+
+                if (selected == null)
+                {
+                    selected = new PerformanceTuningOption(
+                        string.IsNullOrWhiteSpace(requested.SelectedOptionLabel) ? requested.SelectedOptionValue : requested.SelectedOptionLabel,
+                        requested.SelectedOptionValue,
+                        "Выбранное значение");
+                    item.Options.Add(selected);
+                }
+
+                item.SelectedOption = selected;
+                return;
+            }
+
+            if (item.IsToggle)
+            {
+                item.ToggleValue = requested.ToggleValue;
+                return;
+            }
+
+            if (item.IsSlider)
+            {
+                item.NumericValue = item.Maximum > item.Minimum
+                    ? Math.Clamp(requested.NumericValue, item.Minimum, item.Maximum)
+                    : requested.NumericValue;
+            }
+        }
+
+        private static bool IsPowerSettingOperation(string operationKind)
+        {
+            return string.Equals(operationKind, KindPowerAcSetting, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(operationKind, KindPowerDcSetting, StringComparison.OrdinalIgnoreCase);
         }
 
         private PerformanceTuningItem CreateBaseItem(
@@ -457,6 +726,150 @@ namespace TweakWise.Services
             item.OperationKind = KindReadOnly;
             item.ReadOnlyKind = "PowerBatteryStatus";
             FillPowerBatteryStatusState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateAcpiSleepStatesItem(int order)
+        {
+            var item = CreateBaseItem(
+                "power.acpi-sleep-states",
+                "Режимы сна ACPI/BIOS",
+                "Показывает реальные состояния сна, которые прошивка и ACPI-драйвер отдали Windows. Если S3, гибернация или Modern Standby недоступны, здесь будет причина от powercfg.",
+                "powercfg /a",
+                PerformanceSettingControlKind.ReadOnly,
+                order);
+
+            item.OperationKind = KindReadOnly;
+            item.ReadOnlyKind = "PowerSleepStates";
+            FillPowerSleepStatesState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreatePowerRequestsItem(int order)
+        {
+            var item = CreateBaseItem(
+                "power.active-requests",
+                "Активные запросы питания",
+                "Показывает процессы, драйверы или устройства, которые прямо сейчас запрещают сон, отключение экрана или idle-сценарии.",
+                "powercfg /requests",
+                PerformanceSettingControlKind.ReadOnly,
+                order);
+
+            item.OperationKind = KindReadOnly;
+            item.ReadOnlyKind = "PowerRequests";
+            FillPowerRequestsState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateWakeArmedDevicesItem(int order)
+        {
+            var item = CreateBaseItem(
+                "power.wake-armed-devices",
+                "Устройства с правом пробуждения",
+                "Показывает устройства, которым Windows разрешила будить ПК. Это помогает найти причину самопроизвольных пробуждений без перехода в диспетчер устройств.",
+                "powercfg wake_armed",
+                PerformanceSettingControlKind.ReadOnly,
+                order);
+
+            item.OperationKind = KindReadOnly;
+            item.ReadOnlyKind = "PowerWakeArmed";
+            FillPowerWakeArmedState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateHibernationMasterItem(int order)
+        {
+            var item = CreateBaseItem(
+                "power.hibernate-master",
+                "Гибернация Windows",
+                "Включает или отключает системную поддержку гибернации через powercfg. Нужна для гибернации, гибридного сна и некоторых сценариев быстрого запуска.",
+                "powercfg",
+                PerformanceSettingControlKind.Toggle,
+                order);
+
+            item.OperationKind = KindPowerHibernation;
+            item.RequiresElevation = true;
+            item.RiskLabel = "средний";
+            item.EnabledText = "Гибернация включена";
+            item.DisabledText = "Гибернация отключена";
+            item.Recommendation = "Если в Windows пропали пункты гибернации или гибридного сна, включите этот параметр. Если нужен минимум занятого места на диске, отключите.";
+            FillPowerHibernationState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateModernStandbyOverrideItem(int order)
+        {
+            var item = CreateRegistryToggleItem(
+                "power.modern-standby-override",
+                "Отключить Modern Standby (S0)",
+                "Глубокий параметр ACPI/прошивки: PlatformAoAcOverride может запретить Modern Standby на системах, где производитель оставил совместимый путь. Не все BIOS/UEFI уважают этот ключ.",
+                "HKLM",
+                Registry.LocalMachine,
+                PowerControlPath,
+                PlatformAoAcOverrideValueName,
+                order,
+                enabledValue: 0,
+                disabledValue: 1,
+                defaultValue: 1,
+                risk: "высокий");
+
+            item.RegistryDeleteWhenDisabled = true;
+            item.RequiresRestart = true;
+            item.RestartReason = "изменение ACPI/Modern Standby применяется только после перезагрузки";
+            item.EnabledText = "Modern Standby отключается override-ключом";
+            item.DisabledText = "Используется поведение OEM/Windows";
+            item.Recommendation = "Включайте только если знаете, что устройство некорректно работает с S0 Modern Standby. Если после перезагрузки сон пропал или стал нестабильным, выполните откат.";
+            FillRegistryDwordState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateFastStartupItem(int order)
+        {
+            var item = CreateRegistryToggleItem(
+                "power.fast-startup",
+                "Быстрый запуск Windows",
+                "Скрытый параметр гибернационного запуска: Windows сохраняет часть ядра при завершении работы. Иногда мешает драйверам и полному холодному старту.",
+                "HKLM",
+                Registry.LocalMachine,
+                PowerSessionManagerPath,
+                HiberbootEnabledValueName,
+                order,
+                enabledValue: 1,
+                disabledValue: 0,
+                defaultValue: 1,
+                risk: "низкий");
+
+            item.EnabledText = "Быстрый запуск включён";
+            item.DisabledText = "Быстрый запуск отключён";
+            item.RequiresRestart = true;
+            item.RestartReason = "Изменение быстрого запуска применяется после следующего полного завершения работы или перезагрузки.";
+            item.Recommendation = "Если после выключения не сбрасываются драйверы, USB, Wi-Fi или питание устройств, отключите быстрый запуск.";
+            FillRegistryDwordState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreatePowerThrottlingItem(int order)
+        {
+            var item = CreateRegistryToggleItem(
+                "power.power-throttling-off",
+                "Отключить Power Throttling",
+                "Скрытая системная политика Windows. Значение включает запрет энерготроттлинга фоновых задач через HKLM, без перехода в внешние настройки.",
+                "HKLM",
+                Registry.LocalMachine,
+                PowerThrottlingPath,
+                PowerThrottlingOffValueName,
+                order,
+                enabledValue: 1,
+                disabledValue: 0,
+                defaultValue: 0,
+                risk: "средний");
+
+            item.EnabledText = "Power Throttling отключён";
+            item.DisabledText = "Power Throttling разрешён";
+            item.RequiresRestart = true;
+            item.RestartReason = "Политика Power Throttling применяется стабильнее после перезапуска Windows.";
+            item.Recommendation = "Используйте для рабочих станций от сети, если фоновые задачи не должны замедляться. На ноутбуке это может повысить расход батареи.";
+            FillRegistryDwordState(item);
             return item;
         }
 
@@ -608,21 +1021,24 @@ namespace TweakWise.Services
             return item;
         }
 
-        private PerformanceTuningItem CreatePciExpressAspmItem(int order)
+        private PerformanceTuningItem CreatePciExpressAspmItem(int order, bool dc)
         {
             var item = CreatePowerComboItem(
-                "power.pcie-aspm-ac",
-                "PCI Express Link State",
-                "Управляет энергосбережением PCIe от сети. Отключение может снизить задержки устройств и GPU, но увеличит расход энергии.",
+                dc ? "power.pcie-aspm-dc" : "power.pcie-aspm-ac",
+                dc ? "PCI Express Link State от батареи" : "PCI Express Link State от сети",
+                "Управляет энергосбережением PCIe в текущей схеме питания. Отключение может снизить задержки устройств, но повышает расход энергии.",
                 PciExpressAspm,
                 order,
-                "средний",
-                SubPciExpress);
+                dc ? "средний" : "низкий",
+                SubPciExpressGuid,
+                dc);
 
             item.Options.Add(new PerformanceTuningOption("Отключено", "0", "Максимальная отзывчивость PCIe."));
             item.Options.Add(new PerformanceTuningOption("Умеренно", "1", "Баланс."));
             item.Options.Add(new PerformanceTuningOption("Максимальное энергосбережение", "2", "Меньше расход, возможны задержки."));
-            item.Recommendation = "Для производительных режимов обычно выбирают «Отключено».";
+            item.Recommendation = dc
+                ? "На батарее обычно оставляют энергосбережение. Если есть обрывы устройств, проверьте «Отключено»."
+                : "Для производительного режима от сети чаще используют «Отключено».";
             FillPowerAcSettingState(item);
             return item;
         }
@@ -632,8 +1048,8 @@ namespace TweakWise.Services
             var item = CreateBaseItem(
                 "power.disk-idle-ac",
                 "Отключение диска от сети",
-                "Задаёт таймаут отключения накопителя в текущей схеме питания. 0 минут означает «никогда».",
-                "powercfg",
+                "Задаёт таймаут отключения накопителя в текущей схеме питания. Этот пункт оставлен для совместимости, но в блоке питания больше не показывается.",
+                "powercfg AC",
                 PerformanceSettingControlKind.Slider,
                 order);
 
@@ -646,16 +1062,24 @@ namespace TweakWise.Services
             item.NumericStep = 5;
             item.ValueUnit = " мин";
             item.RiskLabel = "низкий";
-            item.Recommendation = "Для стационарного ПК и игр можно поставить 0, чтобы диск не засыпал во время нагрузки.";
+            item.Recommendation = "Этот параметр относится к накопителям и не выводится в узле питания.";
             FillPowerAcSettingState(item);
             return item;
         }
 
-        private PerformanceTuningItem CreateDisplayIdleItem(int order)
+        private static void EnableTimeoutShortcut(PerformanceTuningItem item, double enabledValue, string enableText = "Включить типовое значение")
+        {
+            item.ShowSliderShortcuts = true;
+            item.QuickDisableText = "Отключить / никогда";
+            item.QuickEnableText = enableText;
+            item.QuickEnableValue = enabledValue;
+        }
+
+        private PerformanceTuningItem CreateDisplayIdleItem(int order, bool dc)
         {
             var item = CreatePowerSliderItem(
-                "power.display-idle-ac",
-                "Отключение экрана от сети",
+                dc ? "power.display-idle-dc" : "power.display-idle-ac",
+                dc ? "Отключение экрана от батареи" : "Отключение экрана от сети",
                 "Задаёт таймаут выключения дисплея в текущей схеме питания. 0 минут означает «никогда».",
                 VideoIdle,
                 order,
@@ -663,89 +1087,453 @@ namespace TweakWise.Services
                 180,
                 " мин",
                 "низкий",
-                SubVideo);
+                SubVideoGuid,
+                dc);
 
             item.PowerValueScale = 60;
             item.NumericStep = 5;
-            item.Recommendation = "Для стационарной работы обычно удобно 10-30 минут. Для диагностики или презентаций можно временно поставить 0.";
+            EnableTimeoutShortcut(item, dc ? 5 : 15);
+            item.Recommendation = dc
+                ? "На батарее короткий таймаут экономит заряд. Кнопка отключения выставляет 0 минут — экран не будет гаснуть по таймауту."
+                : "Для стационарной работы обычно удобно 10-30 минут. Кнопка отключения выставляет 0 минут — это режим «никогда».";
             FillPowerAcSettingState(item);
             return item;
         }
 
-        private PerformanceTuningItem CreateSleepIdleItem(int order)
+        private PerformanceTuningItem CreateConsoleLockDisplayIdleItem(int order)
         {
             var item = CreatePowerSliderItem(
-                "power.sleep-idle-ac",
-                "Переход в сон от сети",
-                "Определяет, через сколько минут простоя Windows переведёт компьютер в сон при питании от сети. 0 минут означает «никогда».",
+                "power.display-lock-timeout-ac",
+                "Экран блокировки: отключение дисплея",
+                "Скрытый таймаут выключения дисплея на экране блокировки. В обычных параметрах Windows часто не отображается.",
+                ConsoleLockDisplayOff,
+                order,
+                0,
+                60,
+                " мин",
+                "низкий",
+                SubVideoGuid,
+                dc: false);
+
+            item.PowerValueScale = 60;
+            item.NumericStep = 1;
+            EnableTimeoutShortcut(item, 5);
+            item.Recommendation = "Если экран слишком быстро гаснет после Win+L, измените это значение. 0 минут отключает таймаут экрана блокировки.";
+            FillPowerAcSettingState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateSleepIdleItem(int order, bool dc)
+        {
+            var item = CreatePowerSliderItem(
+                dc ? "power.sleep-idle-dc" : "power.sleep-idle-ac",
+                dc ? "Переход в сон от батареи" : "Переход в сон от сети",
+                "Определяет, через сколько минут простоя Windows переведёт компьютер в сон. 0 минут означает «никогда».",
                 StandbyIdle,
                 order,
                 0,
                 240,
                 " мин",
-                "низкий",
-                SubSleep);
+                dc ? "средний" : "низкий",
+                SubSleepGuid,
+                dc);
 
             item.PowerValueScale = 60;
             item.NumericStep = 5;
-            item.Recommendation = "Для рабочих станций и длительных задач лучше не ставить слишком короткий таймаут, чтобы процессы не прерывались.";
+            EnableTimeoutShortcut(item, dc ? 15 : 30);
+            item.Recommendation = dc
+                ? "На батарее слишком большое значение быстрее разряжает ноутбук. 0 минут отключает автоматический сон."
+                : "Для рабочих станций и долгих задач лучше не ставить слишком короткий таймаут. 0 минут отключает автоматический сон.";
             FillPowerAcSettingState(item);
             return item;
         }
 
-        private PerformanceTuningItem CreateHibernateIdleItem(int order)
+        private PerformanceTuningItem CreateHibernateIdleItem(int order, bool dc)
         {
             var item = CreatePowerSliderItem(
-                "power.hibernate-idle-ac",
-                "Гибернация от сети",
-                "Определяет таймаут перехода в гибернацию в текущей схеме питания. На некоторых ПК параметр скрыт или отключён производителем.",
+                dc ? "power.hibernate-idle-dc" : "power.hibernate-idle-ac",
+                dc ? "Гибернация от батареи" : "Гибернация от сети",
+                "Определяет таймаут перехода в гибернацию в текущей схеме питания. 0 минут означает «никогда».",
                 HibernateIdle,
                 order,
                 0,
                 360,
                 " мин",
                 "низкий",
-                SubSleep);
+                SubSleepGuid,
+                dc);
 
             item.PowerValueScale = 60;
             item.NumericStep = 10;
-            item.Recommendation = "Если компьютер выполняет долгие задачи без участия пользователя, используйте 0 или значение больше таймаута сна.";
+            EnableTimeoutShortcut(item, dc ? 60 : 120);
+            item.Recommendation = dc
+                ? "На батарее гибернация защищает от полной разрядки при долгом простое. 0 минут отключает таймаут гибернации."
+                : "Если компьютер выполняет долгие задачи без участия пользователя, используйте 0 или значение больше таймаута сна.";
             FillPowerAcSettingState(item);
             return item;
         }
 
-        private PerformanceTuningItem CreateHybridSleepItem(int order)
+        private PerformanceTuningItem CreateHybridSleepItem(int order, bool dc)
         {
             var item = CreatePowerToggleItem(
-                "power.hybrid-sleep-ac",
-                "Гибридный спящий режим",
+                dc ? "power.hybrid-sleep-dc" : "power.hybrid-sleep-ac",
+                dc ? "Гибридный сон от батареи" : "Гибридный сон от сети",
                 "Сохраняет состояние в память и на диск перед сном. Это повышает устойчивость к потере питания, но может замедлить переход в сон.",
                 HybridSleep,
                 order,
                 enabledValue: 1,
                 disabledValue: 0,
                 risk: "низкий",
-                subgroupAlias: SubSleep);
+                subgroupAlias: SubSleepGuid,
+                dc: dc);
 
-            item.Recommendation = "Для настольного ПК гибридный сон обычно полезен. Для ноутбука ориентируйтесь на поведение производителя и скорость выхода из сна.";
+            item.Recommendation = dc
+                ? "На ноутбуках обычно достаточно обычного сна/гибернации, но поведение зависит от производителя."
+                : "Для настольного ПК гибридный сон обычно полезен.";
             return item;
         }
 
-        private PerformanceTuningItem CreateUsbSelectiveSuspendItem(int order)
+        private PerformanceTuningItem CreateWakeTimersItem(int order, bool dc)
+        {
+            var item = CreatePowerComboItem(
+                dc ? "power.wake-timers-dc" : "power.wake-timers-ac",
+                dc ? "Таймеры пробуждения от батареи" : "Таймеры пробуждения от сети",
+                "Разрешает задачам Windows будить компьютер по расписанию. Это реальный powercfg-параметр текущей схемы.",
+                WakeTimers,
+                order,
+                "средний",
+                SubSleepGuid,
+                dc);
+
+            item.Options.Add(new PerformanceTuningOption("Отключено", "0", "ПК не будет просыпаться по таймерам задач."));
+            item.Options.Add(new PerformanceTuningOption("Включено", "1", "Windows и приложения могут будить ПК."));
+            item.Options.Add(new PerformanceTuningOption("Только важные таймеры", "2", "Компромисс для системных задач."));
+            item.Recommendation = dc
+                ? "На батарее лучше отключать, чтобы ноутбук не просыпался в сумке."
+                : "Если компьютер сам просыпается ночью, начните с отключения таймеров.";
+            FillPowerAcSettingState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateUnattendedSleepTimeoutItem(int order, bool dc)
+        {
+            var item = CreatePowerSliderItem(
+                dc ? "power.unattended-sleep-dc" : "power.unattended-sleep-ac",
+                dc ? "Сон после автоматического пробуждения от батареи" : "Сон после автоматического пробуждения от сети",
+                "Скрытый таймаут возврата в сон после автоматического пробуждения. Помогает, когда ПК просыпается для обслуживания и не засыпает обратно.",
+                UnattendedSleepTimeout,
+                order,
+                0,
+                120,
+                " мин",
+                "средний",
+                SubSleepGuid,
+                dc);
+
+            item.PowerValueScale = 60;
+            item.NumericStep = 1;
+            EnableTimeoutShortcut(item, 5);
+            item.Recommendation = "Обычно 2-10 минут достаточно. 0 отключает этот таймаут.";
+            FillPowerAcSettingState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateAwayModePolicyItem(int order, bool dc)
         {
             var item = CreatePowerToggleItem(
-                "power.usb-selective-suspend-ac",
-                "Выборочное приостановление USB",
-                "Позволяет Windows временно отключать неактивные USB-устройства. Отключение может помочь при обрывах USB-аудио, VR, геймпадов или внешних накопителей.",
-                UsbSelectiveSuspend,
+                dc ? "power.away-mode-dc" : "power.away-mode-ac",
+                dc ? "Away Mode от батареи" : "Away Mode от сети",
+                "Скрытая политика: компьютер выглядит выключенным, но продолжает выполнять медиа- или фоновые задачи. Используйте только если понимаете сценарий.",
+                AwayModePolicy,
                 order,
                 enabledValue: 1,
                 disabledValue: 0,
                 risk: "средний",
-                subgroupAlias: SubUsb);
+                subgroupAlias: SubSleepGuid,
+                dc: dc);
 
-            item.Recommendation = "Если USB-устройства работают стабильно, оставьте включённым. Отключайте только при реальных обрывах или задержках.";
+            item.Recommendation = "На обычном ПК чаще оставляют выключенным, чтобы сон действительно снижал расход энергии.";
             return item;
+        }
+
+        private PerformanceTuningItem CreateUsbSelectiveSuspendItem(int order, bool dc)
+        {
+            var item = CreatePowerToggleItem(
+                dc ? "power.usb-selective-suspend-dc" : "power.usb-selective-suspend-ac",
+                dc ? "Выборочное приостановление USB от батареи" : "Выборочное приостановление USB от сети",
+                "Позволяет Windows временно отключать неактивные USB-устройства. Отключение может помочь при обрывах USB-аудио, VR, геймпадов или внешних устройств.",
+                UsbSelectiveSuspend,
+                order,
+                enabledValue: 1,
+                disabledValue: 0,
+                risk: dc ? "средний" : "низкий",
+                subgroupAlias: SubUsbGuid,
+                dc: dc);
+
+            item.Recommendation = dc
+                ? "На батарее лучше оставить включённым, если нет реальных обрывов устройств."
+                : "Если USB-устройства работают стабильно, оставьте включённым. Отключайте только при обрывах или задержках.";
+            return item;
+        }
+
+        private PerformanceTuningItem CreateWirelessPowerModeItem(int order, bool dc)
+        {
+            var item = CreatePowerComboItem(
+                dc ? "power.wireless-mode-dc" : "power.wireless-mode-ac",
+                dc ? "Беспроводной адаптер от батареи" : "Беспроводной адаптер от сети",
+                "Режим энергосбережения Wi-Fi-адаптера в текущей схеме питания.",
+                WirelessPowerMode,
+                order,
+                dc ? "средний" : "низкий",
+                SubWirelessGuid,
+                dc);
+
+            item.Options.Add(new PerformanceTuningOption("Максимальная производительность", "0", "Минимум энергосбережения, стабильнее задержки."));
+            item.Options.Add(new PerformanceTuningOption("Низкое энергосбережение", "1", "Небольшая экономия."));
+            item.Options.Add(new PerformanceTuningOption("Среднее энергосбережение", "2", "Баланс."));
+            item.Options.Add(new PerformanceTuningOption("Максимальное энергосбережение", "3", "Экономит заряд, может повысить задержки."));
+            item.Recommendation = dc
+                ? "На батарее используйте баланс или энергосбережение, если не важна минимальная задержка сети."
+                : "От сети для стабильности обычно выбирают максимальную производительность.";
+            FillPowerAcSettingState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateLidCloseActionItem(int order, bool dc)
+        {
+            var item = CreatePowerActionComboItem(
+                dc ? "power.lid-action-dc" : "power.lid-action-ac",
+                dc ? "Закрытие крышки от батареи" : "Закрытие крышки от сети",
+                "Действие Windows при закрытии крышки ноутбука.",
+                LidCloseAction,
+                order,
+                SubButtonsGuid,
+                dc);
+
+            item.Recommendation = dc
+                ? "На батарее безопаснее сон или гибернация."
+                : "Для ноутбука на док-станции можно выбрать «Не требуется действие», если охлаждение не перекрывается.";
+            return item;
+        }
+
+        private PerformanceTuningItem CreatePowerButtonActionItem(int order, bool dc)
+        {
+            var item = CreatePowerActionComboItem(
+                dc ? "power.power-button-action-dc" : "power.power-button-action-ac",
+                dc ? "Действие кнопки питания от батареи" : "Действие кнопки питания от сети",
+                "Действие Windows при нажатии аппаратной кнопки питания.",
+                PowerButtonAction,
+                order,
+                SubButtonsGuid,
+                dc);
+
+            item.Recommendation = dc
+                ? "На батарее обычно безопаснее сон или гибернация."
+                : "Для защиты от случайного выключения часто выбирают сон или запрос штатного завершения.";
+            return item;
+        }
+
+        private PerformanceTuningItem CreateSleepButtonActionItem(int order, bool dc)
+        {
+            var item = CreatePowerActionComboItem(
+                dc ? "power.sleep-button-action-dc" : "power.sleep-button-action-ac",
+                dc ? "Действие кнопки сна от батареи" : "Действие кнопки сна от сети",
+                "Действие Windows при нажатии аппаратной кнопки сна, если она есть.",
+                SleepButtonAction,
+                order,
+                SubButtonsGuid,
+                dc);
+
+            item.Recommendation = "Оставьте «Сон», если аппаратная кнопка реально используется для быстрого ухода в спящий режим.";
+            return item;
+        }
+
+        private PerformanceTuningItem CreatePowerActionComboItem(
+            string settingId,
+            string title,
+            string description,
+            string settingAlias,
+            int order,
+            string subgroupAlias,
+            bool dc)
+        {
+            var item = CreatePowerComboItem(settingId, title, description, settingAlias, order, "низкий", subgroupAlias, dc);
+            item.Options.Add(new PerformanceTuningOption("Не требуется действие", "0", "Windows игнорирует событие."));
+            item.Options.Add(new PerformanceTuningOption("Сон", "1", "Быстрое засыпание."));
+            item.Options.Add(new PerformanceTuningOption("Гибернация", "2", "Сохраняет состояние на диск."));
+            item.Options.Add(new PerformanceTuningOption("Завершение работы", "3", "Полное выключение."));
+            FillPowerAcSettingState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateLowBatteryLevelItem(int order)
+        {
+            var item = CreatePowerSliderItem(
+                "power.battery-low-level-dc",
+                "Низкий уровень батареи",
+                "Порог заряда, при котором Windows показывает предупреждение о низком заряде.",
+                LowBatteryLevel,
+                order,
+                1,
+                100,
+                "%",
+                "низкий",
+                SubBatteryGuid,
+                dc: true);
+
+            item.Recommendation = "Обычно 10-20% достаточно, чтобы успеть подключить питание.";
+            return item;
+        }
+
+        private PerformanceTuningItem CreateCriticalBatteryLevelItem(int order)
+        {
+            var item = CreatePowerSliderItem(
+                "power.battery-critical-level-dc",
+                "Критический уровень батареи",
+                "Порог заряда, при котором Windows выполняет критическое действие батареи.",
+                CriticalBatteryLevel,
+                order,
+                1,
+                100,
+                "%",
+                "средний",
+                SubBatteryGuid,
+                dc: true);
+
+            item.Recommendation = "Не ставьте слишком низко: ноутбук может не успеть корректно уйти в гибернацию.";
+            return item;
+        }
+
+        private PerformanceTuningItem CreateLowBatteryActionItem(int order)
+        {
+            var item = CreatePowerActionComboItem(
+                "power.battery-low-action-dc",
+                "Действие при низком заряде",
+                "Что Windows делает при достижении низкого уровня батареи.",
+                LowBatteryAction,
+                order,
+                SubBatteryGuid,
+                dc: true);
+
+            item.RiskLabel = "средний";
+            item.Recommendation = "Для низкого уровня обычно достаточно уведомления/бездействия; критическое действие настраивается отдельно.";
+            return item;
+        }
+
+        private PerformanceTuningItem CreateCriticalBatteryActionItem(int order)
+        {
+            var item = CreatePowerActionComboItem(
+                "power.battery-critical-action-dc",
+                "Действие при критическом заряде",
+                "Что Windows делает при достижении критического уровня батареи.",
+                CriticalBatteryAction,
+                order,
+                SubBatteryGuid,
+                dc: true);
+
+            item.RiskLabel = "высокий";
+            item.Recommendation = "Обычно безопаснее гибернация. «Не требуется действие» может привести к потере данных при разрядке.";
+            return item;
+        }
+
+        private void AppendDiscoveredPowerSettings(List<PerformanceTuningItem> items, int firstOrder)
+        {
+            var discovered = GetDiscoveredPowerSettings();
+            int order = firstOrder;
+            var existingKeys = new HashSet<string>(items
+                .Where(item => !string.IsNullOrWhiteSpace(item.PowerSettingAlias))
+                .Select(item => BuildPowerSettingItemKey(item.PowerSubgroupAlias, item.PowerSettingAlias, item.OperationKind)),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var setting in discovered)
+            {
+                if (!PowerNodeSubgroupGuids.Contains(NormalizeGuid(setting.SubgroupGuid)))
+                    continue;
+
+                if (CuratedPowerSettingGuids.Contains(NormalizeGuid(setting.SettingGuid)))
+                    continue;
+
+                if (setting.CurrentAcIndex.HasValue)
+                {
+                    var item = CreateDiscoveredPowerSettingItem(setting, dc: false, order++);
+                    string key = BuildPowerSettingItemKey(item.PowerSubgroupAlias, item.PowerSettingAlias, item.OperationKind);
+                    if (existingKeys.Add(key))
+                        items.Add(item);
+                }
+
+                if (setting.CurrentDcIndex.HasValue)
+                {
+                    var item = CreateDiscoveredPowerSettingItem(setting, dc: true, order++);
+                    string key = BuildPowerSettingItemKey(item.PowerSubgroupAlias, item.PowerSettingAlias, item.OperationKind);
+                    if (existingKeys.Add(key))
+                        items.Add(item);
+                }
+            }
+        }
+
+        private PerformanceTuningItem CreateDiscoveredPowerSettingItem(DiscoveredPowerSetting setting, bool dc, int order)
+        {
+            var controlKind = ResolveDiscoveredControlKind(setting);
+            string modeText = dc ? "от батареи" : "от сети";
+            string title = $"{setting.DisplaySettingName} {modeText}";
+
+            var item = CreateBaseItem(
+                $"power.dynamic.{NormalizeGuid(setting.SettingGuid)}.{(dc ? "dc" : "ac")}",
+                title,
+                $"Автоматически найденный powercfg-параметр текущей схемы: {setting.DisplaySubgroupName}. GUID настройки: {setting.SettingGuid}.",
+                dc ? "powercfg DC" : "powercfg AC",
+                controlKind,
+                order);
+
+            item.OperationKind = dc ? KindPowerDcSetting : KindPowerAcSetting;
+            item.PowerSubgroupAlias = setting.SubgroupGuid;
+            item.PowerSettingAlias = setting.SettingGuid;
+            item.SearchKeywords = $"{setting.SubgroupGuid} {setting.SettingGuid} {setting.SubgroupName} {setting.SettingName}";
+            item.RiskLabel = "средний";
+            item.Recommendation = "Это скрытый или дополнительный параметр Windows из текущей схемы питания. Перед изменением TweakWise сохраняет бэкап для отката.";
+
+            if (controlKind == PerformanceSettingControlKind.Combo)
+            {
+                foreach (var option in setting.Options)
+                    item.Options.Add(new PerformanceTuningOption(option.Label, option.Value, option.Hint));
+            }
+            else if (controlKind == PerformanceSettingControlKind.Toggle)
+            {
+                item.EnabledValue = 1;
+                item.DisabledValue = 0;
+                item.EnabledText = "Включено";
+                item.DisabledText = "Отключено";
+            }
+            else
+            {
+                item.Minimum = setting.Minimum ?? 0;
+                item.Maximum = setting.Maximum.HasValue && setting.Maximum.Value > item.Minimum
+                    ? setting.Maximum.Value
+                    : Math.Max(item.Minimum + 1, 100);
+                item.NumericStep = setting.Increment.HasValue && setting.Increment.Value > 0
+                    ? setting.Increment.Value
+                    : 1;
+                item.ValueUnit = string.Empty;
+            }
+
+            FillPowerAcSettingState(item);
+            return item;
+        }
+
+        private static PerformanceSettingControlKind ResolveDiscoveredControlKind(DiscoveredPowerSetting setting)
+        {
+            if (setting.Options.Count > 0)
+                return PerformanceSettingControlKind.Combo;
+
+            if (setting.Minimum == 0 && setting.Maximum == 1)
+                return PerformanceSettingControlKind.Toggle;
+
+            return PerformanceSettingControlKind.Slider;
+        }
+
+        private static string BuildPowerSettingItemKey(string subgroup, string setting, string kind)
+        {
+            return $"{NormalizeGuid(subgroup)}|{NormalizeGuid(setting)}|{kind}";
         }
 
         private PerformanceTuningItem CreateGpuPreferencePolicyItem(int order)
@@ -1082,10 +1870,11 @@ namespace TweakWise.Services
             double maximum,
             string unit,
             string risk,
-            string subgroupAlias = SubProcessor)
+            string subgroupAlias = SubProcessor,
+            bool dc = false)
         {
-            var item = CreateBaseItem(settingId, title, description, "powercfg", PerformanceSettingControlKind.Slider, order);
-            item.OperationKind = KindPowerAcSetting;
+            var item = CreateBaseItem(settingId, title, description, dc ? "powercfg DC" : "powercfg AC", PerformanceSettingControlKind.Slider, order);
+            item.OperationKind = dc ? KindPowerDcSetting : KindPowerAcSetting;
             item.PowerSubgroupAlias = subgroupAlias;
             item.PowerSettingAlias = settingAlias;
             item.Minimum = minimum;
@@ -1104,10 +1893,11 @@ namespace TweakWise.Services
             string settingAlias,
             int order,
             string risk,
-            string subgroupAlias = SubProcessor)
+            string subgroupAlias = SubProcessor,
+            bool dc = false)
         {
-            var item = CreateBaseItem(settingId, title, description, "powercfg", PerformanceSettingControlKind.Combo, order);
-            item.OperationKind = KindPowerAcSetting;
+            var item = CreateBaseItem(settingId, title, description, dc ? "powercfg DC" : "powercfg AC", PerformanceSettingControlKind.Combo, order);
+            item.OperationKind = dc ? KindPowerDcSetting : KindPowerAcSetting;
             item.PowerSubgroupAlias = subgroupAlias;
             item.PowerSettingAlias = settingAlias;
             item.RiskLabel = risk;
@@ -1123,10 +1913,11 @@ namespace TweakWise.Services
             int enabledValue,
             int disabledValue,
             string risk,
-            string subgroupAlias = SubProcessor)
+            string subgroupAlias = SubProcessor,
+            bool dc = false)
         {
-            var item = CreateBaseItem(settingId, title, description, "powercfg", PerformanceSettingControlKind.Toggle, order);
-            item.OperationKind = KindPowerAcSetting;
+            var item = CreateBaseItem(settingId, title, description, dc ? "powercfg DC" : "powercfg AC", PerformanceSettingControlKind.Toggle, order);
+            item.OperationKind = dc ? KindPowerDcSetting : KindPowerAcSetting;
             item.PowerSubgroupAlias = subgroupAlias;
             item.PowerSettingAlias = settingAlias;
             item.EnabledValue = enabledValue;
@@ -1229,21 +2020,24 @@ namespace TweakWise.Services
             if (item.RequiresElevation && !IsAdministrator())
                 return PerformanceTuningResult.Fail("Приложение не запущено с правами администратора, поэтому запись заблокирована.");
 
-            if (item.OperationKind == KindPowerAcSetting)
+            if (IsPowerSettingOperation(item.OperationKind))
             {
+                bool useDc = string.Equals(item.OperationKind, KindPowerDcSetting, StringComparison.OrdinalIgnoreCase);
                 long targetValue = ResolvePowerTargetValue(item);
 
                 if (string.Equals(item.PowerSettingAlias, ProcessorMinState, StringComparison.OrdinalIgnoreCase))
                 {
                     var max = QueryPowerSetting(SubProcessor, ProcessorMaxState);
-                    if (max.Success && max.CurrentAcIndex.HasValue && targetValue > max.CurrentAcIndex.Value)
+                    long? maxIndex = useDc ? max.CurrentDcIndex : max.CurrentAcIndex;
+                    if (max.Success && maxIndex.HasValue && targetValue > maxIndex.Value)
                         return PerformanceTuningResult.Fail("Минимальное состояние CPU не может быть выше текущего максимального состояния CPU.");
                 }
 
                 if (string.Equals(item.PowerSettingAlias, ProcessorMaxState, StringComparison.OrdinalIgnoreCase))
                 {
                     var min = QueryPowerSetting(SubProcessor, ProcessorMinState);
-                    if (min.Success && min.CurrentAcIndex.HasValue && targetValue < min.CurrentAcIndex.Value)
+                    long? minIndex = useDc ? min.CurrentDcIndex : min.CurrentAcIndex;
+                    if (min.Success && minIndex.HasValue && targetValue < minIndex.Value)
                         return PerformanceTuningResult.Fail("Максимальное состояние CPU не может быть ниже текущего минимального состояния CPU.");
                 }
             }
@@ -1260,6 +2054,15 @@ namespace TweakWise.Services
                     break;
                 case "PowerBatteryStatus":
                     FillPowerBatteryStatusState(item);
+                    break;
+                case "PowerSleepStates":
+                    FillPowerSleepStatesState(item);
+                    break;
+                case "PowerRequests":
+                    FillPowerRequestsState(item);
+                    break;
+                case "PowerWakeArmed":
+                    FillPowerWakeArmedState(item);
                     break;
                 case "MemoryLoad":
                     FillMemoryLoadState(item);
@@ -1355,19 +2158,83 @@ namespace TweakWise.Services
             }
         }
 
+        private void FillPowerSleepStatesState(PerformanceTuningItem item)
+        {
+            var result = RunPowerCfg("/a");
+            if (!result.Success)
+            {
+                item.CurrentValue = "Не удалось прочитать состояния сна";
+                item.SetStatus($"powercfg /a завершился с ошибкой: {BuildCommandError(result)}", isWarning: true);
+                return;
+            }
+
+            string summary = SummarizePowerCfgOutput(result.Output, 6);
+            item.CurrentValue = string.IsNullOrWhiteSpace(summary)
+                ? "Windows не вернула список состояний сна"
+                : summary;
+            item.Recommendation = "Если нужный режим сна отсутствует, причина обычно в BIOS/UEFI, ACPI-драйвере, драйвере видеокарты или политике Modern Standby. Универсально включить отсутствующий BIOS-режим из Windows нельзя, но соседние параметры помогут проверить гибернацию и S0 override.";
+            item.IsSupported = true;
+        }
+
+        private void FillPowerRequestsState(PerformanceTuningItem item)
+        {
+            var result = RunPowerCfg("/requests");
+            if (!result.Success)
+            {
+                item.CurrentValue = "Не удалось прочитать активные запросы питания";
+                item.SetStatus($"powercfg /requests завершился с ошибкой: {BuildCommandError(result)}", isWarning: true);
+                return;
+            }
+
+            string summary = SummarizePowerCfgOutput(result.Output, 8);
+            bool clean = IsEmptyPowerCfgDiagnostic(result.Output);
+            item.CurrentValue = clean ? "Активных блокирующих запросов не обнаружено" : summary;
+            item.Recommendation = clean
+                ? "Сейчас процессы и драйверы не блокируют сон или отключение экрана через powercfg requests."
+                : "Если сон или экран не выключаются, проверьте указанные процессы/драйверы и уберите причину, а не отключайте сон глобально.";
+            item.IsPriority = !clean;
+            item.IsSupported = true;
+        }
+
+        private void FillPowerWakeArmedState(PerformanceTuningItem item)
+        {
+            var result = RunPowerCfg("/devicequery", "wake_armed");
+            if (!result.Success)
+            {
+                item.CurrentValue = "Не удалось прочитать устройства пробуждения";
+                item.SetStatus($"powercfg /devicequery wake_armed завершился с ошибкой: {BuildCommandError(result)}", isWarning: true);
+                return;
+            }
+
+            string summary = SummarizePowerCfgOutput(result.Output, 8);
+            item.CurrentValue = string.IsNullOrWhiteSpace(summary)
+                ? "Устройства с правом пробуждения не найдены"
+                : summary;
+            item.Recommendation = string.IsNullOrWhiteSpace(summary)
+                ? "Самопроизвольные пробуждения, если они есть, вероятнее вызваны таймерами, драйверами или BIOS, а не устройствами с wake-правом."
+                : "Если ПК сам просыпается, начните с этих устройств. Для универсального безопасного применения отключение wake-прав лучше делать точечно, когда будет отдельный список устройств.";
+            item.IsPriority = !string.IsNullOrWhiteSpace(summary);
+            item.IsSupported = true;
+        }
+
         private void FillPowerAcSettingState(PerformanceTuningItem item)
         {
+            bool useDc = string.Equals(item.OperationKind, KindPowerDcSetting, StringComparison.OrdinalIgnoreCase);
             var state = QueryPowerSetting(item.PowerSubgroupAlias, item.PowerSettingAlias);
-            if (!state.Success || !state.CurrentAcIndex.HasValue)
+            long? currentIndex = useDc ? state.CurrentDcIndex : state.CurrentAcIndex;
+            string modeText = useDc ? "от батареи" : "от сети";
+
+            if (!state.Success || !currentIndex.HasValue)
             {
                 item.IsSupported = false;
-                item.CurrentValue = "Параметр недоступен";
-                item.SetStatus("Текущая схема питания, прошивка или драйвер ACPI скрывают этот параметр. Можно попробовать другую схему питания, обновить драйверы чипсета/питания или оставить пункт без изменения.", isWarning: true);
+                item.CurrentValue = $"Параметр {modeText} недоступен";
+                string details = string.IsNullOrWhiteSpace(state.Error) ? string.Empty : $" Подробности powercfg: {state.Error.Trim()}";
+                item.SetStatus($"Windows не вернула текущее значение этого параметра {modeText}. Возможные причины: параметр отсутствует в текущей схеме, его заблокировал OEM/ACPI-драйвер или устройство не поддерживает этот режим. Попробуйте сменить схему питания, запустить приложение от администратора, обновить драйверы чипсета/питания или восстановить схемы командой powercfg -restoredefaultschemes.{details}", isWarning: true);
                 return;
             }
 
             item.IsSupported = true;
-            long current = state.CurrentAcIndex.Value;
+            long current = currentIndex.Value;
 
             if (item.IsSlider)
             {
@@ -1380,13 +2247,16 @@ namespace TweakWise.Services
                 if (state.Maximum.HasValue && item.Maximum > 0)
                     item.Maximum = Math.Min(item.Maximum, state.Maximum.Value / scale);
 
+                if (item.Maximum <= item.Minimum)
+                    item.Maximum = item.Minimum + Math.Max(1, item.NumericStep);
+
                 item.NumericValue = Math.Clamp(displayValue, item.Minimum, item.Maximum);
-                item.CurrentValue = $"{displayValue:0}{item.ValueUnit}";
+                item.CurrentValue = $"{modeText}: {displayValue:0}{item.ValueUnit}";
             }
             else if (item.IsToggle)
             {
                 item.ToggleValue = current == item.EnabledValue;
-                item.CurrentValue = item.ToggleValue ? item.EnabledText : item.DisabledText;
+                item.CurrentValue = $"{modeText}: {(item.ToggleValue ? item.EnabledText : item.DisabledText)}";
             }
             else if (item.IsCombo)
             {
@@ -1398,11 +2268,24 @@ namespace TweakWise.Services
                     item.Options.Add(item.SelectedOption);
                 }
 
-                item.CurrentValue = item.SelectedOption.Label;
+                item.CurrentValue = $"{modeText}: {item.SelectedOption.Label}";
             }
 
             item.StatusMessage = string.Empty;
             item.IsPriority = IsPowerItemPriority(item, current);
+        }
+
+        private void FillPowerHibernationState(PerformanceTuningItem item)
+        {
+            var state = ReadRegistryDword(Registry.LocalMachine, PowerControlPath, HibernateEnabledValueName);
+            bool enabled = state.Exists && state.Value != 0;
+
+            item.IsSupported = true;
+            item.ToggleValue = enabled;
+            item.CurrentValue = enabled ? item.EnabledText : item.DisabledText;
+            item.StatusMessage = state.Exists
+                ? string.Empty
+                : "Windows не вернула значение HibernateEnabled в реестре. Применение всё равно будет выполнено через powercfg /hibernate.";
         }
 
         private void FillRegistryDwordState(PerformanceTuningItem item)
@@ -1420,7 +2303,7 @@ namespace TweakWise.Services
 
             if (item.IsToggle)
             {
-                item.ToggleValue = state.Exists && current == item.EnabledValue;
+                item.ToggleValue = current == item.EnabledValue;
                 item.CurrentValue = item.ToggleValue ? item.EnabledText : item.DisabledText;
             }
             else if (item.IsSlider)
@@ -1547,64 +2430,156 @@ namespace TweakWise.Services
             if (item.SelectedOption == null || string.IsNullOrWhiteSpace(item.SelectedOption.Value))
                 return PerformanceTuningResult.Fail("Выберите схему питания.");
 
+            string targetGuid = item.SelectedOption.Value.Trim();
             var active = GetActivePowerPlan();
             if (active == null)
-                return PerformanceTuningResult.Fail("Не удалось сохранить текущую схему питания для бэкапа.");
+                return PerformanceTuningResult.Fail("Не удалось прочитать текущую схему питания через powercfg.");
 
-            SaveBackup(new PerformanceSettingBackupRecord
+            if (string.Equals(active.Guid, targetGuid, StringComparison.OrdinalIgnoreCase))
+                return PerformanceTuningResult.Ok($"Схема «{active.Name}» уже активна. Изменения не требуются.");
+
+            bool backupSaved = SaveBackup(new PerformanceSettingBackupRecord
             {
                 SettingId = item.SettingId,
                 Kind = nameof(PerformanceBackupKind.PowerScheme),
                 Value = active.Guid,
                 Label = active.Name,
                 CreatedAtUtc = DateTime.UtcNow
-            });
+            }, targetGuid);
 
             InvalidatePowerRuntimeCache();
-            var result = RunPowerCfg("/setactive", item.SelectedOption.Value);
+            var result = RunPowerCfg("/setactive", targetGuid);
             if (!result.Success)
-                return PerformanceTuningResult.Fail($"Windows не применила схему питания: {BuildCommandError(result)}");
+            {
+                if (backupSaved)
+                    RemoveBackup(item.SettingId);
 
-            return PerformanceTuningResult.Ok($"Схема питания изменена на «{item.SelectedOption.Label}». Бэкап сохранён.");
+                return PerformanceTuningResult.Fail($"Windows не применила схему питания: {BuildCommandError(result)}");
+            }
+
+            InvalidatePowerRuntimeCache();
+            var applied = GetActivePowerPlan();
+            if (applied == null || !string.Equals(applied.Guid, targetGuid, StringComparison.OrdinalIgnoreCase))
+            {
+                string actual = applied == null ? "не удалось прочитать активную схему" : $"активна «{applied.Name}»";
+                return PerformanceTuningResult.Fail($"Команда выполнена, но Windows не подтвердила смену схемы: {actual}.");
+            }
+
+            string backupText = backupSaved ? " Точка отката сохранена." : " Новая точка отката не создавалась.";
+            return PerformanceTuningResult.Ok($"Активная схема питания: «{applied.Name}».{backupText}");
         }
 
         private PerformanceTuningResult ApplyPowerAcSetting(PerformanceTuningItem item)
         {
+            bool useDc = string.Equals(item.OperationKind, KindPowerDcSetting, StringComparison.OrdinalIgnoreCase);
             var state = QueryPowerSetting(item.PowerSubgroupAlias, item.PowerSettingAlias);
-            if (!state.Success || !state.CurrentAcIndex.HasValue)
-                return PerformanceTuningResult.Fail("Не удалось сохранить текущее значение powercfg для бэкапа.");
-
-            SaveBackup(new PerformanceSettingBackupRecord
-            {
-                SettingId = item.SettingId,
-                Kind = nameof(PerformanceBackupKind.PowerAcSetting),
-                SubgroupAlias = item.PowerSubgroupAlias,
-                SettingAlias = item.PowerSettingAlias,
-                Value = state.CurrentAcIndex.Value.ToString(CultureInfo.InvariantCulture),
-                Label = FormatPowerBackupLabel(item, state.CurrentAcIndex.Value),
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            long? currentIndex = useDc ? state.CurrentDcIndex : state.CurrentAcIndex;
+            if (!state.Success || !currentIndex.HasValue)
+                return PerformanceTuningResult.Fail("Не удалось прочитать текущее значение powercfg перед применением.");
 
             long targetValue = ResolvePowerTargetValue(item);
+            if (currentIndex.Value == targetValue)
+            {
+                string alreadyModeText = useDc ? "от батареи" : "от сети";
+                return PerformanceTuningResult.Ok($"{item.Title}: значение {FormatAppliedValue(item, targetValue)} уже установлено ({alreadyModeText}).");
+            }
+
+            bool backupSaved = SaveBackup(new PerformanceSettingBackupRecord
+            {
+                SettingId = item.SettingId,
+                Kind = useDc ? nameof(PerformanceBackupKind.PowerDcSetting) : nameof(PerformanceBackupKind.PowerAcSetting),
+                SubgroupAlias = item.PowerSubgroupAlias,
+                SettingAlias = item.PowerSettingAlias,
+                Value = currentIndex.Value.ToString(CultureInfo.InvariantCulture),
+                Label = FormatPowerBackupLabel(item, currentIndex.Value),
+                CreatedAtUtc = DateTime.UtcNow
+            }, targetValue.ToString(CultureInfo.InvariantCulture));
+
+            string scheme = GetCurrentPowerSchemeArgument();
             InvalidatePowerRuntimeCache();
             var setResult = RunPowerCfg(
-                "/setacvalueindex",
-                "SCHEME_CURRENT",
+                useDc ? "/setdcvalueindex" : "/setacvalueindex",
+                scheme,
                 item.PowerSubgroupAlias,
                 item.PowerSettingAlias,
                 targetValue.ToString(CultureInfo.InvariantCulture));
 
             if (!setResult.Success)
-                return PerformanceTuningResult.Fail($"Windows не изменила параметр powercfg: {BuildCommandError(setResult)}");
+            {
+                if (backupSaved)
+                    RemoveBackup(item.SettingId);
 
-            RunPowerCfg("/setactive", "SCHEME_CURRENT");
-            return PerformanceTuningResult.Ok($"{item.Title}: применено значение {FormatAppliedValue(item, targetValue)}. Бэкап сохранён.");
+                return PerformanceTuningResult.Fail($"Windows не изменила параметр powercfg: {BuildCommandError(setResult)}");
+            }
+
+            var commitResult = RunPowerCfg("/setactive", scheme);
+            if (!commitResult.Success)
+                return PerformanceTuningResult.Fail($"Значение записано, но Windows не активировала обновлённую схему: {BuildCommandError(commitResult)}");
+
+            InvalidatePowerRuntimeCache();
+            var updated = QueryPowerSetting(item.PowerSubgroupAlias, item.PowerSettingAlias);
+            long? appliedIndex = useDc ? updated.CurrentDcIndex : updated.CurrentAcIndex;
+            if (!updated.Success || !appliedIndex.HasValue || appliedIndex.Value != targetValue)
+            {
+                string actual = appliedIndex.HasValue ? FormatAppliedValue(item, appliedIndex.Value) : "не прочитано";
+                return PerformanceTuningResult.Fail($"Команда выполнена, но повторная проверка не подтвердила значение {FormatAppliedValue(item, targetValue)}. Сейчас: {actual}.");
+            }
+
+            string modeText = useDc ? "от батареи" : "от сети";
+            string backupText = backupSaved ? " Точка отката сохранена." : " Новая точка отката не создавалась.";
+            return PerformanceTuningResult.Ok($"{item.Title}: применено значение {FormatAppliedValue(item, targetValue)} ({modeText}).{backupText}");
+        }
+
+        private PerformanceTuningResult ApplyPowerHibernation(PerformanceTuningItem item)
+        {
+            var state = ReadRegistryDword(Registry.LocalMachine, PowerControlPath, HibernateEnabledValueName);
+            int previousValue = state.Exists ? state.Value : 0;
+            bool targetEnabled = item.ToggleValue;
+
+            if ((previousValue != 0) == targetEnabled)
+                return PerformanceTuningResult.Ok($"{item.Title}: значение уже установлено. Изменения не требуются.");
+
+            bool backupSaved = SaveBackup(new PerformanceSettingBackupRecord
+            {
+                SettingId = item.SettingId,
+                Kind = nameof(PerformanceBackupKind.PowerHibernation),
+                Value = previousValue.ToString(CultureInfo.InvariantCulture),
+                Label = previousValue != 0 ? item.EnabledText : item.DisabledText,
+                CreatedAtUtc = DateTime.UtcNow
+            }, targetEnabled ? "1" : "0");
+
+            InvalidatePowerRuntimeCache();
+            var result = RunPowerCfg("/hibernate", targetEnabled ? "on" : "off");
+            if (!result.Success)
+            {
+                if (backupSaved)
+                    RemoveBackup(item.SettingId);
+
+                return PerformanceTuningResult.Fail($"Windows не изменила режим гибернации: {BuildCommandError(result)}");
+            }
+
+            InvalidatePowerRuntimeCache();
+            var verify = ReadRegistryDword(Registry.LocalMachine, PowerControlPath, HibernateEnabledValueName);
+            if (((verify.Exists && verify.Value != 0) != targetEnabled))
+                return PerformanceTuningResult.Fail("Команда выполнена, но повторное чтение реестра не подтвердило изменение гибернации.");
+
+            string backupText = backupSaved ? " Точка отката сохранена." : " Новая точка отката не создавалась.";
+            return PerformanceTuningResult.Ok($"{item.Title}: {(targetEnabled ? item.EnabledText : item.DisabledText)}.{backupText}");
         }
 
         private PerformanceTuningResult ApplyRegistryDword(PerformanceTuningItem item)
         {
             var current = ReadRegistryDword(item.RegistryHive, item.RegistryPath, item.RegistryValueName);
-            SaveBackup(new PerformanceSettingBackupRecord
+            int targetValue = ResolveRegistryTargetValue(item);
+            bool shouldDelete = item.RegistryDeleteWhenDisabled && item.IsToggle && !item.ToggleValue;
+
+            if (shouldDelete && !current.Exists)
+                return PerformanceTuningResult.Ok($"{item.Title}: значение уже отсутствует. Изменения не требуются.");
+
+            if (!shouldDelete && current.Exists && current.Value == targetValue)
+                return PerformanceTuningResult.Ok($"{item.Title}: значение уже установлено. Изменения не требуются.");
+
+            bool backupSaved = SaveBackup(new PerformanceSettingBackupRecord
             {
                 SettingId = item.SettingId,
                 Kind = nameof(PerformanceBackupKind.RegistryDword),
@@ -1617,26 +2592,36 @@ namespace TweakWise.Services
                 CreatedAtUtc = DateTime.UtcNow
             });
 
-            int targetValue = ResolveRegistryTargetValue(item);
-
             try
             {
                 using var key = item.RegistryHive.CreateSubKey(item.RegistryPath, writable: true);
                 if (key == null)
                     return PerformanceTuningResult.Fail("Не удалось открыть ветку реестра для записи.");
 
-                if (item.RegistryDeleteWhenDisabled && item.IsToggle && !item.ToggleValue)
+                if (shouldDelete)
                     key.DeleteValue(item.RegistryValueName, throwOnMissingValue: false);
                 else
                     key.SetValue(item.RegistryValueName, targetValue, RegistryValueKind.DWord);
             }
             catch (Exception ex)
             {
+                if (backupSaved)
+                    RemoveBackup(item.SettingId);
+
                 return PerformanceTuningResult.Fail($"Не удалось записать реестр: {ex.Message}");
             }
 
+            var updated = ReadRegistryDword(item.RegistryHive, item.RegistryPath, item.RegistryValueName);
+            bool applied = shouldDelete
+                ? !updated.Exists
+                : updated.Exists && updated.Value == targetValue;
+
+            if (!applied)
+                return PerformanceTuningResult.Fail("Запись выполнена, но повторное чтение реестра не подтвердило изменение.");
+
+            string backupText = backupSaved ? " Точка отката сохранена." : " Новая точка отката не создавалась.";
             return PerformanceTuningResult.Ok(
-                $"{item.Title}: применено. Бэкап сохранён.",
+                $"{item.Title}: применено.{backupText}",
                 item.RequiresRestart,
                 item.RestartReason);
         }
@@ -1648,25 +2633,44 @@ namespace TweakWise.Services
                 return PerformanceTuningResult.Fail($"Не удалось сохранить состояние MMAgent: {BuildCommandError(read)}");
 
             bool oldValue = read.Output.IndexOf("True", StringComparison.OrdinalIgnoreCase) >= 0;
-            SaveBackup(new PerformanceSettingBackupRecord
+            bool targetValue = item.ToggleValue;
+
+            if (oldValue == targetValue)
+                return PerformanceTuningResult.Ok($"{item.Title}: значение уже установлено. Изменения не требуются.");
+
+            bool backupSaved = SaveBackup(new PerformanceSettingBackupRecord
             {
                 SettingId = item.SettingId,
                 Kind = nameof(PerformanceBackupKind.MemoryCompression),
                 Value = oldValue ? "true" : "false",
                 Label = oldValue ? "включено" : "отключено",
                 CreatedAtUtc = DateTime.UtcNow
-            });
+            }, targetValue ? "true" : "false");
 
-            string command = item.ToggleValue
+            string command = targetValue
                 ? "Enable-MMAgent -MemoryCompression"
                 : "Disable-MMAgent -MemoryCompression";
 
             var result = RunPowerShell(command);
             if (!result.Success)
-                return PerformanceTuningResult.Fail($"MMAgent не применил изменение: {BuildCommandError(result)}");
+            {
+                if (backupSaved)
+                    RemoveBackup(item.SettingId);
 
+                return PerformanceTuningResult.Fail($"MMAgent не применил изменение: {BuildCommandError(result)}");
+            }
+
+            var verify = RunPowerShell("try { [bool]((Get-MMAgent).MemoryCompression) } catch { Write-Error $_.Exception.Message; exit 1 }");
+            if (verify.Success)
+            {
+                bool verifiedValue = verify.Output.IndexOf("True", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (verifiedValue != targetValue)
+                    return PerformanceTuningResult.Fail("Команда выполнена, но повторная проверка MMAgent не подтвердила изменение.");
+            }
+
+            string backupText = backupSaved ? " Точка отката сохранена." : " Новая точка отката не создавалась.";
             return PerformanceTuningResult.Ok(
-                "Сжатие памяти изменено. Перезагрузка рекомендуется.",
+                $"Сжатие памяти изменено. Перезагрузка рекомендуется.{backupText}",
                 requiresRestart: true,
                 restartReason: item.RestartReason);
         }
@@ -1678,18 +2682,36 @@ namespace TweakWise.Services
             if (!result.Success)
                 return PerformanceTuningResult.Fail($"Не удалось вернуть схему питания: {BuildCommandError(result)}");
 
+            InvalidatePowerRuntimeCache();
             return PerformanceTuningResult.Ok($"Схема питания возвращена: «{backup.Label}».");
         }
 
         private PerformanceTuningResult RollbackPowerAcSetting(PerformanceSettingBackupRecord backup)
         {
+            bool useDc = string.Equals(backup.Kind, nameof(PerformanceBackupKind.PowerDcSetting), StringComparison.OrdinalIgnoreCase);
             InvalidatePowerRuntimeCache();
-            var result = RunPowerCfg("/setacvalueindex", "SCHEME_CURRENT", backup.SubgroupAlias, backup.SettingAlias, backup.Value);
+            var result = RunPowerCfg(useDc ? "/setdcvalueindex" : "/setacvalueindex", "SCHEME_CURRENT", backup.SubgroupAlias, backup.SettingAlias, backup.Value);
             if (!result.Success)
                 return PerformanceTuningResult.Fail($"Не удалось вернуть powercfg: {BuildCommandError(result)}");
 
-            RunPowerCfg("/setactive", "SCHEME_CURRENT");
-            return PerformanceTuningResult.Ok($"Параметр возвращён к значению «{backup.Label}».");
+            var commitResult = RunPowerCfg("/setactive", "SCHEME_CURRENT");
+            if (!commitResult.Success)
+                return PerformanceTuningResult.Fail($"Значение возвращено, но Windows не активировала обновлённую схему: {BuildCommandError(commitResult)}");
+
+            InvalidatePowerRuntimeCache();
+            string modeText = useDc ? "от батареи" : "от сети";
+            return PerformanceTuningResult.Ok($"Параметр {modeText} возвращён к значению «{backup.Label}».");
+        }
+
+        private PerformanceTuningResult RollbackPowerHibernation(PerformanceSettingBackupRecord backup)
+        {
+            bool enable = string.Equals(backup.Value, "1", StringComparison.OrdinalIgnoreCase);
+            InvalidatePowerRuntimeCache();
+            var result = RunPowerCfg("/hibernate", enable ? "on" : "off");
+            if (!result.Success)
+                return PerformanceTuningResult.Fail($"Не удалось вернуть режим гибернации: {BuildCommandError(result)}");
+
+            return PerformanceTuningResult.Ok($"Гибернация возвращена: {(enable ? "включена" : "отключена")}.");
         }
 
         private PerformanceTuningResult RollbackRegistryDword(PerformanceSettingBackupRecord backup)
@@ -1774,7 +2796,222 @@ namespace TweakWise.Services
                 _powerSettingCache.Clear();
                 _powerPlansCache = null;
                 _activePowerPlanCache = null;
+                _discoveredPowerSettingsCache = null;
             }
+        }
+
+        private IReadOnlyList<DiscoveredPowerSetting> GetDiscoveredPowerSettings()
+        {
+            lock (_runtimeCacheSync)
+            {
+                if (_discoveredPowerSettingsCache != null && DateTime.UtcNow - _discoveredPowerSettingsCacheUtc <= RuntimeCacheLifetime)
+                    return _discoveredPowerSettingsCache;
+            }
+
+            string scheme = GetCurrentPowerSchemeArgument();
+            var result = RunPowerCfg("/qh", scheme);
+            if (!result.Success)
+                result = RunPowerCfg("/query", scheme);
+
+            if (!result.Success || string.IsNullOrWhiteSpace(result.Output))
+                return Array.Empty<DiscoveredPowerSetting>();
+
+            var settings = new List<DiscoveredPowerSetting>();
+            string currentSubgroupGuid = string.Empty;
+            string currentSubgroupName = string.Empty;
+            DiscoveredPowerSetting current = null;
+            long? pendingOptionIndex = null;
+
+            foreach (string rawLine in SplitLines(result.Output))
+            {
+                string line = rawLine.Trim();
+                if (IsPowerSubgroupLine(line))
+                {
+                    currentSubgroupGuid = ExtractFirstGuid(line);
+                    currentSubgroupName = ExtractNameFromParentheses(line);
+                    current = null;
+                    pendingOptionIndex = null;
+                    continue;
+                }
+
+                if (IsPowerSettingLine(line))
+                {
+                    string settingGuid = ExtractFirstGuid(line);
+                    if (string.IsNullOrWhiteSpace(settingGuid))
+                        continue;
+
+                    current = new DiscoveredPowerSetting
+                    {
+                        SubgroupGuid = currentSubgroupGuid,
+                        SubgroupName = currentSubgroupName,
+                        SettingGuid = settingGuid,
+                        SettingName = ExtractNameFromParentheses(line)
+                    };
+                    settings.Add(current);
+                    pendingOptionIndex = null;
+                    continue;
+                }
+
+                if (current == null)
+                    continue;
+
+                if (IsMinimumLine(line) && TryReadHexValue(line, out long minimum))
+                {
+                    current.Minimum = minimum;
+                    continue;
+                }
+
+                if (IsMaximumLine(line) && TryReadHexValue(line, out long maximum))
+                {
+                    current.Maximum = maximum;
+                    continue;
+                }
+
+                if (IsIncrementLine(line) && TryReadHexValue(line, out long increment))
+                {
+                    current.Increment = increment;
+                    continue;
+                }
+
+                if (IsPossibleSettingIndexLine(line) && TryReadHexValue(line, out long optionIndex))
+                {
+                    pendingOptionIndex = optionIndex;
+                    continue;
+                }
+
+                if (IsPossibleSettingNameLine(line) && pendingOptionIndex.HasValue)
+                {
+                    string label = ExtractValueAfterColon(line);
+                    if (!string.IsNullOrWhiteSpace(label))
+                    {
+                        current.Options.Add(new PerformanceTuningOption(
+                            label.Trim(),
+                            pendingOptionIndex.Value.ToString(CultureInfo.InvariantCulture),
+                            "Значение из powercfg"));
+                    }
+
+                    pendingOptionIndex = null;
+                    continue;
+                }
+
+                if (IsCurrentAcLine(line) && TryReadHexValue(line, out long currentAc))
+                {
+                    current.CurrentAcIndex = currentAc;
+                    continue;
+                }
+
+                if (IsCurrentDcLine(line) && TryReadHexValue(line, out long currentDc))
+                {
+                    current.CurrentDcIndex = currentDc;
+                    continue;
+                }
+            }
+
+            lock (_runtimeCacheSync)
+            {
+                _discoveredPowerSettingsCache = settings;
+                _discoveredPowerSettingsCacheUtc = DateTime.UtcNow;
+            }
+
+            return settings;
+        }
+
+        private static bool IsPowerSubgroupLine(string line)
+        {
+            return line.IndexOf("Subgroup GUID", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("GUID подгруппы", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("Подгруппа GUID", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsPowerSettingLine(string line)
+        {
+            return line.IndexOf("Power Setting GUID", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("GUID настройки питания", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("Настройка питания GUID", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsMinimumLine(string line)
+        {
+            return line.IndexOf("Minimum", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("Миним", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsMaximumLine(string line)
+        {
+            return line.IndexOf("Maximum", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("Максим", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsIncrementLine(string line)
+        {
+            return line.IndexOf("Increment", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("Шаг", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("Приращ", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsPossibleSettingIndexLine(string line)
+        {
+            return line.IndexOf("Possible Setting Index", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("Индекс возмож", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("Возможное значение индекса", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsPossibleSettingNameLine(string line)
+        {
+            return line.IndexOf("Possible Setting Friendly Name", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("Friendly Name", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("Понятное имя", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("Название возмож", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsCurrentAcLine(string line)
+        {
+            return (line.IndexOf("Current", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    line.IndexOf("AC Power", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                   (line.IndexOf("AC", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    line.IndexOf("Index", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    line.IndexOf("Possible", StringComparison.OrdinalIgnoreCase) < 0) ||
+                   line.IndexOf("от сети", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("переменного тока", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsCurrentDcLine(string line)
+        {
+            return (line.IndexOf("Current", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    line.IndexOf("DC Power", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                   (line.IndexOf("DC", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    line.IndexOf("Index", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    line.IndexOf("Possible", StringComparison.OrdinalIgnoreCase) < 0) ||
+                   line.IndexOf("от батареи", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("от аккумулятора", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   line.IndexOf("постоянного тока", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string ExtractFirstGuid(string line)
+        {
+            var match = GuidRegex.Match(line ?? string.Empty);
+            return match.Success ? match.Value : string.Empty;
+        }
+
+        private static string NormalizeGuid(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
+        }
+
+        private static string ExtractValueAfterColon(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                return string.Empty;
+
+            int index = line.IndexOf(':');
+            return index >= 0 && index + 1 < line.Length
+                ? line[(index + 1)..].Trim()
+                : line.Trim();
+        }
+
+        private string GetCurrentPowerSchemeArgument()
+        {
+            return GetActivePowerPlan()?.Guid ?? "SCHEME_CURRENT";
         }
 
         private IReadOnlyList<PowerPlanInfo> GetPowerPlans()
@@ -1854,17 +3091,41 @@ namespace TweakWise.Services
                 }
             }
 
-            var result = RunPowerCfg("/query", "SCHEME_CURRENT", subgroupAlias, settingAlias);
+            string scheme = GetCurrentPowerSchemeArgument();
+            var result = RunPowerCfg("/query", scheme, subgroupAlias, settingAlias);
             if (!result.Success || !ContainsSettingOutput(result.Output, settingAlias))
-                result = RunPowerCfg("/qh", "SCHEME_CURRENT", subgroupAlias, settingAlias);
+                result = RunPowerCfg("/qh", scheme, subgroupAlias, settingAlias);
 
             if (!result.Success)
+            {
+                var discoveredFallback = QueryPowerSettingFromDiscovered(subgroupAlias, settingAlias);
+                if (discoveredFallback.Success)
+                {
+                    lock (_runtimeCacheSync)
+                        _powerSettingCache[cacheKey] = new PowerSettingCacheEntry(discoveredFallback, DateTime.UtcNow);
+
+                    return discoveredFallback.Clone();
+                }
+
                 return PowerSettingQueryResult.Fail(result.Error);
+            }
 
             if (!ContainsSettingOutput(result.Output, settingAlias))
+            {
+                var discoveredFallback = QueryPowerSettingFromDiscovered(subgroupAlias, settingAlias);
+                if (discoveredFallback.Success)
+                {
+                    lock (_runtimeCacheSync)
+                        _powerSettingCache[cacheKey] = new PowerSettingCacheEntry(discoveredFallback, DateTime.UtcNow);
+
+                    return discoveredFallback.Clone();
+                }
+
                 return PowerSettingQueryResult.Fail("Параметр не найден в текущей схеме.");
+            }
 
             TryReadPowerSettingCurrentAcIndex(result.Output, out long currentAc);
+            TryReadPowerSettingCurrentDcIndex(result.Output, out long currentDc);
             TryReadPowerSettingBound(result.Output, true, out long minimum);
             TryReadPowerSettingBound(result.Output, false, out long maximum);
 
@@ -1872,14 +3133,62 @@ namespace TweakWise.Services
             {
                 Success = true,
                 CurrentAcIndex = currentAc >= 0 ? currentAc : null,
+                CurrentDcIndex = currentDc >= 0 ? currentDc : null,
                 Minimum = minimum >= 0 ? minimum : null,
                 Maximum = maximum >= 0 ? maximum : null
             };
+
+            if (!query.CurrentAcIndex.HasValue && !query.CurrentDcIndex.HasValue)
+            {
+                var discoveredFallback = QueryPowerSettingFromDiscovered(subgroupAlias, settingAlias);
+                if (discoveredFallback.Success)
+                    query = discoveredFallback;
+            }
 
             lock (_runtimeCacheSync)
                 _powerSettingCache[cacheKey] = new PowerSettingCacheEntry(query, DateTime.UtcNow);
 
             return query.Clone();
+        }
+
+        private PowerSettingQueryResult QueryPowerSettingFromDiscovered(string subgroupAlias, string settingAlias)
+        {
+            string subgroup = NormalizePowerSubgroupIdentifier(subgroupAlias);
+            string setting = NormalizeGuid(settingAlias);
+
+            var discovered = GetDiscoveredPowerSettings()
+                .FirstOrDefault(candidate =>
+                    string.Equals(NormalizeGuid(candidate.SubgroupGuid), subgroup, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(NormalizeGuid(candidate.SettingGuid), setting, StringComparison.OrdinalIgnoreCase));
+
+            if (discovered == null)
+                return PowerSettingQueryResult.Fail("Параметр не найден в полном списке powercfg /qh.");
+
+            return new PowerSettingQueryResult
+            {
+                Success = true,
+                CurrentAcIndex = discovered.CurrentAcIndex,
+                CurrentDcIndex = discovered.CurrentDcIndex,
+                Minimum = discovered.Minimum,
+                Maximum = discovered.Maximum
+            };
+        }
+
+        private static string NormalizePowerSubgroupIdentifier(string value)
+        {
+            string normalized = NormalizeGuid(value);
+            return normalized switch
+            {
+                "sub_video" => SubVideoGuid,
+                "sub_sleep" => SubSleepGuid,
+                "sub_usb" => SubUsbGuid,
+                "sub_pciexpress" => SubPciExpressGuid,
+                "sub_buttons" => SubButtonsGuid,
+                "sub_battery" => SubBatteryGuid,
+                "sub_wifi" => SubWirelessGuid,
+                "sub_energysaver" => SubEnergySaverGuid,
+                _ => normalized
+            };
         }
 
         private static bool ContainsSettingOutput(string output, string alias)
@@ -1897,10 +3206,22 @@ namespace TweakWise.Services
             value = -1;
             foreach (string line in SplitLines(output))
             {
-                bool isAcLine = line.IndexOf("от сети", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                line.IndexOf("AC Power", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (!IsCurrentAcLine(line))
+                    continue;
 
-                if (!isAcLine)
+                if (TryReadHexValue(line, out value))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryReadPowerSettingCurrentDcIndex(string output, out long value)
+        {
+            value = -1;
+            foreach (string line in SplitLines(output))
+            {
+                if (!IsCurrentDcLine(line))
                     continue;
 
                 if (TryReadHexValue(line, out value))
@@ -1934,12 +3255,19 @@ namespace TweakWise.Services
         private static bool TryReadHexValue(string line, out long value)
         {
             value = -1;
-            var match = Regex.Match(line ?? string.Empty, @"0x([0-9a-fA-F]+)");
-            if (!match.Success)
-                return false;
+            string source = line ?? string.Empty;
+            var match = Regex.Match(source, @"0x([0-9a-fA-F]+)");
+            if (match.Success)
+            {
+                value = Convert.ToInt64(match.Groups[1].Value, 16);
+                return true;
+            }
 
-            value = Convert.ToInt64(match.Groups[1].Value, 16);
-            return true;
+            match = Regex.Match(source, @"(?<![A-Za-z0-9])([0-9]+)(?![A-Za-z0-9])");
+            if (match.Success && long.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out value))
+                return true;
+
+            return false;
         }
 
         private static string ExtractNameFromParentheses(string value)
@@ -1950,7 +3278,22 @@ namespace TweakWise.Services
 
         private static CommandResult RunPowerCfg(params string[] arguments)
         {
-            return RunProcess("powercfg.exe", arguments);
+            return RunProcess("powercfg.exe", arguments, GetPowerCfgEncoding());
+        }
+
+        private static Encoding GetPowerCfgEncoding()
+        {
+            try
+            {
+                uint codePage = GetOEMCP();
+                if (codePage > 0)
+                    return Encoding.GetEncoding((int)codePage);
+            }
+            catch
+            {
+            }
+
+            return Encoding.Default;
         }
 
         private static CommandResult RunPowerShell(string command)
@@ -1967,7 +3310,7 @@ namespace TweakWise.Services
                 });
         }
 
-        private static CommandResult RunProcess(string fileName, IEnumerable<string> arguments)
+        private static CommandResult RunProcess(string fileName, IEnumerable<string> arguments, Encoding outputEncoding = null)
         {
             try
             {
@@ -1979,6 +3322,12 @@ namespace TweakWise.Services
                     RedirectStandardError = true,
                     CreateNoWindow = true
                 };
+
+                if (outputEncoding != null)
+                {
+                    startInfo.StandardOutputEncoding = outputEncoding;
+                    startInfo.StandardErrorEncoding = outputEncoding;
+                }
 
                 foreach (string argument in arguments)
                     startInfo.ArgumentList.Add(argument);
@@ -2021,6 +3370,36 @@ namespace TweakWise.Services
         {
             return (value ?? string.Empty)
                 .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        private static string SummarizePowerCfgOutput(string output, int maxLines)
+        {
+            var lines = SplitLines(output)
+                .Select(line => line.Trim())
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .Take(Math.Max(1, maxLines))
+                .ToList();
+
+            return string.Join(" · ", lines);
+        }
+
+        private static bool IsEmptyPowerCfgDiagnostic(string output)
+        {
+            var significant = SplitLines(output)
+                .Select(line => line.Trim())
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .Where(line => !line.EndsWith(":", StringComparison.Ordinal))
+                .ToList();
+
+            if (significant.Count == 0)
+                return true;
+
+            return significant.All(line =>
+                line.Equals("None.", StringComparison.OrdinalIgnoreCase) ||
+                line.Equals("None", StringComparison.OrdinalIgnoreCase) ||
+                line.Equals("Нет.", StringComparison.OrdinalIgnoreCase) ||
+                line.Equals("Нет", StringComparison.OrdinalIgnoreCase) ||
+                line.Equals("Отсутствуют", StringComparison.OrdinalIgnoreCase));
         }
 
         private static string NormalizeRisk(string risk)
@@ -2193,18 +3572,34 @@ namespace TweakWise.Services
         private PerformanceSettingBackupRecord GetBackup(string settingId)
         {
             return LoadBackups()
-                .OrderByDescending(record => record.CreatedAtUtc)
+                .OrderBy(record => record.CreatedAtUtc)
                 .FirstOrDefault(record => string.Equals(record.SettingId, settingId, StringComparison.OrdinalIgnoreCase));
         }
 
-        private void SaveBackup(PerformanceSettingBackupRecord record)
+        private bool SaveBackup(PerformanceSettingBackupRecord record, string targetValue = null)
         {
-            var backups = LoadBackups()
-                .Where(item => !string.Equals(item.SettingId, record.SettingId, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            if (record == null || string.IsNullOrWhiteSpace(record.SettingId))
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(targetValue) &&
+                string.Equals(record.Value, targetValue, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var backups = LoadBackups();
+            bool alreadyHasBackup = backups.Any(item =>
+                string.Equals(item.SettingId, record.SettingId, StringComparison.OrdinalIgnoreCase));
+
+            if (alreadyHasBackup)
+            {
+                SaveBackups(backups);
+                return false;
+            }
 
             backups.Add(record);
             SaveBackups(backups);
+            return true;
         }
 
         private void RemoveBackup(string settingId)
@@ -2216,6 +3611,13 @@ namespace TweakWise.Services
             SaveBackups(backups);
         }
 
+        private void PruneBackups()
+        {
+            var backups = LoadBackups();
+            if (backups.Count > 0)
+                SaveBackups(backups);
+        }
+
         private List<PerformanceSettingBackupRecord> LoadBackups()
         {
             try
@@ -2224,7 +3626,8 @@ namespace TweakWise.Services
                     return new List<PerformanceSettingBackupRecord>();
 
                 string json = File.ReadAllText(_backupPath);
-                return JsonSerializer.Deserialize<List<PerformanceSettingBackupRecord>>(json) ?? new List<PerformanceSettingBackupRecord>();
+                var backups = JsonSerializer.Deserialize<List<PerformanceSettingBackupRecord>>(json);
+                return CompactBackups(backups).ToList();
             }
             catch
             {
@@ -2240,7 +3643,8 @@ namespace TweakWise.Services
                 if (!Directory.Exists(dir))
                     Directory.CreateDirectory(dir);
 
-                string json = JsonSerializer.Serialize(backups, new JsonSerializerOptions { WriteIndented = true });
+                var compactBackups = CompactBackups(backups);
+                string json = JsonSerializer.Serialize(compactBackups, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(_backupPath, json);
             }
             catch
@@ -2248,8 +3652,39 @@ namespace TweakWise.Services
             }
         }
 
+        private IReadOnlyList<PerformanceSettingBackupRecord> CompactBackups(IReadOnlyList<PerformanceSettingBackupRecord> backups)
+        {
+            DateTime cutoffUtc = DateTime.UtcNow - TimeSpan.FromDays(GetBackupRetentionDays());
+
+            return (backups ?? Array.Empty<PerformanceSettingBackupRecord>())
+                .Where(record => record != null && !string.IsNullOrWhiteSpace(record.SettingId))
+                .Where(record => record.CreatedAtUtc >= cutoffUtc)
+                .GroupBy(record => record.SettingId, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.OrderBy(record => record.CreatedAtUtc).First())
+                .OrderByDescending(record => record.CreatedAtUtc)
+                .Take(MaxBackupRecords)
+                .OrderBy(record => record.CreatedAtUtc)
+                .ToList();
+        }
+
+        private int GetBackupRetentionDays()
+        {
+            return Math.Clamp(_settingsManager?.CurrentSettings?.PerformanceBackupRetentionDays ?? 30, 1, 30);
+        }
+
+        private static string GetBackupPath()
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "TweakWise",
+                BackupFileName);
+        }
+
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern bool GlobalMemoryStatusEx([In, Out] MemoryStatusEx buffer);
+
+        [DllImport("kernel32.dll")]
+        private static extern uint GetOEMCP();
 
         private sealed class CommandResult
         {
@@ -2272,6 +3707,23 @@ namespace TweakWise.Services
             }
         }
 
+        private sealed class DiscoveredPowerSetting
+        {
+            public string SubgroupGuid { get; set; } = string.Empty;
+            public string SubgroupName { get; set; } = string.Empty;
+            public string SettingGuid { get; set; } = string.Empty;
+            public string SettingName { get; set; } = string.Empty;
+            public long? Minimum { get; set; }
+            public long? Maximum { get; set; }
+            public long? Increment { get; set; }
+            public long? CurrentAcIndex { get; set; }
+            public long? CurrentDcIndex { get; set; }
+            public List<PerformanceTuningOption> Options { get; } = new List<PerformanceTuningOption>();
+
+            public string DisplaySubgroupName => string.IsNullOrWhiteSpace(SubgroupName) ? "Powercfg" : SubgroupName.Trim();
+            public string DisplaySettingName => string.IsNullOrWhiteSpace(SettingName) ? SettingGuid : SettingName.Trim();
+        }
+
         private sealed class PowerPlanInfo
         {
             public PowerPlanInfo(string guid, string name, bool isActive)
@@ -2291,6 +3743,7 @@ namespace TweakWise.Services
             public bool Success { get; set; }
             public string Error { get; set; } = string.Empty;
             public long? CurrentAcIndex { get; set; }
+            public long? CurrentDcIndex { get; set; }
             public long? Minimum { get; set; }
             public long? Maximum { get; set; }
 
@@ -2301,6 +3754,7 @@ namespace TweakWise.Services
                     Success = Success,
                     Error = Error,
                     CurrentAcIndex = CurrentAcIndex,
+                    CurrentDcIndex = CurrentDcIndex,
                     Minimum = Minimum,
                     Maximum = Maximum
                 };
@@ -2340,6 +3794,14 @@ namespace TweakWise.Services
             public int Value { get; }
         }
 
+        private sealed class RequestedPerformanceValue
+        {
+            public string SelectedOptionValue { get; set; }
+            public string SelectedOptionLabel { get; set; }
+            public bool ToggleValue { get; set; }
+            public double NumericValue { get; set; }
+        }
+
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
         private sealed class MemoryStatusEx
         {
@@ -2366,6 +3828,8 @@ namespace TweakWise.Services
         private bool _canRollback;
         private bool _isSupported = true;
         private bool _isPriority;
+        private bool _statusIsWarning;
+        private bool _requiresElevationWarning;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -2378,6 +3842,7 @@ namespace TweakWise.Services
         public string SearchKeywords { get; set; } = string.Empty;
         public string Recommendation { get; set; } = string.Empty;
         public string RiskLabel { get; set; } = string.Empty;
+        public string SignalId { get; set; } = string.Empty;
         public string ApplyButtonText { get; set; } = "Применить";
         public string SensorGroup { get; set; } = string.Empty;
         public string ReadOnlyKind { get; set; } = string.Empty;
@@ -2402,8 +3867,24 @@ namespace TweakWise.Services
         public double Maximum { get; set; }
         public double NumericStep { get; set; } = 1;
         public bool RequiresElevation { get; set; }
+        public bool RequiresElevationWarning
+        {
+            get => _requiresElevationWarning;
+            set
+            {
+                if (_requiresElevationWarning == value)
+                    return;
+
+                _requiresElevationWarning = value;
+                OnPropertyChanged(nameof(RequiresElevationWarning));
+            }
+        }
         public bool RequiresRestart { get; set; }
         public bool ShowApplyAction { get; set; }
+        public bool ShowSliderShortcuts { get; set; }
+        public double QuickEnableValue { get; set; } = 1;
+        public string QuickEnableText { get; set; } = "Включить";
+        public string QuickDisableText { get; set; } = "Отключить";
         public PerformanceSettingControlKind ControlKind { get; set; }
         public ObservableCollection<PerformanceTuningOption> Options { get; } = new ObservableCollection<PerformanceTuningOption>();
 
@@ -2477,6 +3958,23 @@ namespace TweakWise.Services
                 _statusMessage = value ?? string.Empty;
                 OnPropertyChanged(nameof(StatusMessage));
                 OnPropertyChanged(nameof(HasStatusMessage));
+                OnPropertyChanged(nameof(HasActiveSignal));
+                OnPropertyChanged(nameof(SignalActionText));
+            }
+        }
+
+        public bool StatusIsWarning
+        {
+            get => _statusIsWarning;
+            set
+            {
+                if (_statusIsWarning == value)
+                    return;
+
+                _statusIsWarning = value;
+                OnPropertyChanged(nameof(StatusIsWarning));
+                OnPropertyChanged(nameof(HasActiveSignal));
+                OnPropertyChanged(nameof(SignalActionText));
             }
         }
 
@@ -2529,19 +4027,25 @@ namespace TweakWise.Services
 
                 _isPriority = value;
                 OnPropertyChanged(nameof(IsPriority));
+                OnPropertyChanged(nameof(HasActiveSignal));
+                OnPropertyChanged(nameof(SignalActionText));
             }
         }
 
         public bool IsToggle => ControlKind == PerformanceSettingControlKind.Toggle;
         public bool IsCombo => ControlKind == PerformanceSettingControlKind.Combo;
         public bool IsSlider => ControlKind == PerformanceSettingControlKind.Slider;
+        public bool HasSliderShortcuts => IsSlider && ShowSliderShortcuts;
         public bool HasCurrentValue => !string.IsNullOrWhiteSpace(CurrentValue);
         public bool HasRecommendation => !string.IsNullOrWhiteSpace(Recommendation);
         public bool HasRisk => !string.IsNullOrWhiteSpace(RiskLabel);
         public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
+        public bool HasActiveSignal => IsPriority || (StatusIsWarning && HasStatusMessage);
+        public string SignalActionText => "Игнорировать";
 
         public void SetStatus(string message, bool isWarning)
         {
+            StatusIsWarning = !string.IsNullOrWhiteSpace(message) && isWarning;
             StatusMessage = message ?? string.Empty;
         }
 
@@ -2627,6 +4131,8 @@ namespace TweakWise.Services
     {
         PowerScheme,
         PowerAcSetting,
+        PowerDcSetting,
+        PowerHibernation,
         RegistryDword,
         MemoryCompression
     }

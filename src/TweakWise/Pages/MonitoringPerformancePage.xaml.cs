@@ -6,11 +6,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using TweakWise.Managers;
 using TweakWise.Models;
 using TweakWise.Services;
 using Application = System.Windows.Application;
@@ -25,22 +27,26 @@ namespace TweakWise.Pages
         private HardwareTemperatureService _temperatureService;
         private PerformanceTuningService _performanceTuningService;
         private readonly DispatcherTimer _diagnosticsTimer = new DispatcherTimer();
+        private readonly DispatcherTimer _searchDebounceTimer = new DispatcherTimer();
         private readonly Dictionary<string, BoardNode> _nodes;
         private readonly Dictionary<string, Border> _zones = new Dictionary<string, Border>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, FrameworkElement> _glows = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Line> _routes = new Dictionary<string, Line>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _animatedNodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, PerformanceSettingsCacheEntry> _settingsItemsCache = new Dictionary<string, PerformanceSettingsCacheEntry>(StringComparer.OrdinalIgnoreCase);
         private readonly SemaphoreSlim _settingsLoadGate = new SemaphoreSlim(1, 1);
         private readonly object _temperatureSync = new object();
-        private static readonly TimeSpan SettingsItemsCacheLifetime = TimeSpan.FromSeconds(40);
         private CancellationTokenSource _settingsLoadCts;
         private int _settingsLoadVersion;
         private IReadOnlyList<PerformanceTuningItem> _currentPerformanceItems = Array.Empty<PerformanceTuningItem>();
         private string _pendingSearchTargetSettingId = string.Empty;
+        private string _pendingSearchTargetSectionTitle = string.Empty;
+        private WindowsPoint _nodeDetailsOrbStartPoint;
+        private WindowsPoint _nodeDetailsOrbTargetPoint;
+        private string _nodeDetailsOrbSourceNodeKey = "Cpu";
         private List<BoardFinding> _findings = new List<BoardFinding>();
         private string _selectedNodeKey = "Cpu";
         private string _hoverNodeKey = string.Empty;
+        private PerformanceSignalFilter _performanceSignalFilter = PerformanceSignalFilter.All;
         private bool _isDetailsOpen;
         private bool _isInitialized;
         private bool _isPageActive;
@@ -53,6 +59,12 @@ namespace TweakWise.Pages
             _nodes = BuildNodes();
             _diagnosticsTimer.Interval = TimeSpan.FromSeconds(12);
             _diagnosticsTimer.Tick += (sender, args) => RefreshDiagnostics();
+            _searchDebounceTimer.Interval = TimeSpan.FromMilliseconds(170);
+            _searchDebounceTimer.Tick += (sender, args) =>
+            {
+                _searchDebounceTimer.Stop();
+                ApplyPerformanceSearchFilter();
+            };
 
             InitializeMaps();
             _performanceTuningService = new PerformanceTuningService(App.SettingsManager, ReadCurrentTemperatures);
@@ -60,6 +72,12 @@ namespace TweakWise.Pages
             SelectNode(_selectedNodeKey, openDetails: false);
             UpdateModuleStatus();
         }
+
+        private Border DetailsScrimElement => FindName("DetailsScrim") as Border;
+        private System.Windows.Controls.Button NodeDetailsOrbButtonElement => FindName("NodeDetailsOrbButton") as System.Windows.Controls.Button;
+        private ScaleTransform NodeDetailsOrbScaleElement => FindName("NodeDetailsOrbScale") as ScaleTransform;
+        private TranslateTransform NodeDetailsOrbTranslateElement => FindName("NodeDetailsOrbTranslate") as TranslateTransform;
+        private ScaleTransform NodeDetailsScaleElement => FindName("NodeDetailsScale") as ScaleTransform;
 
         private void InitializeMaps()
         {
@@ -168,11 +186,50 @@ namespace TweakWise.Pages
 
             if (e.Key == Key.BrowserBack || e.Key == Key.Back)
             {
+                if (e.Key == Key.Back && IsTextInputFocused())
+                    return;
+
                 if (Application.Current.MainWindow is MainWindow mainWindow)
                     mainWindow.NavigateToCoreHome();
 
                 e.Handled = true;
             }
+        }
+
+        private static bool IsTextInputFocused()
+        {
+            var focused = Keyboard.FocusedElement as DependencyObject;
+            while (focused != null)
+            {
+                if (focused is System.Windows.Controls.Primitives.TextBoxBase ||
+                    focused is System.Windows.Controls.PasswordBox ||
+                    focused is System.Windows.Controls.ComboBox)
+                    return true;
+
+                focused = GetFocusableParent(focused);
+            }
+
+            return false;
+        }
+
+        private static DependencyObject GetFocusableParent(DependencyObject element)
+        {
+            try
+            {
+                var visualParent = VisualTreeHelper.GetParent(element);
+                if (visualParent != null)
+                    return visualParent;
+            }
+            catch
+            {
+            }
+
+            return element switch
+            {
+                FrameworkElement frameworkElement => frameworkElement.Parent,
+                FrameworkContentElement contentElement => contentElement.Parent,
+                _ => null
+            };
         }
 
         private void HealthService_HealthStatusChanged(object sender, EventArgs e)
@@ -184,6 +241,71 @@ namespace TweakWise.Pages
         {
             if (Application.Current.MainWindow is MainWindow mainWindow)
                 mainWindow.NavigateToCoreHome();
+        }
+
+        private void NodeDetailsOrbButton_Click(object sender, RoutedEventArgs e)
+        {
+            HideNodeDetails();
+            e.Handled = true;
+        }
+
+        private async void IgnoreBoardFinding_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+
+            if (sender is not System.Windows.Controls.Button button || button.Tag is not string id || string.IsNullOrWhiteSpace(id))
+                return;
+
+            var finding = _findings.FirstOrDefault(item => string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase));
+            if (finding == null)
+                return;
+
+            bool applied = await HealthSignalActionHelper.PromptAndApplyAsync(
+                Window.GetWindow(this),
+                new[] { finding.Id },
+                finding.Title,
+                finding.Level == HealthLevel.Attention || finding.Level == HealthLevel.Warning || finding.Level == HealthLevel.Critical);
+
+            if (applied)
+                RefreshDiagnostics();
+        }
+
+        private async void IgnorePerformanceSettingSignal_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+
+            if (sender is not System.Windows.Controls.Button button ||
+                button.DataContext is not PerformanceTuningItem item)
+            {
+                return;
+            }
+
+            EnsurePerformanceSettingSignalId(item);
+            bool hasProblem = item.StatusIsWarning && item.HasStatusMessage;
+            bool applied = await HealthSignalActionHelper.PromptAndApplyAsync(
+                Window.GetWindow(this),
+                new[] { item.SignalId },
+                item.Title,
+                hasProblem);
+
+            if (!applied)
+                return;
+
+            item.IsPriority = false;
+            if (hasProblem)
+                item.SetStatus(string.Empty, isWarning: false);
+
+            ApplyPerformanceSearchFilter();
+        }
+
+        private void PerformanceSignalFilter_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not ToggleButton button)
+                return;
+
+            _performanceSignalFilter = ParsePerformanceSignalFilter(button.Tag?.ToString());
+            UpdatePerformanceSignalFilterButtons();
+            ApplyPerformanceSearchFilter();
         }
 
         private void Component_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
@@ -239,13 +361,43 @@ namespace TweakWise.Pages
             var result = await RunPerformanceOperationAsync(
                 item,
                 operationItem => _performanceTuningService?.Apply(operationItem),
-                "Сначала проверяю риск и сохраняю бэкап...");
+                "Проверяю риск и применяю изменение...");
 
             if (result == null)
                 return;
 
             if (result.Success)
-                InvalidatePerformanceSettingsCache(_selectedNodeKey);
+                ReloadPerformanceSettingsAfterOperation();
+
+            if (result.RequiresRestart && App.ComputerHealthService != null)
+                _ = App.ComputerHealthService.RefreshStatusAsync();
+        }
+
+        private async void ApplyPowerSliderShortcut_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryGetPerformanceItem(sender, out var item))
+                return;
+
+            if (sender is FrameworkElement element &&
+                string.Equals(element.Tag?.ToString(), "On", StringComparison.OrdinalIgnoreCase))
+            {
+                item.NumericValue = item.QuickEnableValue;
+            }
+            else
+            {
+                item.NumericValue = 0;
+            }
+
+            var result = await RunPerformanceOperationAsync(
+                item,
+                operationItem => _performanceTuningService?.Apply(operationItem),
+                "Применяю быстрый переключатель...");
+
+            if (result == null)
+                return;
+
+            if (result.Success)
+                ReloadPerformanceSettingsAfterOperation();
 
             if (result.RequiresRestart && App.ComputerHealthService != null)
                 _ = App.ComputerHealthService.RefreshStatusAsync();
@@ -265,10 +417,24 @@ namespace TweakWise.Pages
                 return;
 
             if (result.Success)
-                InvalidatePerformanceSettingsCache(_selectedNodeKey);
+                ReloadPerformanceSettingsAfterOperation();
 
             if (result.RequiresRestart && App.ComputerHealthService != null)
                 _ = App.ComputerHealthService.RefreshStatusAsync();
+        }
+
+        private async void ClearPerformanceBackup_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryGetPerformanceItem(sender, out var item))
+                return;
+
+            var result = await RunPerformanceOperationAsync(
+                item,
+                operationItem => _performanceTuningService?.ClearBackup(operationItem),
+                "Удаляю точку отката...");
+
+            if (result?.Success == true)
+                ReloadPerformanceSettingsAfterOperation();
         }
 
         private void PerformanceSettingCard_Loaded(object sender, RoutedEventArgs e)
@@ -303,22 +469,82 @@ namespace TweakWise.Pages
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     element.BringIntoView();
-                    if (element is Border border)
-                    {
-                        border.BeginAnimation(
-                            Border.OpacityProperty,
-                            new DoubleAnimation(0.72, 1, TimeSpan.FromMilliseconds(520))
-                            {
-                                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-                            });
-                    }
+                    PlaySearchResultHighlight(element);
                 }), DispatcherPriority.Background);
             }
         }
 
+        private void PerformanceSection_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement element ||
+                element.DataContext is not PerformanceSettingSectionViewModel section ||
+                string.IsNullOrWhiteSpace(_pendingSearchTargetSectionTitle) ||
+                !string.Equals(section.Title, _pendingSearchTargetSectionTitle, StringComparison.CurrentCultureIgnoreCase))
+            {
+                return;
+            }
+
+            _pendingSearchTargetSectionTitle = string.Empty;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                element.BringIntoView();
+                PlaySearchResultHighlight(element);
+            }), DispatcherPriority.Background);
+        }
+
+        private void PerformanceSearchTextBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            QueueSearchCaretAtStart();
+        }
+
+        private void PerformanceSearchTextBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (PerformanceSearchTextBox == null ||
+                !string.IsNullOrEmpty(PerformanceSearchTextBox.Text))
+            {
+                return;
+            }
+
+            e.Handled = true;
+            if (!PerformanceSearchTextBox.IsKeyboardFocusWithin)
+                PerformanceSearchTextBox.Focus();
+
+            QueueSearchCaretAtStart();
+        }
+
+        private void PerformanceSearchTextBox_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (PerformanceSearchTextBox == null ||
+                !string.IsNullOrEmpty(PerformanceSearchTextBox.Text))
+            {
+                return;
+            }
+
+            e.Handled = true;
+            QueueSearchCaretAtStart();
+        }
+
+        private void PerformanceSearchTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter ||
+                PerformanceSearchSuggestionsItemsControl?.ItemsSource is not IEnumerable<PerformanceSearchSuggestion> suggestions)
+            {
+                return;
+            }
+
+            var suggestion = suggestions.FirstOrDefault();
+            if (suggestion == null)
+                return;
+
+            ApplyPerformanceSearchSuggestion(suggestion);
+            e.Handled = true;
+        }
+
         private void PerformanceSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            ApplyPerformanceSearchFilter();
+            UpdatePerformanceSearchChrome();
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
         }
 
         private void PerformanceSearchClearButton_Click(object sender, RoutedEventArgs e)
@@ -328,6 +554,9 @@ namespace TweakWise.Pages
 
             PerformanceSearchTextBox.Text = string.Empty;
             PerformanceSearchTextBox.Focus();
+            PerformanceSearchTextBox.CaretIndex = 0;
+            _searchDebounceTimer.Stop();
+            ApplyPerformanceSearchFilter();
         }
 
         private void PerformanceSearchSuggestion_Click(object sender, RoutedEventArgs e)
@@ -338,11 +567,116 @@ namespace TweakWise.Pages
                 return;
             }
 
-            _pendingSearchTargetSettingId = suggestion.SettingId;
-            if (PerformanceSearchTextBox != null)
-                PerformanceSearchTextBox.Text = suggestion.Title;
+            ApplyPerformanceSearchSuggestion(suggestion);
+        }
 
+        private void ApplyPerformanceSearchSuggestion(PerformanceSearchSuggestion suggestion)
+        {
+            if (suggestion == null)
+                return;
+
+            _pendingSearchTargetSettingId = suggestion.IsSection ? string.Empty : suggestion.SettingId;
+            _pendingSearchTargetSectionTitle = suggestion.IsSection ? suggestion.SectionTitle : string.Empty;
+
+            if (PerformanceSearchSuggestionsItemsControl != null)
+                PerformanceSearchSuggestionsItemsControl.Visibility = Visibility.Collapsed;
+
+            if (PerformanceSearchTextBox != null)
+            {
+                PerformanceSearchTextBox.Text = suggestion.Title;
+                PerformanceSearchTextBox.CaretIndex = 0;
+            }
+
+            _searchDebounceTimer.Stop();
             ApplyPerformanceSearchFilter();
+
+            if (PerformanceSearchSuggestionsItemsControl != null)
+                PerformanceSearchSuggestionsItemsControl.Visibility = Visibility.Collapsed;
+        }
+
+        private void PlaceSearchCaretAtStartWhenEmpty()
+        {
+            if (PerformanceSearchTextBox == null ||
+                !string.IsNullOrEmpty(PerformanceSearchTextBox.Text))
+            {
+                return;
+            }
+
+            PerformanceSearchTextBox.CaretIndex = 0;
+            PerformanceSearchTextBox.Select(0, 0);
+            PerformanceSearchTextBox.ScrollToHorizontalOffset(0);
+        }
+
+        private void UpdatePerformanceSearchChrome()
+        {
+            if (PerformanceSearchTextBox == null)
+                return;
+
+            bool hasQuery = !string.IsNullOrWhiteSpace(PerformanceSearchTextBox.Text);
+
+            if (PerformanceSearchPlaceholderTextBlock != null)
+                PerformanceSearchPlaceholderTextBlock.Visibility = hasQuery ? Visibility.Collapsed : Visibility.Visible;
+
+            if (PerformanceSearchClearButton != null)
+                PerformanceSearchClearButton.Visibility = hasQuery ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void QueueSearchCaretAtStart()
+        {
+            Dispatcher.BeginInvoke(new Action(PlaceSearchCaretAtStartWhenEmpty), DispatcherPriority.Input);
+        }
+
+        private static void PlaySearchResultHighlight(FrameworkElement element)
+        {
+            if (element == null)
+                return;
+
+            var overlay = FindTaggedChild<Border>(element, "SearchHighlightOverlay");
+            var target = overlay ?? element;
+
+            target.Opacity = 0;
+            target.BeginAnimation(
+                UIElement.OpacityProperty,
+                new DoubleAnimationUsingKeyFrames
+                {
+                    KeyFrames =
+                    {
+                        new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)),
+                        new EasingDoubleKeyFrame(0.74, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(180)))
+                        {
+                            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                        },
+                        new EasingDoubleKeyFrame(0.18, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(760)))
+                        {
+                            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+                        },
+                        new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1250)))
+                        {
+                            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
+                        }
+                    }
+                });
+        }
+
+        private static T FindTaggedChild<T>(DependencyObject root, object tag)
+            where T : FrameworkElement
+        {
+            if (root == null)
+                return null;
+
+            int count = VisualTreeHelper.GetChildrenCount(root);
+            for (int index = 0; index < count; index++)
+            {
+                var child = VisualTreeHelper.GetChild(root, index);
+                if (child is T typed && Equals(typed.Tag, tag))
+                    return typed;
+
+                var nested = FindTaggedChild<T>(child, tag);
+                if (nested != null)
+                    return nested;
+            }
+
+            return null;
         }
 
         private static bool TryGetPerformanceItem(object sender, out PerformanceTuningItem item)
@@ -409,6 +743,7 @@ namespace TweakWise.Pages
                 SearchKeywords = source.SearchKeywords,
                 Recommendation = source.Recommendation,
                 RiskLabel = source.RiskLabel,
+                SignalId = source.SignalId,
                 ApplyButtonText = source.ApplyButtonText,
                 SensorGroup = source.SensorGroup,
                 ReadOnlyKind = source.ReadOnlyKind,
@@ -433,11 +768,17 @@ namespace TweakWise.Pages
                 Maximum = source.Maximum,
                 NumericStep = source.NumericStep,
                 RequiresElevation = source.RequiresElevation,
+                RequiresElevationWarning = source.RequiresElevationWarning,
                 RequiresRestart = source.RequiresRestart,
                 ShowApplyAction = source.ShowApplyAction,
+                ShowSliderShortcuts = source.ShowSliderShortcuts,
+                QuickEnableValue = source.QuickEnableValue,
+                QuickEnableText = source.QuickEnableText,
+                QuickDisableText = source.QuickDisableText,
                 ControlKind = source.ControlKind,
                 CurrentValue = source.CurrentValue,
                 StatusMessage = source.StatusMessage,
+                StatusIsWarning = source.StatusIsWarning,
                 CanApply = source.CanApply,
                 CanRollback = source.CanRollback,
                 IsSupported = source.IsSupported,
@@ -462,6 +803,7 @@ namespace TweakWise.Pages
         {
             target.Recommendation = source.Recommendation;
             target.RiskLabel = source.RiskLabel;
+            target.SignalId = source.SignalId;
             target.ApplyButtonText = source.ApplyButtonText;
             target.SectionTitle = source.SectionTitle;
             target.SectionDescription = source.SectionDescription;
@@ -470,14 +812,20 @@ namespace TweakWise.Pages
             target.Maximum = source.Maximum;
             target.NumericStep = source.NumericStep;
             target.RequiresElevation = source.RequiresElevation;
+            target.RequiresElevationWarning = source.RequiresElevationWarning;
             target.RequiresRestart = source.RequiresRestart;
             target.ShowApplyAction = source.ShowApplyAction;
+            target.ShowSliderShortcuts = source.ShowSliderShortcuts;
+            target.QuickEnableValue = source.QuickEnableValue;
+            target.QuickEnableText = source.QuickEnableText;
+            target.QuickDisableText = source.QuickDisableText;
             target.IsSupported = source.IsSupported;
             target.IsPriority = source.IsPriority;
             target.ToggleValue = source.ToggleValue;
             target.NumericValue = source.NumericValue;
             target.CurrentValue = source.CurrentValue;
             target.StatusMessage = source.StatusMessage;
+            target.StatusIsWarning = source.StatusIsWarning;
             target.CanRollback = source.CanRollback;
 
             string selectedValue = source.SelectedOption?.Value;
@@ -500,6 +848,9 @@ namespace TweakWise.Pages
             if (!_nodes.TryGetValue(key, out var node))
                 return;
 
+            if (openDetails || _isDetailsOpen)
+                _nodeDetailsOrbSourceNodeKey = key;
+
             _selectedNodeKey = key;
 
             if (SelectedTitleTextBlock != null)
@@ -509,35 +860,101 @@ namespace TweakWise.Pages
                 SelectedDescriptionTextBlock.Text = node.Description;
 
             UpdateSelectedFindings();
-            if (openDetails || _isDetailsOpen)
-                BeginPerformanceSettingsLoad();
             UpdateHighlights();
 
             if (openDetails)
+            {
                 ShowNodeDetails();
+                BeginPerformanceSettingsLoad(forceRefresh: true);
+            }
+            else if (_isDetailsOpen)
+            {
+                UnloadPerformanceSettingsView(clearSearch: true);
+                BeginPerformanceSettingsLoad(forceRefresh: true);
+            }
         }
 
         private void ShowNodeDetails()
         {
             _isDetailsOpen = true;
+            ResetNodeDetailsPanelAnimations();
+            UnloadPerformanceSettingsView(clearSearch: true);
 
             if (NodeDetailsLayer.Visibility != Visibility.Visible)
             {
                 NodeDetailsLayer.Visibility = Visibility.Visible;
-                NodeDetailsLayer.Opacity = 0;
             }
 
-            NodeDetailsTranslate.X = 44;
-            AnimateOpacity(NodeDetailsLayer, 1, 210);
+            NodeDetailsLayer.Opacity = 1;
+            var detailsScrim = DetailsScrimElement;
+            if (detailsScrim != null)
+            {
+                detailsScrim.Opacity = 0;
+                AnimateOpacity(detailsScrim, 0.80, 210);
+            }
+
+            if (NodeDetailsPanel != null)
+                NodeDetailsPanel.Opacity = 0;
+
+            var detailsScale = NodeDetailsScaleElement;
+            if (detailsScale != null)
+            {
+                detailsScale.ScaleX = 0.985;
+                detailsScale.ScaleY = 0.985;
+            }
+
+            NodeDetailsTranslate.X = 0;
+            NodeDetailsTranslate.Y = 12;
             NodeDetailsTranslate.BeginAnimation(
-                TranslateTransform.XProperty,
+                TranslateTransform.YProperty,
                 new DoubleAnimation(0, TimeSpan.FromMilliseconds(240))
                 {
+                    BeginTime = TimeSpan.FromMilliseconds(160),
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 });
 
+            detailsScale = NodeDetailsScaleElement;
+            if (detailsScale != null)
+            {
+                var scale = new DoubleAnimation(1, TimeSpan.FromMilliseconds(260))
+                {
+                    BeginTime = TimeSpan.FromMilliseconds(160),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                detailsScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
+                detailsScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale.Clone());
+            }
+
+            NodeDetailsPanel?.BeginAnimation(
+                UIElement.OpacityProperty,
+                new DoubleAnimation(1, TimeSpan.FromMilliseconds(250))
+                {
+                    BeginTime = TimeSpan.FromMilliseconds(170),
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                });
+
+            PlayNodeDetailsOrbOpenAnimation(_selectedNodeKey);
             StopRouteAnimations();
             UpdateHighlights();
+        }
+
+        private void ResetNodeDetailsPanelAnimations()
+        {
+            DetailsScrimElement?.BeginAnimation(UIElement.OpacityProperty, null);
+            NodeDetailsPanel?.BeginAnimation(UIElement.OpacityProperty, null);
+
+            if (NodeDetailsTranslate != null)
+            {
+                NodeDetailsTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+                NodeDetailsTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+            }
+
+            var detailsScale = NodeDetailsScaleElement;
+            if (detailsScale == null)
+                return;
+
+            detailsScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            detailsScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
         }
 
         private void HideNodeDetails()
@@ -546,25 +963,40 @@ namespace TweakWise.Pages
                 return;
 
             _isDetailsOpen = false;
+            CancelPerformanceSettingsLoad();
+            UnloadPerformanceSettingsView(clearSearch: true);
 
-            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(170))
+            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(260))
             {
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
             };
 
-            fade.Completed += (sender, args) =>
-            {
-                if (!_isDetailsOpen)
-                    NodeDetailsLayer.Visibility = Visibility.Collapsed;
-            };
-
-            NodeDetailsLayer.BeginAnimation(UIElement.OpacityProperty, fade);
+            DetailsScrimElement?.BeginAnimation(UIElement.OpacityProperty, fade);
+            NodeDetailsPanel?.BeginAnimation(
+                UIElement.OpacityProperty,
+                new DoubleAnimation(0, TimeSpan.FromMilliseconds(170))
+                {
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
+                });
             NodeDetailsTranslate.BeginAnimation(
-                TranslateTransform.XProperty,
-                new DoubleAnimation(44, TimeSpan.FromMilliseconds(170))
+                TranslateTransform.YProperty,
+                new DoubleAnimation(12, TimeSpan.FromMilliseconds(170))
                 {
                     EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
                 });
+
+            var detailsScale = NodeDetailsScaleElement;
+            if (detailsScale != null)
+            {
+                var scale = new DoubleAnimation(0.985, TimeSpan.FromMilliseconds(170))
+                {
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                };
+                detailsScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
+                detailsScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale.Clone());
+            }
+
+            PlayNodeDetailsOrbCloseAnimation();
 
             StopRouteAnimations();
             UpdateHighlights();
@@ -621,7 +1053,9 @@ namespace TweakWise.Pages
             AddTemperatureFindings(findings);
             AddPowerFindings(findings);
             AddRamFindings(findings);
-            return findings;
+            return findings
+                .Where(finding => !App.SettingsManager.IsHealthSignalSuppressed(finding.Id))
+                .ToList();
         }
 
         private void AddTemperatureFindings(List<BoardFinding> findings)
@@ -643,6 +1077,7 @@ namespace TweakWise.Pages
             {
                 findings.Add(new BoardFinding
                 {
+                    Id = "resources.cooling.high-temperature",
                     NodeKey = "Cooling",
                     Level = HealthLevel.Warning,
                     Title = "Система сильно нагревается",
@@ -653,6 +1088,7 @@ namespace TweakWise.Pages
             {
                 findings.Add(new BoardFinding
                 {
+                    Id = "resources.cooling.elevated-temperature",
                     NodeKey = "Cooling",
                     Level = HealthLevel.Normal,
                     Title = "Охлаждение близко к высокой нагрузке",
@@ -679,6 +1115,7 @@ namespace TweakWise.Pages
 
             findings.Add(new BoardFinding
             {
+                Id = $"resources.{group.ToLowerInvariant()}.temperature",
                 NodeKey = group,
                 Level = hottest.ValueCelsius >= warningThreshold ? HealthLevel.Warning : HealthLevel.Normal,
                 Title = title,
@@ -696,6 +1133,7 @@ namespace TweakWise.Pages
 
                 findings.Add(new BoardFinding
                 {
+                    Id = "resources.power.on-battery",
                     NodeKey = "Power",
                     Level = HealthLevel.Normal,
                     Title = "Питание от батареи",
@@ -719,6 +1157,7 @@ namespace TweakWise.Pages
                 {
                     findings.Add(new BoardFinding
                     {
+                        Id = "resources.ram.high-load",
                         NodeKey = "Ram",
                         Level = HealthLevel.Warning,
                         Title = "Оперативная память почти заполнена",
@@ -729,6 +1168,7 @@ namespace TweakWise.Pages
                 {
                     findings.Add(new BoardFinding
                     {
+                        Id = "resources.ram.elevated-load",
                         NodeKey = "Ram",
                         Level = HealthLevel.Normal,
                         Title = "Оперативная память сильно загружена",
@@ -825,9 +1265,20 @@ namespace TweakWise.Pages
                 TextWrapping = TextWrapping.Wrap
             };
 
+            var ignoreButton = new System.Windows.Controls.Button
+            {
+                Content = "Игнорировать",
+                Tag = finding.Id,
+                Margin = new Thickness(0, 10, 0, 0),
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+                Style = FindResource("PerformanceActionButtonStyle") as Style
+            };
+            ignoreButton.Click += IgnoreBoardFinding_Click;
+
             panel.Children.Add(header);
             panel.Children.Add(title);
             panel.Children.Add(description);
+            panel.Children.Add(ignoreButton);
             card.Child = panel;
 
             Canvas.SetLeft(card, layout.Card.X);
@@ -947,18 +1398,16 @@ namespace TweakWise.Pages
             string nodeKey = _selectedNodeKey;
             int loadVersion = ResetPerformanceSettingsLoad();
 
-            if (!forceRefresh && TryApplyCachedPerformanceSettings(nodeKey))
-            {
-                CancelPerformanceSettingsLoad();
-                return;
-            }
-
             SetPerformanceSettingsLoading(true);
 
             var token = _settingsLoadCts.Token;
-            await _settingsLoadGate.WaitAsync();
+            bool gateEntered = false;
             try
             {
+                await Dispatcher.Yield(DispatcherPriority.Background);
+                await _settingsLoadGate.WaitAsync(token);
+                gateEntered = true;
+
                 if (token.IsCancellationRequested)
                     return;
 
@@ -970,7 +1419,6 @@ namespace TweakWise.Pages
                     return;
                 }
 
-                _settingsItemsCache[nodeKey] = new PerformanceSettingsCacheEntry(items, DateTime.UtcNow);
                 ApplyPerformanceSettingsItems(items);
             }
             catch (OperationCanceledException)
@@ -983,7 +1431,8 @@ namespace TweakWise.Pages
             }
             finally
             {
-                _settingsLoadGate.Release();
+                if (gateEntered)
+                    _settingsLoadGate.Release();
 
                 if (loadVersion == _settingsLoadVersion)
                     SetPerformanceSettingsLoading(false);
@@ -1016,27 +1465,57 @@ namespace TweakWise.Pages
             _settingsLoadCts = null;
         }
 
-        private bool TryApplyCachedPerformanceSettings(string nodeKey)
-        {
-            if (!_settingsItemsCache.TryGetValue(nodeKey, out var entry))
-                return false;
-
-            if (DateTime.UtcNow - entry.CreatedAtUtc > SettingsItemsCacheLifetime)
-            {
-                _settingsItemsCache.Remove(nodeKey);
-                return false;
-            }
-
-            ApplyPerformanceSettingsItems(entry.Items);
-            SetPerformanceSettingsLoading(false);
-            return true;
-        }
-
         private void ApplyPerformanceSettingsItems(IReadOnlyList<PerformanceTuningItem> items)
         {
             PerformanceSettingsEmptyText.Text = "Для этого узла пока нет доступных действий.";
-            _currentPerformanceItems = items ?? Array.Empty<PerformanceTuningItem>();
+            var preparedItems = (items ?? Array.Empty<PerformanceTuningItem>()).ToList();
+            foreach (var item in preparedItems)
+                ApplyPerformanceSettingSignalSuppression(item);
+
+            _currentPerformanceItems = preparedItems;
+            if (preparedItems.Any(item => item.HasActiveSignal))
+                _ = App.ComputerHealthService?.RefreshStatusAsync();
+
             ApplyPerformanceSearchFilter();
+        }
+
+        private static void ApplyPerformanceSettingSignalSuppression(PerformanceTuningItem item)
+        {
+            if (item == null)
+                return;
+
+            EnsurePerformanceSettingSignalId(item);
+            if (!App.SettingsManager.IsHealthSignalSuppressed(item.SignalId))
+                return;
+
+            item.IsPriority = false;
+            if (item.StatusIsWarning)
+                item.SetStatus(string.Empty, isWarning: false);
+        }
+
+        private static void EnsurePerformanceSettingSignalId(PerformanceTuningItem item)
+        {
+            if (item == null || !string.IsNullOrWhiteSpace(item.SignalId))
+                return;
+
+            string source = !string.IsNullOrWhiteSpace(item.SettingId)
+                ? item.SettingId
+                : item.Title;
+            item.SignalId = $"performance.setting.{NormalizeSignalFragment(source)}";
+        }
+
+        private static string NormalizeSignalFragment(string value)
+        {
+            string normalized = new string((value ?? string.Empty)
+                .ToLowerInvariant()
+                .Select(ch => char.IsLetterOrDigit(ch) ? ch : '-')
+                .ToArray())
+                .Trim('-');
+
+            while (normalized.Contains("--", StringComparison.Ordinal))
+                normalized = normalized.Replace("--", "-", StringComparison.Ordinal);
+
+            return string.IsNullOrWhiteSpace(normalized) ? "item" : normalized;
         }
 
         private void ShowPerformanceSettingsLoadError(string message)
@@ -1051,10 +1530,57 @@ namespace TweakWise.Pages
             PerformanceSearchSuggestionsItemsControl.Visibility = Visibility.Collapsed;
         }
 
-        private void InvalidatePerformanceSettingsCache(string nodeKey)
+        private void ReloadPerformanceSettingsAfterOperation()
         {
-            if (!string.IsNullOrWhiteSpace(nodeKey))
-                _settingsItemsCache.Remove(nodeKey);
+            if (_isDetailsOpen)
+                BeginPerformanceSettingsLoad(forceRefresh: true);
+        }
+
+        private void UnloadPerformanceSettingsView(bool clearSearch)
+        {
+            _searchDebounceTimer.Stop();
+            _currentPerformanceItems = Array.Empty<PerformanceTuningItem>();
+            _pendingSearchTargetSettingId = string.Empty;
+            _pendingSearchTargetSectionTitle = string.Empty;
+
+            if (PerformanceSettingsItemsControl != null)
+                PerformanceSettingsItemsControl.ItemsSource = null;
+
+            if (PerformanceSettingsEmptyText != null)
+                PerformanceSettingsEmptyText.Visibility = Visibility.Collapsed;
+
+            if (PerformanceSearchEmptyText != null)
+                PerformanceSearchEmptyText.Visibility = Visibility.Collapsed;
+
+            if (PerformanceSearchSuggestionsItemsControl != null)
+            {
+                PerformanceSearchSuggestionsItemsControl.ItemsSource = null;
+                PerformanceSearchSuggestionsItemsControl.Visibility = Visibility.Collapsed;
+            }
+
+            if (PerformanceSearchClearButton != null)
+                PerformanceSearchClearButton.Visibility = Visibility.Collapsed;
+
+            if (PerformanceSearchPlaceholderTextBlock != null)
+                PerformanceSearchPlaceholderTextBlock.Visibility = Visibility.Visible;
+
+            if (clearSearch && PerformanceSearchTextBox != null)
+            {
+                PerformanceSearchTextBox.Text = string.Empty;
+                PerformanceSearchTextBox.CaretIndex = 0;
+            }
+
+            if (PerformanceSettingsLoadingPanel != null)
+                PerformanceSettingsLoadingPanel.Visibility = Visibility.Collapsed;
+
+            if (PerformanceSettingsEmptyText != null)
+                PerformanceSettingsEmptyText.Visibility = Visibility.Collapsed;
+
+            if (PerformanceSearchEmptyText != null)
+                PerformanceSearchEmptyText.Visibility = Visibility.Collapsed;
+
+            StopLoadingSquares();
+            NodeDetailsScrollViewer?.ScrollToTop();
         }
 
         private void SetPerformanceSettingsLoading(bool isLoading)
@@ -1101,17 +1627,61 @@ namespace TweakWise.Pages
             var filtered = hasQuery
                 ? items.Where(item => MatchesPerformanceSearch(item, query)).ToList()
                 : items.ToList();
+            filtered = ApplyPerformanceSignalFilter(filtered, _performanceSignalFilter)
+                .OrderByDescending(GetPerformanceSignalSortScore)
+                .ThenBy(item => item.Order)
+                .ToList();
 
             PerformanceSettingsItemsControl.ItemsSource = BuildPerformanceSections(filtered);
 
             bool noItems = items.Count == 0;
             bool noSearchResults = !noItems && filtered.Count == 0 && hasQuery;
+            bool noFilterResults = !noItems && filtered.Count == 0 && !hasQuery && _performanceSignalFilter != PerformanceSignalFilter.All;
             PerformanceSettingsEmptyText.Visibility = noItems ? Visibility.Visible : Visibility.Collapsed;
 
             if (PerformanceSearchEmptyText != null)
-                PerformanceSearchEmptyText.Visibility = noSearchResults ? Visibility.Visible : Visibility.Collapsed;
+            {
+                PerformanceSearchEmptyText.Text = noFilterResults
+                    ? "В текущем узле нет сигналов выбранного типа."
+                    : "По этому запросу в текущем узле ничего не найдено.";
+                PerformanceSearchEmptyText.Visibility = noSearchResults || noFilterResults ? Visibility.Visible : Visibility.Collapsed;
+            }
 
             UpdatePerformanceSearchSuggestions(items, query);
+        }
+
+        private static IEnumerable<PerformanceTuningItem> ApplyPerformanceSignalFilter(
+            IEnumerable<PerformanceTuningItem> items,
+            PerformanceSignalFilter filter)
+        {
+            return filter switch
+            {
+                PerformanceSignalFilter.Recommendations => items.Where(item => GetPerformanceSignalLevel(item) == HealthLevel.Normal),
+                PerformanceSignalFilter.Problems => items.Where(item => GetPerformanceSignalLevel(item) == HealthLevel.Warning),
+                PerformanceSignalFilter.Critical => items.Where(item => GetPerformanceSignalLevel(item) == HealthLevel.Critical),
+                _ => items
+            };
+        }
+
+        private static PerformanceSignalFilter ParsePerformanceSignalFilter(string value)
+        {
+            return Enum.TryParse(value, ignoreCase: true, out PerformanceSignalFilter filter)
+                ? filter
+                : PerformanceSignalFilter.All;
+        }
+
+        private void UpdatePerformanceSignalFilterButtons()
+        {
+            SetFilterButtonState(PerformanceFilterAllButton, PerformanceSignalFilter.All);
+            SetFilterButtonState(PerformanceFilterRecommendationsButton, PerformanceSignalFilter.Recommendations);
+            SetFilterButtonState(PerformanceFilterProblemsButton, PerformanceSignalFilter.Problems);
+            SetFilterButtonState(PerformanceFilterCriticalButton, PerformanceSignalFilter.Critical);
+        }
+
+        private void SetFilterButtonState(ToggleButton button, PerformanceSignalFilter filter)
+        {
+            if (button != null)
+                button.IsChecked = _performanceSignalFilter == filter;
         }
 
         private void UpdatePerformanceSearchSuggestions(IReadOnlyList<PerformanceTuningItem> items, string query)
@@ -1126,15 +1696,33 @@ namespace TweakWise.Pages
                 return;
             }
 
-            var suggestions = items
+            var sectionSuggestions = BuildPerformanceSections(items)
+                .Where(section => MatchesPerformanceSectionSearch(section, query))
+                .Take(3)
+                .Select(section => new PerformanceSearchSuggestion
+                {
+                    IsSection = true,
+                    Title = section.Title,
+                    SectionTitle = section.Title,
+                    Caption = "Раздел узла"
+                });
+
+            var itemSuggestions = items
                 .Where(item => MatchesPerformanceSearch(item, query))
                 .Take(5)
                 .Select(item => new PerformanceSearchSuggestion
                 {
                     SettingId = item.SettingId,
                     Title = item.Title,
-                    SectionTitle = string.IsNullOrWhiteSpace(item.SectionTitle) ? "Параметры" : item.SectionTitle
-                })
+                    SectionTitle = string.IsNullOrWhiteSpace(item.SectionTitle) ? "Параметры" : item.SectionTitle,
+                    Caption = $"Параметр: {(string.IsNullOrWhiteSpace(item.SectionTitle) ? "Параметры" : item.SectionTitle)}"
+                });
+
+            var suggestions = sectionSuggestions
+                .Concat(itemSuggestions)
+                .GroupBy(suggestion => $"{suggestion.IsSection}|{suggestion.Title}|{suggestion.SectionTitle}", StringComparer.CurrentCultureIgnoreCase)
+                .Select(group => group.First())
+                .Take(6)
                 .ToList();
 
             PerformanceSearchSuggestionsItemsControl.ItemsSource = suggestions;
@@ -1150,7 +1738,10 @@ namespace TweakWise.Pages
                 .GroupBy(item => string.IsNullOrWhiteSpace(item.SectionTitle) ? "Параметры" : item.SectionTitle)
                 .Select(group =>
                 {
-                    var groupItems = group.OrderByDescending(item => item.IsPriority).ThenBy(item => item.Order).ToList();
+                    var groupItems = group
+                        .OrderByDescending(GetPerformanceSignalSortScore)
+                        .ThenBy(item => item.Order)
+                        .ToList();
                     string description = groupItems
                         .Select(item => item.SectionDescription)
                         .FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)) ?? string.Empty;
@@ -1165,6 +1756,34 @@ namespace TweakWise.Pages
                 })
                 .OrderBy(section => section.FirstOrder)
                 .ToList();
+        }
+
+        private static HealthLevel GetPerformanceSignalLevel(PerformanceTuningItem item)
+        {
+            if (item == null)
+                return HealthLevel.Good;
+
+            if (item.StatusIsWarning && item.HasStatusMessage)
+            {
+                string text = $"{item.StatusMessage} {item.Title}";
+                return text.IndexOf("крит", StringComparison.CurrentCultureIgnoreCase) >= 0
+                    ? HealthLevel.Critical
+                    : HealthLevel.Warning;
+            }
+
+            return item.IsPriority ? HealthLevel.Normal : HealthLevel.Good;
+        }
+
+        private static int GetPerformanceSignalSortScore(PerformanceTuningItem item)
+        {
+            return GetPerformanceSignalLevel(item) switch
+            {
+                HealthLevel.Critical => 4,
+                HealthLevel.Warning => 3,
+                HealthLevel.Attention => 2,
+                HealthLevel.Normal => 1,
+                _ => 0
+            };
         }
 
         private static bool MatchesPerformanceSearch(PerformanceTuningItem item, string query)
@@ -1187,6 +1806,15 @@ namespace TweakWise.Pages
                 string.Join(" ", item.Options.Select(option => $"{option.Label} {option.Hint}"))
             });
 
+            return source.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0;
+        }
+
+        private static bool MatchesPerformanceSectionSearch(PerformanceSettingSectionViewModel section, string query)
+        {
+            if (section == null || string.IsNullOrWhiteSpace(query))
+                return false;
+
+            string source = $"{section.Title} {section.Description}";
             return source.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0;
         }
 
@@ -1688,18 +2316,6 @@ namespace TweakWise.Pages
             public string Description { get; set; } = string.Empty;
         }
 
-        private sealed class PerformanceSettingsCacheEntry
-        {
-            public PerformanceSettingsCacheEntry(IReadOnlyList<PerformanceTuningItem> items, DateTime createdAtUtc)
-            {
-                Items = items ?? Array.Empty<PerformanceTuningItem>();
-                CreatedAtUtc = createdAtUtc;
-            }
-
-            public IReadOnlyList<PerformanceTuningItem> Items { get; }
-            public DateTime CreatedAtUtc { get; }
-        }
-
         private sealed class PerformanceSettingSectionViewModel
         {
             public string Title { get; set; } = string.Empty;
@@ -1710,13 +2326,24 @@ namespace TweakWise.Pages
 
         private sealed class PerformanceSearchSuggestion
         {
+            public bool IsSection { get; set; }
             public string SettingId { get; set; } = string.Empty;
             public string Title { get; set; } = string.Empty;
             public string SectionTitle { get; set; } = string.Empty;
+            public string Caption { get; set; } = string.Empty;
+        }
+
+        private enum PerformanceSignalFilter
+        {
+            All,
+            Recommendations,
+            Problems,
+            Critical
         }
 
         private sealed class BoardFinding
         {
+            public string Id { get; set; } = string.Empty;
             public string NodeKey { get; set; } = string.Empty;
             public HealthLevel Level { get; set; } = HealthLevel.Normal;
             public string Title { get; set; } = string.Empty;

@@ -18,6 +18,7 @@ namespace TweakWise.Models
         public bool StartMinimizedToTray { get; set; } = false;
         public bool FirstRunCompleted { get; set; } = false;
         public bool PendingRestart { get; set; } = false;
+        public int PerformanceBackupRetentionDays { get; set; } = 30;
         public System.DateTime? PendingRestartMarkedAtUtc { get; set; }
         public string PendingRestartReason { get; set; } = string.Empty;
         public string LastHealthLevel { get; set; } = "Unknown";
@@ -28,6 +29,7 @@ namespace TweakWise.Models
         public string LastNotifiedUpdateVersion { get; set; } = string.Empty;
         public string LastNotifiedReleaseCommit { get; set; } = string.Empty;
         public List<NotificationData> Notifications { get; set; } = new List<NotificationData>();
+        public List<HealthSignalSuppression> HealthSignalSuppressions { get; set; } = new List<HealthSignalSuppression>();
     }
 
     public class NotificationData
@@ -36,5 +38,13 @@ namespace TweakWise.Models
         public string Message { get; set; }
         public bool IsRead { get; set; }
         public bool HasAction { get; set; }
+    }
+
+    public class HealthSignalSuppression
+    {
+        public string SignalId { get; set; } = string.Empty;
+        public bool IsPermanent { get; set; }
+        public System.DateTime? SuppressedUntilUtc { get; set; }
+        public System.DateTime CreatedAtUtc { get; set; } = System.DateTime.UtcNow;
     }
 }

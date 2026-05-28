@@ -8,6 +8,7 @@ using TweakWise.Managers;
 using TweakWise.Models;
 using TweakWise.Pages;
 using TweakWise.Search;
+using TweakWise.Services;
 using Application = System.Windows.Application;
 using Button = System.Windows.Controls.Button;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
@@ -36,7 +37,13 @@ namespace TweakWise
             App.NotificationManager.UnreadCountChanged += UpdateBadge;
             App.NotificationManager.Notifications.CollectionChanged += Notifications_CollectionChanged;
 
-            SettingsButton.Checked += (s, e) => SettingsPopup.IsOpen = true;
+            SettingsButton.Checked += (s, e) =>
+            {
+                if (ClearPerformanceBackupsButton != null)
+                    ClearPerformanceBackupsButton.Content = "Удалить все бэкапы";
+
+                SettingsPopup.IsOpen = true;
+            };
             SettingsButton.Unchecked += (s, e) => SettingsPopup.IsOpen = false;
 
             NotificationsButton.Checked += (s, e) => NotificationsPopup.IsOpen = true;
@@ -150,13 +157,24 @@ namespace TweakWise
         private void LoadSavedSettings()
         {
             _settingsLoaded = false;
+            EnsureBackupRetentionItems();
             RunOnStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.RunOnStartup;
             AutoCheckUpdatesCheckBox.IsChecked = _settingsManager.CurrentSettings.AutoCheckUpdates;
             ShowNotificationsCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowNotifications;
             ShowTrayTemperatureCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowTrayTemperature;
             MinimizeToTrayOnCloseCheckBox.IsChecked = _settingsManager.CurrentSettings.MinimizeToTrayOnClose;
             StartMinimizedToTrayCheckBox.IsChecked = _settingsManager.CurrentSettings.StartMinimizedToTray;
+            BackupRetentionComboBox.SelectedItem = Math.Clamp(_settingsManager.CurrentSettings.PerformanceBackupRetentionDays, 1, 30);
             _settingsLoaded = true;
+        }
+
+        private void EnsureBackupRetentionItems()
+        {
+            if (BackupRetentionComboBox == null || BackupRetentionComboBox.Items.Count > 0)
+                return;
+
+            for (int day = 1; day <= 30; day++)
+                BackupRetentionComboBox.Items.Add(day);
         }
 
         private void UpdateBadge()
@@ -267,6 +285,23 @@ namespace TweakWise
                 MinimizeToTrayOnCloseCheckBox.IsChecked == true,
                 StartMinimizedToTrayCheckBox.IsChecked == true);
             ApplyTrayPreferences();
+        }
+
+        private void BackupRetentionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!_settingsLoaded || BackupRetentionComboBox.SelectedItem is not int days)
+                return;
+
+            _settingsManager.CurrentSettings.PerformanceBackupRetentionDays = Math.Clamp(days, 1, 30);
+            _settingsManager.SaveSettings();
+        }
+
+        private void ClearPerformanceBackupsButton_Click(object sender, RoutedEventArgs e)
+        {
+            int deleted = PerformanceTuningService.DeleteAllBackups();
+            ClearPerformanceBackupsButton.Content = deleted > 0
+                ? $"Удалено: {deleted}"
+                : "Бэкапов нет";
         }
 
         private async void CheckUpdatesButton_Click(object sender, RoutedEventArgs e)

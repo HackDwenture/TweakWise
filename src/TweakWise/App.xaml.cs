@@ -28,7 +28,7 @@ namespace TweakWise
             UpdateManager = new UpdateManager();
             DialogManager = new DialogManager();
             ComputerHealthService = new ComputerHealthService(SettingsManager);
-            TweakCatalogProvider = new MockTweakCatalogProvider();
+            TweakCatalogProvider = new SeedTweakCatalogProvider();
             GlobalSearchService = new GlobalSearchService(TweakCatalogProvider);
             var rollbackService = new RegistryRollbackService();
             var stateReader = new RegistryTweakStateReader();

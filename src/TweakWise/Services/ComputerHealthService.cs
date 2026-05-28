@@ -1,12 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using Microsoft.Win32;
 using TweakWise.Managers;
 using TweakWise.Models;
+using Application = System.Windows.Application;
 using WinForms = System.Windows.Forms;
 
 namespace TweakWise.Services
@@ -15,6 +20,7 @@ namespace TweakWise.Services
     {
         private readonly SettingsManager _settingsManager;
         private readonly List<CoreModuleDefinition> _modules;
+        private HashSet<string> _lastProblemFindingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private ComputerHealthStatus _overallStatus;
 
         public ComputerHealthService(SettingsManager settingsManager)
@@ -47,6 +53,16 @@ namespace TweakWise.Services
             return module == null ? null : CloneModule(module);
         }
 
+        public void SnoozeFindings(IEnumerable<string> findingIds, TimeSpan duration)
+        {
+            _settingsManager.SnoozeHealthSignals(findingIds, duration);
+        }
+
+        public void DismissFindings(IEnumerable<string> findingIds)
+        {
+            _settingsManager.DismissHealthSignals(findingIds);
+        }
+
         public async Task RefreshStatusAsync()
         {
             SetCheckingState();
@@ -62,6 +78,7 @@ namespace TweakWise.Services
             }
 
             SaveLastKnownStatus();
+            PublishProblemNotifications(result.ModuleStatuses);
             OnHealthStatusChanged();
         }
 
@@ -109,16 +126,7 @@ namespace TweakWise.Services
             CheckNetworkState(moduleStatuses, findings);
 
             MarkUntouchedModulesAsGood(moduleStatuses);
-
-            var overall = new ComputerHealthStatus
-            {
-                OverallStatus = ResolveOverallStatus(findings),
-                ProblemCount = findings.ProblemCount,
-                RecommendationCount = findings.RecommendationCount,
-                CriticalCount = findings.CriticalCount,
-                PendingRestart = findings.PendingRestart,
-                LastCheckedAt = now
-            };
+            var overall = ApplySuppressionsAndRecalculate(moduleStatuses, findings.PendingRestart, now);
 
             return new HealthCheckSnapshot(overall, moduleStatuses.Values.ToList());
         }
@@ -334,12 +342,17 @@ namespace TweakWise.Services
             {
                 performanceFindings.Add(new ModuleHealthFinding
                 {
+                    Id = "resources.power.on-battery",
+                    ModuleId = CoreModuleId.Resources,
                     Level = HealthLevel.Normal,
                     Title = "Питание от батареи",
                     Description = "Windows может ограничивать частоты и охлаждение при работе без сети.",
                     ActionText = "Для тяжёлых задач включите питание от сети или производительный профиль."
                 });
             }
+
+            AddPowerDiagnosticFindings(performanceFindings);
+            AddMemoryFindings(performanceFindings);
 
             if (performanceFindings.Count == 0)
             {
@@ -367,6 +380,44 @@ namespace TweakWise.Services
             }
         }
 
+        private static void AddPowerDiagnosticFindings(List<ModuleHealthFinding> findings)
+        {
+            var requests = RunPowerCfg("/requests");
+            if (requests.Success && !IsEmptyPowerCfgDiagnostic(requests.Output))
+            {
+                string summary = SummarizePowerCfgOutput(requests.Output, 8);
+                findings.Add(new ModuleHealthFinding
+                {
+                    Id = "performance.setting.power-active-requests",
+                    ModuleId = CoreModuleId.Resources,
+                    Level = HealthLevel.Normal,
+                    Title = "Активные запросы питания",
+                    Description = string.IsNullOrWhiteSpace(summary)
+                        ? "Обнаружены процессы, драйверы или устройства, которые сейчас блокируют сон, отключение экрана или idle-сценарии."
+                        : summary,
+                    ActionText = "Проверьте указанные процессы или драйверы в узле «Питание»."
+                });
+            }
+
+            var wakeArmed = RunPowerCfg("/devicequery", "wake_armed");
+            if (wakeArmed.Success && !string.IsNullOrWhiteSpace(wakeArmed.Output))
+            {
+                string summary = SummarizePowerCfgOutput(wakeArmed.Output, 8);
+                if (!string.IsNullOrWhiteSpace(summary) && !IsEmptyPowerCfgDiagnostic(summary))
+                {
+                    findings.Add(new ModuleHealthFinding
+                    {
+                        Id = "performance.setting.power-wake-armed-devices",
+                        ModuleId = CoreModuleId.Resources,
+                        Level = HealthLevel.Normal,
+                        Title = "Устройства могут будить ПК",
+                        Description = summary,
+                        ActionText = "Если компьютер просыпается сам, начните проверку с этих устройств в узле «Питание»."
+                    });
+                }
+            }
+        }
+
         private static void AddTemperatureFinding(
             List<ModuleHealthFinding> findings,
             IReadOnlyList<TemperatureSensorReading> readings,
@@ -387,11 +438,51 @@ namespace TweakWise.Services
 
             findings.Add(new ModuleHealthFinding
             {
+                Id = $"resources.{group.ToLowerInvariant()}.temperature",
+                ModuleId = CoreModuleId.Resources,
                 Level = hottest.ValueCelsius >= warningThreshold ? HealthLevel.Warning : HealthLevel.Normal,
                 Title = title,
                 Description = $"{description} Сейчас: {hottest.Title} {HardwareTemperatureService.FormatTemperature(hottest.ValueCelsius)}.",
                 ActionText = actionText
             });
+        }
+
+        private static void AddMemoryFindings(List<ModuleHealthFinding> findings)
+        {
+            try
+            {
+                var memory = new MemoryStatusEx();
+                if (!GlobalMemoryStatusEx(memory) || memory.ullTotalPhys == 0)
+                    return;
+
+                if (memory.dwMemoryLoad >= 90)
+                {
+                    findings.Add(new ModuleHealthFinding
+                    {
+                        Id = "resources.ram.high-load",
+                        ModuleId = CoreModuleId.Resources,
+                        Level = HealthLevel.Warning,
+                        Title = "Оперативная память почти заполнена",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. При таком уровне загрузки система может медленнее реагировать.",
+                        ActionText = "Закройте лишние тяжёлые приложения или проверьте автозагрузку перед включением производительных режимов."
+                    });
+                }
+                else if (memory.dwMemoryLoad >= 78)
+                {
+                    findings.Add(new ModuleHealthFinding
+                    {
+                        Id = "resources.ram.elevated-load",
+                        ModuleId = CoreModuleId.Resources,
+                        Level = HealthLevel.Normal,
+                        Title = "Оперативная память сильно загружена",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Это не ошибка, но запас памяти сейчас небольшой.",
+                        ActionText = "Перед играми, рендером или включением производительных профилей закройте ненужные тяжёлые приложения."
+                    });
+                }
+            }
+            catch
+            {
+            }
         }
 
         private static bool IsRunningOnBattery()
@@ -413,6 +504,51 @@ namespace TweakWise.Services
                 if (status.Status == HealthLevel.Unknown)
                     status.Status = HealthLevel.Good;
             }
+        }
+
+        private ComputerHealthStatus ApplySuppressionsAndRecalculate(
+            Dictionary<CoreModuleId, ModuleHealthStatus> moduleStatuses,
+            bool pendingRestart,
+            DateTime checkedAt)
+        {
+            int problemCount = 0;
+            int recommendationCount = 0;
+            int criticalCount = 0;
+
+            foreach (var status in moduleStatuses.Values)
+            {
+                status.Findings = status.Findings
+                    .Where(finding => finding != null &&
+                                      !string.IsNullOrWhiteSpace(finding.Id) &&
+                                      !_settingsManager.IsHealthSignalSuppressed(finding.Id))
+                    .ToList();
+
+                status.ProblemCount = status.Findings.Count(IsProblemLevel);
+                status.CriticalCount = status.Findings.Count(finding => finding.Level == HealthLevel.Critical);
+                status.RecommendationCount = status.Findings.Count - status.ProblemCount;
+                status.Status = status.Findings.Count == 0
+                    ? HealthLevel.Good
+                    : status.Findings.OrderByDescending(finding => GetSeverity(finding.Level)).First().Level;
+                status.LastCheckedAt = checkedAt;
+
+                problemCount += status.ProblemCount;
+                recommendationCount += status.RecommendationCount;
+                criticalCount += status.CriticalCount;
+            }
+
+            bool visiblePendingRestart = pendingRestart &&
+                moduleStatuses.TryGetValue(CoreModuleId.SystemParameters, out var systemStatus) &&
+                systemStatus.Findings.Any(finding => string.Equals(finding.Title, "Ожидается перезагрузка", StringComparison.OrdinalIgnoreCase));
+
+            return new ComputerHealthStatus
+            {
+                OverallStatus = ResolveOverallStatus(problemCount, recommendationCount, criticalCount),
+                ProblemCount = problemCount,
+                RecommendationCount = recommendationCount,
+                CriticalCount = criticalCount,
+                PendingRestart = visiblePendingRestart,
+                LastCheckedAt = checkedAt
+            };
         }
 
         private ComputerHealthStatus LoadLastKnownStatus()
@@ -645,15 +781,15 @@ namespace TweakWise.Services
             };
         }
 
-        private static HealthLevel ResolveOverallStatus(HealthFindingAccumulator findings)
+        private static HealthLevel ResolveOverallStatus(int problemCount, int recommendationCount, int criticalCount)
         {
-            if (findings.CriticalCount > 0)
+            if (criticalCount > 0)
                 return HealthLevel.Critical;
 
-            if (findings.ProblemCount > 0)
+            if (problemCount > 0)
                 return HealthLevel.Warning;
 
-            if (findings.RecommendationCount > 0)
+            if (recommendationCount > 0)
                 return HealthLevel.Normal;
 
             return HealthLevel.Good;
@@ -676,7 +812,203 @@ namespace TweakWise.Services
             target.RecommendationCount += recommendations;
 
             if (finding != null)
+            {
+                finding.ModuleId = target.ModuleId;
+                if (string.IsNullOrWhiteSpace(finding.Id))
+                    finding.Id = BuildGeneratedFindingId(target.ModuleId, finding);
+
                 target.Findings.Add(finding);
+            }
+        }
+
+        private static string BuildGeneratedFindingId(CoreModuleId moduleId, ModuleHealthFinding finding)
+        {
+            string title = new string((finding.Title ?? string.Empty)
+                .ToLowerInvariant()
+                .Select(ch => char.IsLetterOrDigit(ch) ? ch : '-')
+                .ToArray())
+                .Trim('-');
+
+            while (title.Contains("--", StringComparison.Ordinal))
+                title = title.Replace("--", "-", StringComparison.Ordinal);
+
+            if (string.IsNullOrWhiteSpace(title))
+                title = "signal";
+
+            return $"{moduleId}.{title}";
+        }
+
+        private static CommandResult RunPowerCfg(params string[] arguments)
+        {
+            return RunProcess("powercfg.exe", arguments, GetPowerCfgEncoding());
+        }
+
+        private static Encoding GetPowerCfgEncoding()
+        {
+            try
+            {
+                uint codePage = GetOEMCP();
+                if (codePage > 0)
+                    return Encoding.GetEncoding((int)codePage);
+            }
+            catch
+            {
+            }
+
+            return Encoding.Default;
+        }
+
+        private static CommandResult RunProcess(string fileName, IEnumerable<string> arguments, Encoding outputEncoding = null)
+        {
+            try
+            {
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                if (outputEncoding != null)
+                {
+                    startInfo.StandardOutputEncoding = outputEncoding;
+                    startInfo.StandardErrorEncoding = outputEncoding;
+                }
+
+                foreach (string argument in arguments)
+                    startInfo.ArgumentList.Add(argument);
+
+                using var process = Process.Start(startInfo);
+                if (process == null)
+                    return CommandResult.Fail("Процесс не запустился.");
+
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+
+                if (!process.WaitForExit(6000))
+                {
+                    try
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                    catch
+                    {
+                    }
+
+                    return CommandResult.Fail("Команда превысила время ожидания.", output);
+                }
+
+                return new CommandResult(process.ExitCode == 0, output, error, process.ExitCode);
+            }
+            catch (Exception ex)
+            {
+                return CommandResult.Fail(ex.Message);
+            }
+        }
+
+        private static IReadOnlyList<string> SplitLines(string value)
+        {
+            return (value ?? string.Empty)
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        private static string SummarizePowerCfgOutput(string output, int maxLines)
+        {
+            var lines = SplitLines(output)
+                .Select(line => line.Trim())
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .Take(Math.Max(1, maxLines))
+                .ToList();
+
+            return string.Join(" · ", lines);
+        }
+
+        private static bool IsEmptyPowerCfgDiagnostic(string output)
+        {
+            var significant = SplitLines(output)
+                .Select(line => line.Trim())
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .Where(line => !line.EndsWith(":", StringComparison.Ordinal))
+                .ToList();
+
+            if (significant.Count == 0)
+                return true;
+
+            return significant.All(line =>
+                line.Equals("None.", StringComparison.OrdinalIgnoreCase) ||
+                line.Equals("None", StringComparison.OrdinalIgnoreCase) ||
+                line.Equals("Нет.", StringComparison.OrdinalIgnoreCase) ||
+                line.Equals("Нет", StringComparison.OrdinalIgnoreCase) ||
+                line.Equals("Отсутствуют", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsProblemLevel(ModuleHealthFinding finding)
+        {
+            return finding?.Level == HealthLevel.Attention ||
+                   finding?.Level == HealthLevel.Warning ||
+                   finding?.Level == HealthLevel.Critical;
+        }
+
+        private void PublishProblemNotifications(IReadOnlyList<ModuleHealthStatus> moduleStatuses)
+        {
+            var problemFindings = moduleStatuses
+                .SelectMany(status => status.Findings.Select(finding => new { Status = status, Finding = finding }))
+                .Where(item => IsProblemLevel(item.Finding))
+                .ToList();
+
+            var currentIds = new HashSet<string>(
+                problemFindings.Select(item => item.Finding.Id),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var item in problemFindings)
+            {
+                if (_lastProblemFindingIds.Contains(item.Finding.Id))
+                    continue;
+
+                AddHealthNotification(item.Status.ModuleId, item.Status.Title, item.Finding);
+            }
+
+            _lastProblemFindingIds = currentIds;
+        }
+
+        private static void AddHealthNotification(CoreModuleId moduleId, string moduleTitle, ModuleHealthFinding finding)
+        {
+            if (finding == null || App.SettingsManager?.CurrentSettings.ShowNotifications != true)
+                return;
+
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher == null)
+                return;
+
+            dispatcher.BeginInvoke(new Action(() =>
+            {
+                string severityTitle = finding.Level == HealthLevel.Critical
+                    ? "Критическая проблема"
+                    : "Проблема";
+
+                string title = $"{severityTitle}: {moduleTitle}";
+                string message = string.IsNullOrWhiteSpace(finding.Description)
+                    ? finding.Title
+                    : $"{finding.Title}. {finding.Description}";
+
+                if (App.NotificationManager.Notifications.Any(notification =>
+                        string.Equals(notification.Title, title, StringComparison.Ordinal) &&
+                        string.Equals(notification.Message, message, StringComparison.Ordinal)))
+                {
+                    return;
+                }
+
+                App.NotificationManager.AddNotification(
+                    title,
+                    message,
+                    () =>
+                    {
+                        if (Application.Current?.MainWindow is MainWindow mainWindow)
+                            mainWindow.OpenModuleWorkspace(moduleId);
+                    });
+            }));
         }
 
         private static string FormatBytes(long bytes)
@@ -750,9 +1082,12 @@ namespace TweakWise.Services
                     Status = source.Status.Status,
                     ProblemCount = source.Status.ProblemCount,
                     RecommendationCount = source.Status.RecommendationCount,
+                    CriticalCount = source.Status.CriticalCount,
                     Findings = source.Status.Findings
                         .Select(finding => new ModuleHealthFinding
                         {
+                            Id = finding.Id,
+                            ModuleId = finding.ModuleId,
                             Level = finding.Level,
                             Title = finding.Title,
                             Description = finding.Description,
@@ -916,6 +1251,47 @@ namespace TweakWise.Services
             public bool SystemDriveReady { get; }
             public long? FreeBytes { get; }
             public long? TotalBytes { get; }
+        }
+
+        private readonly struct CommandResult
+        {
+            public CommandResult(bool success, string output, string error, int exitCode)
+            {
+                Success = success;
+                Output = output ?? string.Empty;
+                Error = error ?? string.Empty;
+                ExitCode = exitCode;
+            }
+
+            public bool Success { get; }
+            public string Output { get; }
+            public string Error { get; }
+            public int ExitCode { get; }
+
+            public static CommandResult Fail(string error, string output = "")
+            {
+                return new CommandResult(false, output, error, -1);
+            }
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern bool GlobalMemoryStatusEx([In, Out] MemoryStatusEx buffer);
+
+        [DllImport("kernel32.dll")]
+        private static extern uint GetOEMCP();
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private sealed class MemoryStatusEx
+        {
+            public uint dwLength = (uint)Marshal.SizeOf<MemoryStatusEx>();
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys;
+            public ulong ullAvailPhys;
+            public ulong ullTotalPageFile;
+            public ulong ullAvailPageFile;
+            public ulong ullTotalVirtual;
+            public ulong ullAvailVirtual;
+            public ulong ullAvailExtendedVirtual;
         }
     }
 }
