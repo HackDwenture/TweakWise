@@ -162,6 +162,11 @@ namespace TweakWise
             AutoCheckUpdatesCheckBox.IsChecked = _settingsManager.CurrentSettings.AutoCheckUpdates;
             ShowNotificationsCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowNotifications;
             ShowTrayTemperatureCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowTrayTemperature;
+            ShowCoreCpuTemperatureCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowCoreCpuTemperature;
+            ShowCoreGpuTemperatureCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowCoreGpuTemperature;
+            ShowCoreStorageTemperatureCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowCoreStorageTemperature;
+            ShowCoreMotherboardTemperatureCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowCoreMotherboardTemperature;
+            ShowCoreOtherTemperatureCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowCoreOtherTemperature;
             MinimizeToTrayOnCloseCheckBox.IsChecked = _settingsManager.CurrentSettings.MinimizeToTrayOnClose;
             StartMinimizedToTrayCheckBox.IsChecked = _settingsManager.CurrentSettings.StartMinimizedToTray;
             BackupRetentionComboBox.SelectedItem = Math.Clamp(_settingsManager.CurrentSettings.PerformanceBackupRetentionDays, 1, 30);
@@ -284,6 +289,14 @@ namespace TweakWise
                 ShowTrayTemperatureCheckBox.IsChecked == true,
                 MinimizeToTrayOnCloseCheckBox.IsChecked == true,
                 StartMinimizedToTrayCheckBox.IsChecked == true);
+
+            _settingsManager.UpdateCoreTemperaturePreferences(
+                ShowCoreCpuTemperatureCheckBox.IsChecked == true,
+                ShowCoreGpuTemperatureCheckBox.IsChecked == true,
+                ShowCoreStorageTemperatureCheckBox.IsChecked == true,
+                ShowCoreMotherboardTemperatureCheckBox.IsChecked == true,
+                ShowCoreOtherTemperatureCheckBox.IsChecked == true);
+
             ApplyTrayPreferences();
         }
 

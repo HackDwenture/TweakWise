@@ -209,6 +209,21 @@ namespace TweakWise.Managers
             SaveSettings();
         }
 
+        public void UpdateCoreTemperaturePreferences(
+            bool showCpu,
+            bool showGpu,
+            bool showStorage,
+            bool showMotherboard,
+            bool showOther)
+        {
+            CurrentSettings.ShowCoreCpuTemperature = showCpu;
+            CurrentSettings.ShowCoreGpuTemperature = showGpu;
+            CurrentSettings.ShowCoreStorageTemperature = showStorage;
+            CurrentSettings.ShowCoreMotherboardTemperature = showMotherboard;
+            CurrentSettings.ShowCoreOtherTemperature = showOther;
+            SaveSettings();
+        }
+
         public void MarkPendingRestart(string reason)
         {
             CurrentSettings.PendingRestart = true;

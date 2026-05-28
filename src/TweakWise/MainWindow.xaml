@@ -420,6 +420,32 @@
                                       Checked="SettingsCheckBox_Changed"
                                       Unchecked="SettingsCheckBox_Changed"/>
 
+                            <TextBlock Text="Температуры на главном экране"
+                                       Margin="0,14,0,4"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.78"/>
+                            <CheckBox x:Name="ShowCoreCpuTemperatureCheckBox"
+                                      Content="CPU"
+                                      Checked="SettingsCheckBox_Changed"
+                                      Unchecked="SettingsCheckBox_Changed"/>
+                            <CheckBox x:Name="ShowCoreGpuTemperatureCheckBox"
+                                      Content="GPU"
+                                      Checked="SettingsCheckBox_Changed"
+                                      Unchecked="SettingsCheckBox_Changed"/>
+                            <CheckBox x:Name="ShowCoreStorageTemperatureCheckBox"
+                                      Content="Накопители"
+                                      Checked="SettingsCheckBox_Changed"
+                                      Unchecked="SettingsCheckBox_Changed"/>
+                            <CheckBox x:Name="ShowCoreMotherboardTemperatureCheckBox"
+                                      Content="Плата / VRM"
+                                      Checked="SettingsCheckBox_Changed"
+                                      Unchecked="SettingsCheckBox_Changed"/>
+                            <CheckBox x:Name="ShowCoreOtherTemperatureCheckBox"
+                                      Content="Прочие датчики"
+                                      Checked="SettingsCheckBox_Changed"
+                                      Unchecked="SettingsCheckBox_Changed"/>
+
                             <TextBlock Text="Уведомления"
                                        Margin="0,18,0,4"
                                        FontSize="12"

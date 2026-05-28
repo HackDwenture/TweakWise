@@ -13,12 +13,14 @@ namespace TweakWise.Services
         private readonly Computer _computer;
         private readonly HashSet<string> _faultedHardwareKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly bool _suppressHardwareBackend;
+        private readonly bool _skipUnsafeHardwareUpdates;
         private bool _disposed;
         private bool _isOpen;
 
         public HardwareTemperatureService()
         {
             _suppressHardwareBackend = ShouldSuppressLibreHardwareMonitor();
+            _skipUnsafeHardwareUpdates = ShouldSkipUnsafeHardwareUpdates();
             _computer = new Computer
             {
                 IsCpuEnabled = true,
@@ -78,8 +80,19 @@ namespace TweakWise.Services
 
         private static bool ShouldSuppressLibreHardwareMonitor()
         {
+            string suppressHardware = Environment.GetEnvironmentVariable("TW_SUPPRESS_HARDWARE_MONITORING") ?? string.Empty;
+            return string.Equals(suppressHardware, "1", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(suppressHardware, "true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ShouldSkipUnsafeHardwareUpdates()
+        {
+            string allowUnsafeUpdate = Environment.GetEnvironmentVariable("TW_ALLOW_UNSAFE_HARDWARE_UPDATE") ?? string.Empty;
             string allowDebugTelemetry = Environment.GetEnvironmentVariable("TW_ALLOW_HARDWARE_DEBUG") ?? string.Empty;
-            if (string.Equals(allowDebugTelemetry, "1", StringComparison.OrdinalIgnoreCase) ||
+
+            if (string.Equals(allowUnsafeUpdate, "1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(allowUnsafeUpdate, "true", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(allowDebugTelemetry, "1", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(allowDebugTelemetry, "true", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
@@ -157,10 +170,20 @@ namespace TweakWise.Services
             }
         }
 
+        [DebuggerNonUserCode]
+        [DebuggerStepThrough]
         private void UpdateHardwareRecursive(IHardware hardware)
         {
             if (hardware == null)
                 return;
+
+            if (_skipUnsafeHardwareUpdates)
+            {
+                foreach (var child in GetSafeSubHardware(hardware))
+                    UpdateHardwareRecursive(child);
+
+                return;
+            }
 
             string hardwareKey = GetHardwareKey(hardware);
 

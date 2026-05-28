@@ -226,7 +226,7 @@ namespace TweakWise.Pages
 
                 _temperatureCards.Clear();
                 TemperatureDockTextBlock.Text = "Температуры: отключены";
-                TemperatureDetailsTextBlock.Text = "Включите нужные группы датчиков, чтобы TweakWise начал их читать.";
+                TemperatureDetailsTextBlock.Text = "Включите нужные группы датчиков в разделе «Настройки», чтобы TweakWise начал их читать.";
                 return;
             }
 
@@ -280,7 +280,7 @@ namespace TweakWise.Pages
             }
 
             TemperatureDockTextBlock.Text = "Температуры: " + string.Join(" · ", visibleReadings.Select(item => $"{GetGroupTitle(item.Group)} {HardwareTemperatureService.FormatTemperature(item.ValueCelsius)}"));
-            TemperatureDetailsTextBlock.Text = "Показываются самые горячие доступные датчики по выбранным группам. Состав можно менять тумблерами ниже.";
+            TemperatureDetailsTextBlock.Text = "Показываются самые горячие доступные датчики по выбранным группам. Состав можно менять в разделе «Настройки».";
         }
 
         private HardwareTemperatureService EnsureTemperatureService()

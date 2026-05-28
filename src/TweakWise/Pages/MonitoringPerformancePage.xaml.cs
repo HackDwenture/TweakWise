@@ -52,6 +52,13 @@ namespace TweakWise.Pages
         private bool _isPageActive;
         private bool _diagnosticsRefreshRunning;
 
+        private bool CanRunPageAnimations =>
+            _isPageActive &&
+            IsLoaded &&
+            Dispatcher != null &&
+            !Dispatcher.HasShutdownStarted &&
+            !Dispatcher.HasShutdownFinished;
+
         public MonitoringPerformancePage()
         {
             InitializeComponent();
@@ -153,8 +160,15 @@ namespace TweakWise.Pages
             if (App.ComputerHealthService != null)
                 App.ComputerHealthService.HealthStatusChanged += HealthService_HealthStatusChanged;
 
-            _diagnosticsTimer.Start();
-            RefreshDiagnostics();
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!_isPageActive)
+                    return;
+
+                UpdateHighlights();
+                _diagnosticsTimer.Start();
+                RefreshDiagnostics();
+            }), DispatcherPriority.ContextIdle);
         }
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)
@@ -166,12 +180,57 @@ namespace TweakWise.Pages
                 App.ComputerHealthService.HealthStatusChanged -= HealthService_HealthStatusChanged;
 
             _diagnosticsTimer.Stop();
+            _searchDebounceTimer.Stop();
             StopAllNodeMicroAnimations();
+            StopTransientAnimations();
 
             lock (_temperatureSync)
             {
                 _temperatureService?.Dispose();
                 _temperatureService = null;
+            }
+        }
+
+        private void StopTransientAnimations()
+        {
+            try
+            {
+                DetailsScrimElement?.BeginAnimation(UIElement.OpacityProperty, null);
+                NodeDetailsPanel?.BeginAnimation(UIElement.OpacityProperty, null);
+                NodeDetailsTranslate?.BeginAnimation(TranslateTransform.XProperty, null);
+                NodeDetailsTranslate?.BeginAnimation(TranslateTransform.YProperty, null);
+                NodeDetailsScaleElement?.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                NodeDetailsScaleElement?.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                NodeDetailsOrbButtonElement?.BeginAnimation(UIElement.OpacityProperty, null);
+                NodeDetailsOrbTranslateElement?.BeginAnimation(TranslateTransform.XProperty, null);
+                NodeDetailsOrbTranslateElement?.BeginAnimation(TranslateTransform.YProperty, null);
+                NodeDetailsOrbScaleElement?.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                NodeDetailsOrbScaleElement?.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+
+                foreach (var glow in _glows.Values)
+                    glow?.BeginAnimation(UIElement.OpacityProperty, null);
+
+                foreach (var route in _routes.Values)
+                {
+                    route?.BeginAnimation(UIElement.OpacityProperty, null);
+                    route?.BeginAnimation(Shape.StrokeDashOffsetProperty, null);
+                }
+
+                foreach (var zone in _zones.Values)
+                {
+                    if (zone == null)
+                        continue;
+
+                    EnsurePartTransforms(zone, out var scaleTransform, out var translateTransform);
+                    scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                    scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                    translateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+                }
+
+                CalloutLayer?.Children.Clear();
+            }
+            catch
+            {
             }
         }
 
@@ -292,8 +351,7 @@ namespace TweakWise.Pages
                 return;
 
             item.IsPriority = false;
-            if (hasProblem)
-                item.SetStatus(string.Empty, isWarning: false);
+            item.SetSignal(HealthLevel.Good);
 
             ApplyPerformanceSearchFilter();
         }
@@ -779,6 +837,7 @@ namespace TweakWise.Pages
                 CurrentValue = source.CurrentValue,
                 StatusMessage = source.StatusMessage,
                 StatusIsWarning = source.StatusIsWarning,
+                SignalLevel = source.SignalLevel,
                 CanApply = source.CanApply,
                 CanRollback = source.CanRollback,
                 IsSupported = source.IsSupported,
@@ -826,6 +885,7 @@ namespace TweakWise.Pages
             target.CurrentValue = source.CurrentValue;
             target.StatusMessage = source.StatusMessage;
             target.StatusIsWarning = source.StatusIsWarning;
+            target.SignalLevel = source.SignalLevel;
             target.CanRollback = source.CanRollback;
 
             string selectedValue = source.SelectedOption?.Value;
@@ -1017,7 +1077,7 @@ namespace TweakWise.Pages
 
         private async void RefreshDiagnostics()
         {
-            if (!_isInitialized || _diagnosticsRefreshRunning)
+            if (!_isInitialized || !_isPageActive || _diagnosticsRefreshRunning)
                 return;
 
             _diagnosticsRefreshRunning = true;
@@ -1064,8 +1124,8 @@ namespace TweakWise.Pages
             if (readings.Count == 0)
                 return;
 
-            AddThermalFinding(findings, readings, "Cpu", "CPU нагревается", 90, 82);
-            AddThermalFinding(findings, readings, "Gpu", "GPU нагревается", 87, 80);
+            AddThermalFinding(findings, readings, "Cpu", "CPU нагревается", 95, 85, 78);
+            AddThermalFinding(findings, readings, "Gpu", "GPU нагревается", 92, 85, 78);
 
             float hottestPerformanceTemp = readings
                 .Where(item => item.Group == "Cpu" || item.Group == "Gpu" || item.Group == "Motherboard" || item.Group == "Other")
@@ -1073,7 +1133,18 @@ namespace TweakWise.Pages
                 .DefaultIfEmpty(0)
                 .Max();
 
-            if (hottestPerformanceTemp >= 86)
+            if (hottestPerformanceTemp >= 95)
+            {
+                findings.Add(new BoardFinding
+                {
+                    Id = "resources.cooling.critical-temperature",
+                    NodeKey = "Cooling",
+                    Level = HealthLevel.Critical,
+                    Title = "Критическая температура",
+                    Description = $"Самый горячий датчик показывает {HardwareTemperatureService.FormatTemperature(hottestPerformanceTemp)}. Лучше остановить нагрузку и проверить охлаждение, пыль, прижим, вентиляторы и лимиты питания."
+                });
+            }
+            else if (hottestPerformanceTemp >= 85)
             {
                 findings.Add(new BoardFinding
                 {
@@ -1102,6 +1173,7 @@ namespace TweakWise.Pages
             IReadOnlyList<TemperatureSensorReading> readings,
             string group,
             string title,
+            float criticalThreshold,
             float warningThreshold,
             float recommendationThreshold)
         {
@@ -1113,12 +1185,18 @@ namespace TweakWise.Pages
             if (hottest == null || hottest.ValueCelsius < recommendationThreshold)
                 return;
 
+            HealthLevel level = hottest.ValueCelsius >= criticalThreshold
+                ? HealthLevel.Critical
+                : hottest.ValueCelsius >= warningThreshold
+                    ? HealthLevel.Warning
+                    : HealthLevel.Normal;
+
             findings.Add(new BoardFinding
             {
                 Id = $"resources.{group.ToLowerInvariant()}.temperature",
                 NodeKey = group,
-                Level = hottest.ValueCelsius >= warningThreshold ? HealthLevel.Warning : HealthLevel.Normal,
-                Title = title,
+                Level = level,
+                Title = level == HealthLevel.Critical ? $"{group}: критическая температура" : title,
                 Description = $"{hottest.Title}: {HardwareTemperatureService.FormatTemperature(hottest.ValueCelsius)}."
             });
         }
@@ -1157,22 +1235,33 @@ namespace TweakWise.Pages
                 {
                     findings.Add(new BoardFinding
                     {
+                        Id = "resources.ram.critical-load",
+                        NodeKey = "Ram",
+                        Level = HealthLevel.Critical,
+                        Title = "Оперативная память почти заполнена",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Высок риск активной подкачки, зависаний и падения производительности."
+                    });
+                }
+                else if (memory.dwMemoryLoad >= 75)
+                {
+                    findings.Add(new BoardFinding
+                    {
                         Id = "resources.ram.high-load",
                         NodeKey = "Ram",
                         Level = HealthLevel.Warning,
-                        Title = "Оперативная память почти заполнена",
-                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Система может медленнее реагировать, особенно при запуске игр, браузера или тяжёлых программ."
+                        Title = "Оперативная память сильно загружена",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Для тяжёлых задач это уже проблема: лучше закрыть лишние приложения или проверить утечки памяти."
                     });
                 }
-                else if (memory.dwMemoryLoad >= 78)
+                else if (memory.dwMemoryLoad >= 65)
                 {
                     findings.Add(new BoardFinding
                     {
                         Id = "resources.ram.elevated-load",
                         NodeKey = "Ram",
                         Level = HealthLevel.Normal,
-                        Title = "Оперативная память сильно загружена",
-                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Перед включением производительных настроек лучше закрыть лишние тяжёлые приложения."
+                        Title = "ОЗУ приближается к высокой загрузке",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Перед нагрузкой стоит освободить память."
                     });
                 }
             }
@@ -1763,6 +1852,9 @@ namespace TweakWise.Pages
             if (item == null)
                 return HealthLevel.Good;
 
+            if (item.SignalLevel != HealthLevel.Good)
+                return item.SignalLevel;
+
             if (item.StatusIsWarning && item.HasStatusMessage)
             {
                 string text = $"{item.StatusMessage} {item.Title}";
@@ -1876,12 +1968,18 @@ namespace TweakWise.Pages
 
         private void UpdateHighlights()
         {
+            bool animate = CanRunPageAnimations;
+
             foreach (var pair in _glows)
             {
                 bool isHover = string.Equals(pair.Key, _hoverNodeKey, StringComparison.OrdinalIgnoreCase);
                 bool isSelected = string.Equals(pair.Key, _selectedNodeKey, StringComparison.OrdinalIgnoreCase);
                 double targetOpacity = isHover ? 0.18 : isSelected && _isDetailsOpen ? 0.14 : isSelected ? 0.08 : 0;
-                AnimateOpacity(pair.Value, targetOpacity, 170);
+
+                if (animate)
+                    AnimateOpacity(pair.Value, targetOpacity, 170);
+                else if (pair.Value != null)
+                    pair.Value.Opacity = targetOpacity;
             }
 
             foreach (var pair in _zones)
@@ -1890,10 +1988,22 @@ namespace TweakWise.Pages
                 bool isSelected = string.Equals(pair.Key, _selectedNodeKey, StringComparison.OrdinalIgnoreCase);
                 double targetScale = isHover ? 1.035 : isSelected && _isDetailsOpen ? 1.022 : isSelected ? 1.01 : 1;
                 double targetLift = isHover ? -7 : isSelected && _isDetailsOpen ? -4 : 0;
-                AnimatePart(pair.Value, targetScale, targetLift);
+
+                if (animate)
+                {
+                    AnimatePart(pair.Value, targetScale, targetLift);
+                }
+                else if (pair.Value != null)
+                {
+                    EnsurePartTransforms(pair.Value, out var scaleTransform, out var translateTransform);
+                    scaleTransform.ScaleX = targetScale;
+                    scaleTransform.ScaleY = targetScale;
+                    translateTransform.Y = targetLift;
+                }
             }
 
-            UpdateNodeMicroAnimations();
+            if (animate)
+                UpdateNodeMicroAnimations();
         }
 
         private void UpdateNodeMicroAnimations()
@@ -2117,16 +2227,22 @@ namespace TweakWise.Pages
             if (line == null)
                 return;
 
-            line.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0.90, TimeSpan.FromMilliseconds(120)));
-            line.BeginAnimation(
-                Shape.StrokeDashOffsetProperty,
-                new DoubleAnimation
-                {
-                    From = fromCore ? 28 : -28,
-                    To = 0,
-                    Duration = TimeSpan.FromMilliseconds(620),
-                    RepeatBehavior = RepeatBehavior.Forever
-                });
+            try
+            {
+                line.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0.90, TimeSpan.FromMilliseconds(120)));
+                line.BeginAnimation(
+                    Shape.StrokeDashOffsetProperty,
+                    new DoubleAnimation
+                    {
+                        From = fromCore ? 28 : -28,
+                        To = 0,
+                        Duration = TimeSpan.FromMilliseconds(620),
+                        RepeatBehavior = RepeatBehavior.Forever
+                    });
+            }
+            catch
+            {
+            }
         }
 
         private void StopRouteAnimations(bool clearSelected = false)
@@ -2151,12 +2267,19 @@ namespace TweakWise.Pages
             if (element == null)
                 return;
 
-            element.BeginAnimation(
-                UIElement.OpacityProperty,
-                new DoubleAnimation(opacity, TimeSpan.FromMilliseconds(milliseconds))
-                {
-                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-                });
+            try
+            {
+                element.BeginAnimation(
+                    UIElement.OpacityProperty,
+                    new DoubleAnimation(opacity, TimeSpan.FromMilliseconds(milliseconds))
+                    {
+                        EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                    });
+            }
+            catch
+            {
+                element.Opacity = opacity;
+            }
         }
 
         private static void AnimatePart(Border border, double scale, double yOffset)
@@ -2167,9 +2290,19 @@ namespace TweakWise.Pages
             EnsurePartTransforms(border, out var scaleTransform, out var translateTransform);
             var duration = TimeSpan.FromMilliseconds(170);
             var easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
-            scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
-            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
-            translateTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(yOffset, duration) { EasingFunction = easing });
+
+            try
+            {
+                scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
+                scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
+                translateTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(yOffset, duration) { EasingFunction = easing });
+            }
+            catch
+            {
+                scaleTransform.ScaleX = scale;
+                scaleTransform.ScaleY = scale;
+                translateTransform.Y = yOffset;
+            }
         }
 
         private static void EnsurePartTransforms(

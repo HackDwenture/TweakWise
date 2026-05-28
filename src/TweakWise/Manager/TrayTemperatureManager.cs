@@ -29,6 +29,7 @@ namespace TweakWise.Managers
         private readonly Forms.NotifyIcon _notifyIcon;
         private readonly HashSet<string> _faultedHardwareKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly bool _suppressHardwareBackend;
+        private readonly bool _skipUnsafeHardwareUpdates;
         private Computer _computer;
         private bool _enabled;
         private bool _showTemperature;
@@ -38,6 +39,7 @@ namespace TweakWise.Managers
         public TrayTemperatureManager()
         {
             _suppressHardwareBackend = ShouldSuppressLibreHardwareMonitor();
+            _skipUnsafeHardwareUpdates = ShouldSkipUnsafeHardwareUpdates();
 
             var menu = new Forms.ContextMenuStrip();
             menu.Items.Add("Открыть", null, (_, _) => RestoreMainWindow());
@@ -188,8 +190,19 @@ namespace TweakWise.Managers
 
         private static bool ShouldSuppressLibreHardwareMonitor()
         {
+            string suppressHardware = Environment.GetEnvironmentVariable("TW_SUPPRESS_HARDWARE_MONITORING") ?? string.Empty;
+            return string.Equals(suppressHardware, "1", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(suppressHardware, "true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ShouldSkipUnsafeHardwareUpdates()
+        {
+            string allowUnsafeUpdate = Environment.GetEnvironmentVariable("TW_ALLOW_UNSAFE_HARDWARE_UPDATE") ?? string.Empty;
             string allowDebugTelemetry = Environment.GetEnvironmentVariable("TW_ALLOW_HARDWARE_DEBUG") ?? string.Empty;
-            if (string.Equals(allowDebugTelemetry, "1", StringComparison.OrdinalIgnoreCase) ||
+
+            if (string.Equals(allowUnsafeUpdate, "1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(allowUnsafeUpdate, "true", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(allowDebugTelemetry, "1", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(allowDebugTelemetry, "true", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
@@ -306,10 +319,20 @@ namespace TweakWise.Managers
                 .Concat(GetSafeSubHardware(hardware).SelectMany(GetSensors));
         }
 
+        [DebuggerNonUserCode]
+        [DebuggerStepThrough]
         private void UpdateHardwareRecursive(IHardware hardware)
         {
             if (hardware == null)
                 return;
+
+            if (_skipUnsafeHardwareUpdates)
+            {
+                foreach (var child in GetSafeSubHardware(hardware))
+                    UpdateHardwareRecursive(child);
+
+                return;
+            }
 
             string hardwareKey = GetHardwareKey(hardware);
 

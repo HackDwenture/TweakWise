@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using TweakWise.Execution;
 using TweakWise.Managers;
@@ -38,6 +39,8 @@ namespace TweakWise
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            DispatcherUnhandledException += App_DispatcherUnhandledException;
+
             base.OnStartup(e);
 
             SettingsManager.ApplySavedSystemSettings();
@@ -60,6 +63,24 @@ namespace TweakWise
             }
 
             mainWindow.Show();
+        }
+
+        private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+        {
+            if (IsRecoverableWpfAnimationException(e.Exception))
+            {
+                e.Handled = true;
+            }
+        }
+
+        private static bool IsRecoverableWpfAnimationException(Exception exception)
+        {
+            if (exception is not NullReferenceException)
+                return false;
+
+            string stackTrace = exception.StackTrace ?? string.Empty;
+            return stackTrace.IndexOf("System.Windows.Media.Animation.Clock", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   stackTrace.IndexOf("System.Windows.Media.Animation.TimeManager", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         public void ChangeTheme(string themeName)

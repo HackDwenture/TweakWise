@@ -340,7 +340,7 @@
                                         <TextBlock Text="Температуры" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource WindowForeground}"/>
                                         <TextBlock x:Name="TemperatureDetailsTextBlock" Margin="0,8,44,0" FontSize="13" LineHeight="19" TextWrapping="Wrap" Opacity="0.78" Foreground="{DynamicResource WindowForeground}"/>
                                     </StackPanel>
-                                    <Button x:Name="TemperatureEditButton" Width="34" Height="30" HorizontalAlignment="Right" VerticalAlignment="Top" FontFamily="Segoe MDL2 Assets" Content="&#xE70F;" Opacity="0" Style="{StaticResource CorePanelButtonStyle}" Padding="0" Click="TemperatureEditButton_Click" ToolTip="Настроить показатели"/>
+                                    <Button x:Name="TemperatureEditButton" Width="34" Height="30" HorizontalAlignment="Right" VerticalAlignment="Top" FontFamily="Segoe MDL2 Assets" Content="&#xE70F;" Opacity="0" Visibility="Collapsed" Style="{StaticResource CorePanelButtonStyle}" Padding="0" Click="TemperatureEditButton_Click" ToolTip="Настраивается в разделе «Настройки»"/>
                                 </Grid>
 
                                 <ItemsControl x:Name="TemperatureDetailsItemsControl" Margin="0,12,0,0">
