@@ -1,6 +1,7 @@
 <Page x:Class="TweakWise.Pages.MonitoringPerformancePage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:models="clr-namespace:TweakWise.Models"
       Loaded="Page_Loaded"
       Unloaded="Page_Unloaded"
       PreviewKeyDown="Page_PreviewKeyDown"
@@ -156,6 +157,12 @@
                     <DropShadowEffect BlurRadius="12" ShadowDepth="0" Opacity="0.12" Color="#05080D"/>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsUnavailable}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="PerformanceBadgeStyle" TargetType="Border">
@@ -538,8 +545,41 @@
                     </Grid>
 
                     <WrapPanel Margin="0,12,0,0">
-                        <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding HasActiveSignal, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <TextBlock Text="{Binding SignalBadgeText}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource CoreNormalBrush}"/>
+                        <Border Visibility="{Binding HasActiveSignal, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Border.Style>
+                                <Style TargetType="Border" BasedOn="{StaticResource PerformanceBadgeStyle}">
+                                    <Setter Property="BorderBrush" Value="{DynamicResource CoreNormalBrush}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Attention}">
+                                            <Setter Property="BorderBrush" Value="{DynamicResource CoreAttentionBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Warning}">
+                                            <Setter Property="BorderBrush" Value="{DynamicResource CoreWarningBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Critical}">
+                                            <Setter Property="BorderBrush" Value="{DynamicResource CoreCriticalBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding SignalKindText}" FontSize="11" FontWeight="SemiBold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource CoreNormalBrush}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Attention}">
+                                                <Setter Property="Foreground" Value="{DynamicResource CoreAttentionBrush}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Warning}">
+                                                <Setter Property="Foreground" Value="{DynamicResource CoreWarningBrush}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Critical}">
+                                                <Setter Property="Foreground" Value="{DynamicResource CoreCriticalBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </Border>
                         <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding HasRisk, Converter={StaticResource BoolToVisibilityConverter}}">
                             <TextBlock Text="{Binding RiskLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
@@ -549,6 +589,9 @@
                         </Border>
                         <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding RequiresRestart, Converter={StaticResource BoolToVisibilityConverter}}">
                             <TextBlock Text="после применения нужна перезагрузка" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource CoreAttentionBrush}"/>
+                        </Border>
+                        <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding IsUnavailable, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="недоступно" FontSize="11" FontWeight="SemiBold" Opacity="0.66"/>
                         </Border>
                         <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding CanRollback, Converter={StaticResource BoolToVisibilityConverter}}">
                             <TextBlock Text="откат доступен" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource CoreGoodBrush}"/>
@@ -1038,9 +1081,14 @@
                             <ItemsControl x:Name="SelectedFindingsItemsControl" Margin="0,10,0,8">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Style="{StaticResource DetailsCardStyle}">
+                                        <Border Style="{StaticResource DetailsCardStyle}"
+                                                Loaded="SelectedFindingCard_Loaded"
+                                                Cursor="Hand"
+                                                ToolTip="Перейти к связанному блоку"
+                                                MouseLeftButtonUp="SelectedFindingCard_MouseLeftButtonUp">
                                             <StackPanel>
-                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding KindText}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                                                <TextBlock Text="{Binding Title}" Margin="0,5,0,0" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                                 <TextBlock Text="{Binding Description}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.78" TextWrapping="Wrap"/>
                                                 <Button Content="Игнорировать"
                                                         Tag="{Binding Id}"
@@ -1163,13 +1211,13 @@
                                         <Border x:Name="LoadingSquareC" Style="{StaticResource PerformanceLoadingSquareStyle}"/>
                                         <Border x:Name="LoadingSquareD" Style="{StaticResource PerformanceLoadingSquareStyle}"/>
                                     </UniformGrid>
-                                    <TextBlock Text="Выполняется анализ узла"
+                                    <TextBlock Text="Загрузка узла, пожалуйста подождите"
                                                Margin="0,12,0,0"
                                                HorizontalAlignment="Center"
                                                FontSize="12"
                                                FontWeight="SemiBold"
                                                Opacity="0.76"/>
-                                     <TextBlock Text="Параметры считываются в фоновом режиме, интерфейс остаётся доступным."
+                                     <TextBlock Text="Считываем параметры системы и подготавливаем доступные действия."
                                                Margin="0,5,0,0"
                                                HorizontalAlignment="Center"
                                                FontSize="11"
@@ -1214,6 +1262,38 @@
                             </ItemsControl>
                         </StackPanel>
                     </ScrollViewer>
+
+                    <Border x:Name="PerformanceNavigationBusyOverlay"
+                            Grid.RowSpan="2"
+                            Panel.ZIndex="20"
+                            Background="#D91D2A34"
+                            BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Visibility="Collapsed"
+                            Opacity="0"
+                            IsHitTestVisible="True">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <UniformGrid Rows="2" Columns="2" Width="60" Height="60" HorizontalAlignment="Center">
+                                <Border x:Name="SearchBusySquareA" Style="{StaticResource PerformanceLoadingSquareStyle}"/>
+                                <Border x:Name="SearchBusySquareB" Style="{StaticResource PerformanceLoadingSquareStyle}"/>
+                                <Border x:Name="SearchBusySquareC" Style="{StaticResource PerformanceLoadingSquareStyle}"/>
+                                <Border x:Name="SearchBusySquareD" Style="{StaticResource PerformanceLoadingSquareStyle}"/>
+                            </UniformGrid>
+                            <TextBlock Text="Загрузка перехода, пожалуйста подождите"
+                                       Margin="0,12,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.80"/>
+                            <TextBlock Text="Открываем нужный блок и подготавливаем подсветку."
+                                       Margin="0,5,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="11"
+                                       Opacity="0.58"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Border>
 

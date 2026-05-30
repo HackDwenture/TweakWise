@@ -78,32 +78,9 @@ namespace TweakWise.Services
             }
         }
 
-        private static bool ShouldSuppressLibreHardwareMonitor()
-        {
-            string suppressHardware = Environment.GetEnvironmentVariable("TW_SUPPRESS_HARDWARE_MONITORING") ?? string.Empty;
-            return string.Equals(suppressHardware, "1", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(suppressHardware, "true", StringComparison.OrdinalIgnoreCase);
-        }
+        private static bool ShouldSuppressLibreHardwareMonitor() => HardwareMonitorSafety.IsHardwareBackendSuppressed();
 
-        private static bool ShouldSkipUnsafeHardwareUpdates()
-        {
-            string allowUnsafeUpdate = Environment.GetEnvironmentVariable("TW_ALLOW_UNSAFE_HARDWARE_UPDATE") ?? string.Empty;
-            string allowDebugTelemetry = Environment.GetEnvironmentVariable("TW_ALLOW_HARDWARE_DEBUG") ?? string.Empty;
-
-            if (string.Equals(allowUnsafeUpdate, "1", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(allowUnsafeUpdate, "true", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(allowDebugTelemetry, "1", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(allowDebugTelemetry, "true", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-#if DEBUG
-            return Debugger.IsAttached;
-#else
-            return false;
-#endif
-        }
+        private static bool ShouldSkipUnsafeHardwareUpdates() => HardwareMonitorSafety.ShouldSkipUnsafeHardwareUpdates();
 
         private IReadOnlyList<IHardware> GetRootHardware()
         {

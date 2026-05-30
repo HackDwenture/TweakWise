@@ -29,7 +29,6 @@ namespace TweakWise.Services
         private const string KindPowerHibernation = "PowerHibernation";
         private const string KindRegistryDword = "RegistryDword";
         private const string KindMemoryCompression = "MemoryCompression";
-        private const string KindPageCombining = "PageCombining";
         private const string KindReadOnly = "ReadOnly";
 
         private const string SubProcessor = "SUB_PROCESSOR";
@@ -60,10 +59,6 @@ namespace TweakWise.Services
         private const string ProcessorBoostPolicy = "PERFBOOSTPOL";
         private const string ProcessorCoreParkingMin = "CPMINCORES";
         private const string ProcessorIdleDisable = "IDLEDISABLE";
-        private const string ProcessorAutonomousMode = "8baa4a8a-14c6-4451-8e8b-14bdbd197537";
-        private const string ProcessorPerfIncreaseThreshold = "06cadf0e-64ed-448a-8927-ce7bf90eb35d";
-        private const string ProcessorPerfDecreaseThreshold = "12a0ab44-fe28-4fa9-b3bd-4b64f44960a6";
-        private const string ProcessorPerfCheckInterval = "4d2b0152-7d5c-498b-88e2-34345392a2c5";
         private const string SystemCoolingPolicy = "SYSCOOLPOL";
         private const string DiskIdle = "DISKIDLE";
         private const string PciExpressAspm = "ee12f906-d277-404b-b6da-e5fa1a576df5";
@@ -98,13 +93,8 @@ namespace TweakWise.Services
         private const string HardwareSchedulingValueName = "HwSchMode";
 
         private const string MultimediaSystemProfilePath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile";
-        private const string PriorityControlPath = @"SYSTEM\CurrentControlSet\Control\PriorityControl";
-        private const string GamesTaskProfilePath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games";
         private const string MemoryManagementPath = @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
-        private const string PrefetchParametersPath = @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters";
-        private const string SvcHostPath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost";
         private const string DwmPath = @"SOFTWARE\Microsoft\Windows\Dwm";
-        private const string GameBarPath = @"Software\Microsoft\GameBar";
 
         private static readonly Regex GuidRegex = new Regex(
             @"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
@@ -235,63 +225,36 @@ namespace TweakWise.Services
                     items.Add(CreateProcessorEppItem(40, false));
                     items.Add(CreateProcessorBoostPolicyItem(50));
                     items.Add(CreateCoreParkingItem(60));
-                    items.Add(CreateProcessorAutonomousModeItem(70));
-                    items.Add(CreateProcessorPerfIncreaseThresholdItem(80));
-                    items.Add(CreateProcessorPerfDecreaseThresholdItem(90));
-                    items.Add(CreateProcessorPerfCheckIntervalItem(100));
-                    items.Add(CreateProcessorIdleDisableItem(110));
-                    items.Add(CreateWin32PrioritySeparationItem(120));
-                    items.Add(CreateSystemResponsivenessItem(130));
-                    items.Add(CreateNetworkThrottlingItem(140));
-                    items.Add(CreateGamesTaskPriorityItem(150));
-                    items.Add(CreateGamesTaskGpuPriorityItem(160));
-                    items.Add(CreateTemperatureItem("cpu.temperatures", "Температура CPU", "Cpu", 170));
+                    items.Add(CreateProcessorIdleDisableItem(70));
+                    items.Add(CreateSystemResponsivenessItem(80));
+                    items.Add(CreateNetworkThrottlingItem(90));
+                    items.Add(CreateTemperatureItem("cpu.temperatures", "Температура CPU", "Cpu", 100));
                     break;
 
                 case "Gpu":
                     items.Add(CreateHardwareSchedulingItem(10));
                     items.Add(CreateGpuPreferencePolicyItem(20));
-                    items.Add(CreateGameModeItem(30));
-                    items.Add(CreateGameDvrItem(40));
-                    items.Add(CreateAppCaptureItem(50));
-                    items.Add(CreateTdrDelayItem(60));
-                    items.Add(CreateTdrDdiDelayItem(70));
-                    items.Add(CreateTdrLevelItem(80));
-                    items.Add(CreateTdrLimitTimeItem(90));
-                    items.Add(CreateTdrLimitCountItem(100));
-                    items.Add(CreateMpoItem(110));
-                    items.Add(CreateTemperatureItem("gpu.temperatures", "Температура GPU", "Gpu", 120));
+                    items.Add(CreateGameDvrItem(30));
+                    items.Add(CreateAppCaptureItem(40));
+                    items.Add(CreateTdrDelayItem(50));
+                    items.Add(CreateMpoItem(60));
+                    items.Add(CreateTemperatureItem("gpu.temperatures", "Температура GPU", "Gpu", 70));
                     break;
 
                 case "Ram":
                     items.Add(CreateMemoryLoadItem(10));
                     items.Add(CreateMemoryCompressionItem(20));
-                    items.Add(CreatePageCombiningItem(30));
-                    items.Add(CreateClearPageFileItem(40));
-                    items.Add(CreateDisablePagingExecutiveItem(50));
-                    items.Add(CreateLargeSystemCacheItem(60));
-                    items.Add(CreatePrefetcherItem(70));
-                    items.Add(CreateSuperfetchItem(80));
-                    items.Add(CreateSvcHostSplitThresholdItem(90));
+                    items.Add(CreateClearPageFileItem(30));
+                    items.Add(CreateDisablePagingExecutiveItem(40));
+                    items.Add(CreateLargeSystemCacheItem(50));
                     break;
 
                 case "Cooling":
                     items.Add(CreateThermalOverviewItem(10));
-                    items.Add(CreateTemperatureItem("cooling.cpu-thermal", "CPU: тепловой датчик", "Cpu", 20));
-                    items.Add(CreateTemperatureItem("cooling.gpu-thermal", "GPU: тепловой датчик", "Gpu", 30));
-                    items.Add(CreateTemperatureItem("cooling.board-thermal", "Плата и VRM: доступные датчики", "Motherboard", 40));
-                    items.Add(CreateSystemCoolingPolicyItem(50));
-                    items.Add(CreateSystemCoolingPolicyDcItem(60));
-                    items.Add(CreateProcessorMaxStateItem("Тепловой лимит CPU", 70, true));
-                    items.Add(CreateProcessorBoostModeCoolingItem(80));
-                    items.Add(CreateProcessorEppItem(90, true));
-                    items.Add(CreateProcessorBoostPolicyItem(100));
-                    items.Add(CreateProcessorPerfIncreaseThresholdItem(110));
-                    items.Add(CreateProcessorPerfDecreaseThresholdItem(120));
-                    items.Add(CreateProcessorPerfCheckIntervalItem(130));
-                    items.Add(CreateProcessorAutonomousModeItem(140));
-                    items.Add(CreateCoreParkingItem(150));
-                    items.Add(CreateProcessorIdleDisableItem(160));
+                    items.Add(CreateSystemCoolingPolicyItem(20));
+                    items.Add(CreateProcessorMaxStateItem("Тепловой лимит CPU", 30, true));
+                    items.Add(CreateProcessorEppItem(40, true));
+                    items.Add(CreateProcessorIdleDisableItem(50));
                     break;
             }
 
@@ -504,8 +467,7 @@ namespace TweakWise.Services
                 KindPowerDcSetting => ApplyPowerAcSetting(item),
                 KindPowerHibernation => ApplyPowerHibernation(item),
                 KindRegistryDword => ApplyRegistryDword(item),
-                KindMemoryCompression => ApplyMemoryAgentFeature(item, "MemoryCompression", "MemoryCompression", "Сжатие памяти"),
-                KindPageCombining => ApplyMemoryAgentFeature(item, "PageCombining", "PageCombining", "Объединение одинаковых страниц"),
+                KindMemoryCompression => ApplyMemoryCompression(item),
                 _ => PerformanceTuningResult.Fail("У этого блока нет прямого действия применения.")
             };
 
@@ -537,8 +499,7 @@ namespace TweakWise.Services
                 nameof(PerformanceBackupKind.PowerDcSetting) => RollbackPowerAcSetting(backup),
                 nameof(PerformanceBackupKind.PowerHibernation) => RollbackPowerHibernation(backup),
                 nameof(PerformanceBackupKind.RegistryDword) => RollbackRegistryDword(backup),
-                nameof(PerformanceBackupKind.MemoryCompression) => RollbackMemoryAgentFeature(backup, "MemoryCompression", "Сжатие памяти"),
-                nameof(PerformanceBackupKind.PageCombining) => RollbackMemoryAgentFeature(backup, "PageCombining", "Объединение одинаковых страниц"),
+                nameof(PerformanceBackupKind.MemoryCompression) => RollbackMemoryCompression(backup),
                 _ => PerformanceTuningResult.Fail("Тип бэкапа не поддерживается.")
             };
 
@@ -614,10 +575,7 @@ namespace TweakWise.Services
                     FillRegistryDwordState(item);
                     break;
                 case KindMemoryCompression:
-                    FillMemoryAgentFeatureState(item, "MemoryCompression");
-                    break;
-                case KindPageCombining:
-                    FillMemoryAgentFeatureState(item, "PageCombining");
+                    FillMemoryCompressionState(item);
                     break;
                 case KindReadOnly:
                     FillReadOnlyState(item);
@@ -1045,176 +1003,6 @@ namespace TweakWise.Services
             item.Recommendation = "Используйте только для диагностики задержек. На ноутбуках может быстро поднять температуру.";
             return item;
         }
-
-        private PerformanceTuningItem CreateProcessorAutonomousModeItem(int order)
-        {
-            var item = CreatePowerToggleItem(
-                "cpu.autonomous-mode-ac",
-                "Автономное управление CPU",
-                "Скрытый параметр CPPC/автономного выбора частот. Если поддерживается BIOS/UEFI, часть решений о частоте принимает процессор и прошивка, а не только Windows.",
-                ProcessorAutonomousMode,
-                order,
-                1,
-                0,
-                "средний");
-
-            item.EnabledText = "Автономное управление разрешено";
-            item.DisabledText = "Управление чаще остаётся за Windows";
-            item.Recommendation = "Обычно лучше оставить включённым на современных CPU. Отключайте только при проверке нестабильного boost/частот.";
-            return item;
-        }
-
-        private PerformanceTuningItem CreateProcessorPerfIncreaseThresholdItem(int order)
-        {
-            var item = CreatePowerSliderItem(
-                "cpu.perf-increase-threshold-ac",
-                "Порог повышения производительности CPU",
-                "Скрытый powercfg-параметр: насколько должна вырасти нагрузка, чтобы Windows подняла производительность процессора.",
-                ProcessorPerfIncreaseThreshold,
-                order,
-                1,
-                100,
-                "%",
-                "высокий");
-
-            item.Recommendation = "Меньшее значение быстрее поднимает частоты и нагрев. Для плавного режима повышайте постепенно.";
-            return item;
-        }
-
-        private PerformanceTuningItem CreateProcessorPerfDecreaseThresholdItem(int order)
-        {
-            var item = CreatePowerSliderItem(
-                "cpu.perf-decrease-threshold-ac",
-                "Порог снижения производительности CPU",
-                "Скрытый powercfg-параметр: насколько должна снизиться нагрузка, чтобы Windows начала опускать частоты.",
-                ProcessorPerfDecreaseThreshold,
-                order,
-                1,
-                100,
-                "%",
-                "высокий");
-
-            item.Recommendation = "Высокое значение быстрее снижает частоты и температуру. Слишком агрессивное снижение может давать микрофризы.";
-            return item;
-        }
-
-        private PerformanceTuningItem CreateProcessorPerfCheckIntervalItem(int order)
-        {
-            var item = CreatePowerSliderItem(
-                "cpu.perf-check-interval-ac",
-                "Интервал проверки производительности CPU",
-                "Скрытый интервал powercfg, с которым Windows переоценивает производительность процессора. Меньше — быстрее реакция, больше — спокойнее поведение.",
-                ProcessorPerfCheckInterval,
-                order,
-                1,
-                500,
-                " мс",
-                "высокий");
-
-            item.NumericStep = 5;
-            item.Recommendation = "Не ставьте экстремально низко без причины. Это тонкая настройка планировщика питания CPU.";
-            return item;
-        }
-
-        private PerformanceTuningItem CreateWin32PrioritySeparationItem(int order)
-        {
-            var item = CreateRegistryComboItem(
-                "cpu.win32-priority-separation",
-                "Квант планировщика Win32",
-                "Скрытый параметр PriorityControl: влияет на распределение квантов между активными и фоновыми задачами. Это классический твик из гайдов по отзывчивости.",
-                "HKLM",
-                Registry.LocalMachine,
-                PriorityControlPath,
-                "Win32PrioritySeparation",
-                order,
-                "высокий",
-                defaultValue: 2);
-
-            item.Options.Add(new PerformanceTuningOption("Windows default", "2", "Стандартное поведение Windows."));
-            item.Options.Add(new PerformanceTuningOption("Приоритет активных программ", "38", "Более агрессивный профиль для интерактивных задач."));
-            item.Options.Add(new PerformanceTuningOption("Фоновые службы", "24", "Больше равномерности для служб и серверных задач."));
-            item.RequiresRestart = true;
-            item.RestartReason = "изменение квантов планировщика Win32";
-            item.Recommendation = "Для универсального ПК безопаснее default. Меняйте только если понимаете, какой сценарий оптимизируете.";
-            FillRegistryDwordState(item);
-            return item;
-        }
-
-        private PerformanceTuningItem CreateGamesTaskPriorityItem(int order)
-        {
-            var item = CreateRegistrySliderItem(
-                "cpu.games-task-priority",
-                "MMCSS Games Priority",
-                "Приоритет мультимедийного профиля Games в MMCSS. Параметр часто встречается в гайдах по задержкам и игровому режиму.",
-                "HKLM",
-                Registry.LocalMachine,
-                GamesTaskProfilePath,
-                "Priority",
-                order,
-                1,
-                8,
-                string.Empty,
-                "средний",
-                defaultValue: 2);
-
-            item.RequiresRestart = true;
-            item.RestartReason = "изменение профиля MMCSS Games";
-            item.Recommendation = "Поднимайте осторожно. Слишком высокий приоритет может ухудшить звук, запись и фоновые задачи.";
-            return item;
-        }
-
-        private PerformanceTuningItem CreateGamesTaskGpuPriorityItem(int order)
-        {
-            var item = CreateRegistrySliderItem(
-                "gpu.games-task-gpu-priority",
-                "MMCSS Games GPU Priority",
-                "Приоритет GPU в профиле MMCSS Games. Это реестровый параметр, который часто настраивают вручную для игровых сценариев.",
-                "HKLM",
-                Registry.LocalMachine,
-                GamesTaskProfilePath,
-                "GPU Priority",
-                order,
-                1,
-                8,
-                string.Empty,
-                "средний",
-                defaultValue: 8);
-
-            item.RequiresRestart = true;
-            item.RestartReason = "изменение GPU-приоритета MMCSS Games";
-            item.Recommendation = "Обычно значение 8 уже используется Windows для игрового профиля. Если у вас другое значение, можно вернуть к 8.";
-            return item;
-        }
-
-        private PerformanceTuningItem CreateProcessorBoostModeCoolingItem(int order)
-        {
-            var item = CreateProcessorBoostModeItem(order);
-            item.SettingId = "cooling.cpu-boost-mode-ac";
-            item.Title = "Boost CPU для охлаждения";
-            item.Description = "Тот же скрытый boost-режим CPU, но в контексте охлаждения: позволяет быстро снизить нагрев без изменения BIOS.";
-            item.Recommendation = "Если CPU перегревается, начните с «Эффективно» или «Отключено» как временной проверки. Для максимальной производительности верните агрессивный режим.";
-            return item;
-        }
-
-        private PerformanceTuningItem CreateSystemCoolingPolicyDcItem(int order)
-        {
-            var item = CreatePowerComboItem(
-                "cooling.system-policy-dc",
-                "Политика охлаждения от батареи",
-                "Активная/пассивная политика охлаждения для режима батареи. На ноутбуках влияет на шум и снижение частот вне сети.",
-                SystemCoolingPolicy,
-                order,
-                "средний",
-                SubProcessor,
-                dc: true);
-
-            item.Options.Add(new PerformanceTuningOption("Пассивная", "0", "Тише, но раньше снижает частоты."));
-            item.Options.Add(new PerformanceTuningOption("Активная", "1", "Лучше держит производительность, может быть шумнее."));
-            item.Recommendation = "На батарее чаще выбирают пассивную политику. Для производительного режима от батареи можно проверить активную.";
-            FillPowerAcSettingState(item);
-            return item;
-        }
-
 
         private PerformanceTuningItem CreateSystemCoolingPolicyItem(int order)
         {
@@ -1903,121 +1691,6 @@ namespace TweakWise.Services
             return item;
         }
 
-        private PerformanceTuningItem CreateGameModeItem(int order)
-        {
-            var item = CreateRegistryToggleItem(
-                "gpu.game-mode",
-                "Game Mode Windows",
-                "Включает внутренний Game Mode без перехода в параметры Windows. Полезно проверить, если игра или полноэкранное приложение конфликтует с фоновыми задачами.",
-                "HKCU",
-                Registry.CurrentUser,
-                GameBarPath,
-                "AutoGameModeEnabled",
-                order,
-                enabledValue: 1,
-                disabledValue: 0,
-                risk: "низкий",
-                defaultValue: 1);
-
-            item.EnabledText = "Game Mode включён";
-            item.DisabledText = "Game Mode отключён";
-            item.Recommendation = "Обычно лучше оставить включённым. При нестабильности старых игр можно временно отключить и сравнить.";
-            return item;
-        }
-
-        private PerformanceTuningItem CreateTdrDdiDelayItem(int order)
-        {
-            var item = CreateRegistrySliderItem(
-                "gpu.tdr-ddi-delay",
-                "TDR DDI Delay",
-                "Дополнительное ожидание драйверного интерфейса GPU перед сбросом. Используется для тяжёлых вычислений и диагностики зависаний драйвера.",
-                "HKLM",
-                Registry.LocalMachine,
-                GraphicsDriversPath,
-                "TdrDdiDelay",
-                order,
-                5,
-                120,
-                " сек",
-                "высокий",
-                defaultValue: 5);
-
-            item.RequiresRestart = true;
-            item.RestartReason = "изменение TDR DDI Delay GPU";
-            item.Recommendation = "Не повышайте без конкретной причины. Длинное ожидание маскирует зависший драйвер.";
-            return item;
-        }
-
-        private PerformanceTuningItem CreateTdrLevelItem(int order)
-        {
-            var item = CreateRegistryComboItem(
-                "gpu.tdr-level",
-                "TDR Level",
-                "Определяет, будет ли Windows обнаруживать и сбрасывать зависший GPU-драйвер. Отключение TDR опасно: система может зависать вместо восстановления драйвера.",
-                "HKLM",
-                Registry.LocalMachine,
-                GraphicsDriversPath,
-                "TdrLevel",
-                order,
-                "критический",
-                defaultValue: 3);
-
-            item.Options.Add(new PerformanceTuningOption("Отключить TDR", "0", "Опасно: зависший драйвер может повесить систему."));
-            item.Options.Add(new PerformanceTuningOption("Восстановление по таймауту", "3", "Стандартное поведение Windows."));
-            item.RequiresRestart = true;
-            item.RestartReason = "изменение режима TDR GPU";
-            item.Recommendation = "Для обычного ПК держите стандартное восстановление. Отключать стоит только на время узкой диагностики вычислительных задач.";
-            FillRegistryDwordState(item);
-            return item;
-        }
-
-        private PerformanceTuningItem CreateTdrLimitTimeItem(int order)
-        {
-            var item = CreateRegistrySliderItem(
-                "gpu.tdr-limit-time",
-                "TDR Limit Time",
-                "Период, за который Windows считает повторные сбросы GPU-драйвера. Полезно для диагностики частых падений драйвера, но не лечит причину.",
-                "HKLM",
-                Registry.LocalMachine,
-                GraphicsDriversPath,
-                "TdrLimitTime",
-                order,
-                10,
-                600,
-                " сек",
-                "средний",
-                defaultValue: 60);
-
-            item.NumericStep = 10;
-            item.RequiresRestart = true;
-            item.RestartReason = "изменение окна подсчёта TDR";
-            item.Recommendation = "Если драйвер часто восстанавливается, лучше обновить драйвер/проверить разгон и температуру, а не только увеличивать лимит.";
-            return item;
-        }
-
-        private PerformanceTuningItem CreateTdrLimitCountItem(int order)
-        {
-            var item = CreateRegistrySliderItem(
-                "gpu.tdr-limit-count",
-                "TDR Limit Count",
-                "Количество TDR-событий за окно TdrLimitTime, после которого Windows считает драйвер проблемным.",
-                "HKLM",
-                Registry.LocalMachine,
-                GraphicsDriversPath,
-                "TdrLimitCount",
-                order,
-                1,
-                20,
-                string.Empty,
-                "средний",
-                defaultValue: 5);
-
-            item.RequiresRestart = true;
-            item.RestartReason = "изменение счётчика TDR";
-            item.Recommendation = "Не используйте как замену исправлению драйвера, питания GPU или охлаждения.";
-            return item;
-        }
-
         private PerformanceTuningItem CreateMpoItem(int order)
         {
             var item = CreateRegistryToggleItem(
@@ -2081,104 +1754,6 @@ namespace TweakWise.Services
             FillMemoryCompressionState(item);
             return item;
         }
-
-        private PerformanceTuningItem CreatePageCombiningItem(int order)
-        {
-            var item = CreateBaseItem(
-                "ram.page-combining",
-                "Page Combining",
-                "MMAgent может объединять одинаковые страницы памяти. Это скрытый параметр, который обычно меняют через PowerShell, а не через интерфейс Windows.",
-                "MMAgent",
-                PerformanceSettingControlKind.Toggle,
-                order);
-
-            item.OperationKind = KindPageCombining;
-            item.RequiresElevation = true;
-            item.RequiresRestart = true;
-            item.RestartReason = "изменение Page Combining Windows";
-            item.RiskLabel = "средний";
-            item.EnabledText = "Page Combining включён";
-            item.DisabledText = "Page Combining отключён";
-            item.ApplyButtonText = "Применить и перезагрузить позже";
-            item.Recommendation = "Обычно лучше оставить включённым на системах с ограниченной RAM. Отключайте только при проверке задержек.";
-            FillMemoryAgentFeatureState(item, "PageCombining");
-            return item;
-        }
-
-        private PerformanceTuningItem CreatePrefetcherItem(int order)
-        {
-            var item = CreateRegistryComboItem(
-                "ram.prefetcher",
-                "EnablePrefetcher",
-                "Скрытый параметр Prefetcher. Управляет предварительной загрузкой данных для старта Windows и приложений.",
-                "HKLM",
-                Registry.LocalMachine,
-                PrefetchParametersPath,
-                "EnablePrefetcher",
-                order,
-                "средний",
-                defaultValue: 3);
-
-            item.Options.Add(new PerformanceTuningOption("Отключено", "0", "Без prefetch."));
-            item.Options.Add(new PerformanceTuningOption("Только приложения", "1", "Prefetch для приложений."));
-            item.Options.Add(new PerformanceTuningOption("Только загрузка Windows", "2", "Prefetch для boot-сценария."));
-            item.Options.Add(new PerformanceTuningOption("Windows default: boot + приложения", "3", "Обычно оптимальный режим."));
-            item.RequiresRestart = true;
-            item.RestartReason = "изменение Prefetcher";
-            item.Recommendation = "Для универсального ПК чаще оставляют 3. Отключение редко даёт пользу на современных системах.";
-            FillRegistryDwordState(item);
-            return item;
-        }
-
-        private PerformanceTuningItem CreateSuperfetchItem(int order)
-        {
-            var item = CreateRegistryComboItem(
-                "ram.superfetch",
-                "EnableSuperfetch / SysMain",
-                "Реестровый режим Superfetch/SysMain. Windows использует его для предзагрузки данных и оптимизации запуска приложений.",
-                "HKLM",
-                Registry.LocalMachine,
-                PrefetchParametersPath,
-                "EnableSuperfetch",
-                order,
-                "средний",
-                defaultValue: 3);
-
-            item.Options.Add(new PerformanceTuningOption("Отключено", "0", "Минимум предзагрузки."));
-            item.Options.Add(new PerformanceTuningOption("Только приложения", "1", "Предзагрузка приложений."));
-            item.Options.Add(new PerformanceTuningOption("Только загрузка Windows", "2", "Оптимизация boot-сценария."));
-            item.Options.Add(new PerformanceTuningOption("Windows default", "3", "Обычно оставляют так."));
-            item.RequiresRestart = true;
-            item.RestartReason = "изменение SysMain/Superfetch";
-            item.Recommendation = "Не отключайте вслепую: на HDD это может ухудшить запуск, на SSD эффект зависит от системы.";
-            FillRegistryDwordState(item);
-            return item;
-        }
-
-        private PerformanceTuningItem CreateSvcHostSplitThresholdItem(int order)
-        {
-            var item = CreateRegistrySliderItem(
-                "ram.svchost-split-threshold",
-                "SvcHostSplitThresholdInKB",
-                "Скрытый реестровый порог, влияющий на разделение служб по процессам svchost. Может снизить число отдельных процессов на системах с большим объёмом RAM, но ухудшает изоляцию служб.",
-                "HKLM",
-                Registry.LocalMachine,
-                SvcHostPath,
-                "SvcHostSplitThresholdInKB",
-                order,
-                256000,
-                8388608,
-                " КБ",
-                "высокий",
-                defaultValue: 380000);
-
-            item.NumericStep = 65536;
-            item.RequiresRestart = true;
-            item.RestartReason = "изменение разделения служб svchost";
-            item.Recommendation = "Это не ускоритель игр. Используйте как продвинутую настройку памяти и служб, с обязательным откатом при проблемах.";
-            return item;
-        }
-
 
         private PerformanceTuningItem CreateClearPageFileItem(int order)
         {
@@ -2515,6 +2090,7 @@ namespace TweakWise.Services
                 item.IsSupported = true;
                 item.IsPriority = active.Name.IndexOf("quiet", StringComparison.OrdinalIgnoreCase) >= 0 ||
                                   active.Name.IndexOf("eco", StringComparison.OrdinalIgnoreCase) >= 0;
+                item.SignalLevel = item.IsPriority ? HealthLevel.Normal : HealthLevel.Good;
             }
             else
             {
@@ -2540,10 +2116,8 @@ namespace TweakWise.Services
                 item.Recommendation = onBattery
                     ? "Для производительных профилей подключите питание от сети."
                     : "Ограничений из-за батареи сейчас не видно.";
-                if (onBattery)
-                    item.SetSignal(HealthLevel.Normal, "Устройство работает от батареи — Windows, BIOS или контроллер питания могут ограничивать производительность.");
-                else
-                    item.SignalLevel = HealthLevel.Good;
+                item.IsPriority = onBattery;
+                item.SignalLevel = onBattery ? HealthLevel.Normal : HealthLevel.Good;
             }
             catch
             {
@@ -2577,10 +2151,8 @@ namespace TweakWise.Services
                 item.Recommendation = status.PowerLineStatus == WinForms.PowerLineStatus.Offline
                     ? "При работе от батареи Windows и прошивка ноутбука могут ограничивать производительность независимо от выбранной схемы."
                     : "Батарея обнаружена, сейчас устройство работает от сети.";
-                if (status.PowerLineStatus == WinForms.PowerLineStatus.Offline)
-                    item.SetSignal(HealthLevel.Normal, "Система работает от батареи. Это может ограничивать CPU/GPU и охлаждение на уровне прошивки.");
-                else
-                    item.SignalLevel = HealthLevel.Good;
+                item.IsPriority = status.PowerLineStatus == WinForms.PowerLineStatus.Offline;
+                item.SignalLevel = item.IsPriority ? HealthLevel.Normal : HealthLevel.Good;
             }
             catch
             {
@@ -2623,10 +2195,8 @@ namespace TweakWise.Services
             item.Recommendation = clean
                 ? "Сейчас процессы и драйверы не блокируют сон или отключение экрана через powercfg requests."
                 : "Если сон или экран не выключаются, проверьте указанные процессы/драйверы и уберите причину, а не отключайте сон глобально.";
-            if (!clean)
-                item.SetSignal(HealthLevel.Warning, "Найдены активные запросы питания. Они могут блокировать сон, выключение экрана или переход в энергосберегающие режимы.");
-            else
-                item.SignalLevel = HealthLevel.Good;
+            item.IsPriority = !clean;
+            item.SignalLevel = clean ? HealthLevel.Good : HealthLevel.Warning;
             item.IsSupported = true;
         }
 
@@ -2647,10 +2217,8 @@ namespace TweakWise.Services
             item.Recommendation = string.IsNullOrWhiteSpace(summary)
                 ? "Самопроизвольные пробуждения, если они есть, вероятнее вызваны таймерами, драйверами или BIOS, а не устройствами с wake-правом."
                 : "Если ПК сам просыпается, начните с этих устройств. Для универсального безопасного применения отключение wake-прав лучше делать точечно, когда будет отдельный список устройств.";
-            if (!string.IsNullOrWhiteSpace(summary))
-                item.SetSignal(HealthLevel.Normal, "Есть устройства с правом пробуждения. Это не ошибка, но может объяснить самопроизвольные пробуждения.");
-            else
-                item.SignalLevel = HealthLevel.Good;
+            item.IsPriority = !string.IsNullOrWhiteSpace(summary);
+            item.SignalLevel = item.IsPriority ? HealthLevel.Normal : HealthLevel.Good;
             item.IsSupported = true;
         }
 
@@ -2666,7 +2234,10 @@ namespace TweakWise.Services
                 item.IsSupported = false;
                 item.CurrentValue = $"Параметр {modeText} недоступен";
                 string details = string.IsNullOrWhiteSpace(state.Error) ? string.Empty : $" Подробности powercfg: {state.Error.Trim()}";
-                item.SetStatus($"Windows не вернула текущее значение этого параметра {modeText}. Возможные причины: параметр отсутствует в текущей схеме, его заблокировал OEM/ACPI-драйвер или устройство не поддерживает этот режим. Попробуйте сменить схему питания, запустить приложение от администратора, обновить драйверы чипсета/питания или восстановить схемы командой powercfg -restoredefaultschemes.{details}", isWarning: true);
+                item.IsPriority = false;
+                item.SignalLevel = HealthLevel.Good;
+                item.Recommendation = $"Этот параметр не считается проблемой: на части ПК производитель, ACPI/BIOS или текущая схема питания не отдают его Windows. Возможные причины: режим не поддерживается устройством, скрыт OEM-драйвером или отсутствует в активной схеме.{details}";
+                item.SetStatus("Недоступно на этой конфигурации. Можно попробовать другую схему питания, запуск от администратора, обновление драйверов чипсета/питания или восстановление схем командой powercfg -restoredefaultschemes.", isWarning: false);
                 return;
             }
 
@@ -2709,8 +2280,7 @@ namespace TweakWise.Services
             }
 
             item.StatusMessage = string.Empty;
-            item.StatusIsWarning = false;
-            ApplyPowerItemSignal(item, current);
+            item.IsPriority = IsPowerItemPriority(item, current);
         }
 
         private void FillPowerHibernationState(PerformanceTuningItem item)
@@ -2768,117 +2338,16 @@ namespace TweakWise.Services
                 item.CurrentValue += " (значение отсутствует, используется default)";
 
             item.StatusMessage = string.Empty;
-            item.StatusIsWarning = false;
-            ApplyRegistryItemSignal(item, current, state.Exists);
-        }
-
-        private static void ApplyRegistryItemSignal(PerformanceTuningItem item, int current, bool valueExists)
-        {
-            if (item == null)
-                return;
-
-            if (string.Equals(item.RegistryPath, GraphicsDriversPath, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(item.RegistryValueName, "TdrLevel", StringComparison.OrdinalIgnoreCase) &&
-                current == 0)
-            {
-                item.SetSignal(HealthLevel.Critical, "TDR отключён. При зависании GPU Windows может зависнуть полностью вместо восстановления драйвера.");
-                return;
-            }
-
-            if (string.Equals(item.RegistryPath, GraphicsDriversPath, StringComparison.OrdinalIgnoreCase) &&
-                (string.Equals(item.RegistryValueName, "TdrDelay", StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(item.RegistryValueName, "TdrDdiDelay", StringComparison.OrdinalIgnoreCase)) &&
-                current > item.DefaultDwordValue * 4)
-            {
-                item.SetSignal(HealthLevel.Warning, "TDR-таймаут сильно увеличен. Это может скрывать проблемы драйвера, разгона, питания GPU или температуры.");
-                return;
-            }
-
-            if (string.Equals(item.RegistryPath, MemoryManagementPath, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(item.RegistryValueName, "LargeSystemCache", StringComparison.OrdinalIgnoreCase) &&
-                current != 0)
-            {
-                item.SetSignal(HealthLevel.Warning, "LargeSystemCache включён. Для обычной рабочей станции это может ухудшить отзывчивость приложений.");
-                return;
-            }
-
-            if (string.Equals(item.RegistryPath, MemoryManagementPath, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(item.RegistryValueName, "DisablePagingExecutive", StringComparison.OrdinalIgnoreCase) &&
-                current != 0)
-            {
-                item.SetSignal(HealthLevel.Normal, "Ядро и драйверы удерживаются в RAM. Это может помочь на системах с большим запасом памяти, но не стоит включать при дефиците ОЗУ.");
-                return;
-            }
-
-            if (string.Equals(item.RegistryPath, MemoryManagementPath, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(item.RegistryValueName, "ClearPageFileAtShutdown", StringComparison.OrdinalIgnoreCase) &&
-                current != 0)
-            {
-                item.SetSignal(HealthLevel.Normal, "Очистка pagefile при завершении работы включена. Это безопасно для приватности, но может замедлять выключение.");
-                return;
-            }
-
-            if (string.Equals(item.RegistryPath, PrefetchParametersPath, StringComparison.OrdinalIgnoreCase) &&
-                current == 0)
-            {
-                item.SetSignal(HealthLevel.Normal, "Prefetch/SysMain отключён. Это не всегда ускоряет систему; на части ПК запуск приложений становится медленнее.");
-                return;
-            }
-
-            if (string.Equals(item.RegistryPath, DwmPath, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(item.RegistryValueName, "OverlayTestMode", StringComparison.OrdinalIgnoreCase) &&
-                current == 5)
-            {
-                item.SetSignal(HealthLevel.Normal, "MPO принудительно отключён. Это может быть полезным твиком от мерцаний, но при нормальной работе драйвера лучше сравнить с default.");
-                return;
-            }
-
-            if (string.Equals(item.RegistryPath, @"System\GameConfigStore", StringComparison.OrdinalIgnoreCase) &&
-                current != 0)
-            {
-                item.SetSignal(HealthLevel.Normal, "Game DVR включён. Если запись клипов не нужна, отключение убирает лишние фоновые хуки.");
-                return;
-            }
-
-            if (string.Equals(item.RegistryPath, @"Software\Microsoft\Windows\CurrentVersion\GameDVR", StringComparison.OrdinalIgnoreCase) &&
-                current != 0)
-            {
-                item.SetSignal(HealthLevel.Normal, "Фоновый захват игр включён. Если запись не используется, отключение может снизить лишнюю нагрузку.");
-                return;
-            }
-
-            if (string.Equals(item.RegistryPath, MultimediaSystemProfilePath, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(item.RegistryValueName, "NetworkThrottlingIndex", StringComparison.OrdinalIgnoreCase) &&
-                current == unchecked((int)0xFFFFFFFF))
-            {
-                item.SetSignal(HealthLevel.Normal, "Сетевой throttling MMCSS отключён. Это продвинутый latency-твик; при проблемах сети верните default.");
-                return;
-            }
-
-            item.SetSignal(HealthLevel.Good);
         }
 
         private void FillMemoryCompressionState(PerformanceTuningItem item)
         {
-            FillMemoryAgentFeatureState(item, "MemoryCompression");
-        }
-
-        private void FillMemoryAgentFeatureState(PerformanceTuningItem item, string featureName)
-        {
-            string safeFeatureName = Regex.Replace(featureName ?? string.Empty, @"[^A-Za-z]", string.Empty);
-            if (string.IsNullOrWhiteSpace(safeFeatureName))
-            {
-                item.CurrentValue = "Не удалось определить MMAgent-параметр";
-                item.SetSignal(HealthLevel.Warning, "Внутренняя ошибка описания MMAgent-параметра.");
-                return;
-            }
-
-            var result = RunPowerShell($"try {{ [bool]((Get-MMAgent).{safeFeatureName}) }} catch {{ Write-Error $_.Exception.Message; exit 1 }}");
+            var result = RunPowerShell("try { [bool]((Get-MMAgent).MemoryCompression) } catch { Write-Error $_.Exception.Message; exit 1 }");
             if (!result.Success)
             {
-                item.CurrentValue = "Не удалось прочитать MMAgent";
+                item.CurrentValue = "Нужны права администратора";
                 item.IsSupported = true;
-                item.SetSignal(HealthLevel.Warning, $"MMAgent не вернул состояние параметра {safeFeatureName}: {BuildCommandError(result)}");
+                item.SetStatus("MMAgent не разрешил чтение без прав администратора.", isWarning: true);
                 return;
             }
 
@@ -2887,12 +2356,6 @@ namespace TweakWise.Services
             item.CurrentValue = enabled ? item.EnabledText : item.DisabledText;
             item.IsSupported = true;
             item.StatusMessage = string.Empty;
-            item.StatusIsWarning = false;
-
-            if (!enabled)
-                item.SetSignal(HealthLevel.Normal, $"{item.Title}: параметр отключён. Это может быть осознанным твиком, но для универсального режима стоит проверить причину.");
-            else
-                item.SignalLevel = HealthLevel.Good;
         }
 
         private void FillMemoryLoadState(PerformanceTuningItem item)
@@ -2908,25 +2371,29 @@ namespace TweakWise.Services
             double totalGb = memory.ullTotalPhys / 1024d / 1024d / 1024d;
             item.CurrentValue = $"{memory.dwMemoryLoad}% занято · {usedGb:0.0} из {totalGb:0.0} ГБ";
 
-            if (memory.dwMemoryLoad >= 90)
+            if (memory.dwMemoryLoad >= 92)
             {
-                item.Recommendation = "ОЗУ почти заполнена. Сначала закройте тяжёлые процессы, затем меняйте системные параметры.";
-                item.SetSignal(HealthLevel.Critical, "Критическая загрузка ОЗУ: система может активно использовать файл подкачки, а приложения — тормозить или падать.");
+                item.Recommendation = "ОЗУ почти заполнена. Это уже критичный уровень для тяжёлых задач: закройте лишние процессы и проверьте утечки памяти.";
+                item.IsPriority = true;
+                item.SignalLevel = HealthLevel.Critical;
             }
-            else if (memory.dwMemoryLoad >= 75)
+            else if (memory.dwMemoryLoad >= 78)
             {
-                item.Recommendation = "Память заметно загружена. Перед производительными профилями лучше освободить RAM.";
-                item.SetSignal(HealthLevel.Warning, "Высокая загрузка ОЗУ. Это уже проблема для тяжёлых игр, IDE, монтажа и стресс-тестов, а не просто рекомендация.");
+                item.Recommendation = "Память сильно загружена. Для игр, рендера и виртуальных машин это проблема: освободите RAM или проверьте тяжёлые процессы.";
+                item.IsPriority = true;
+                item.SignalLevel = HealthLevel.Warning;
             }
-            else if (memory.dwMemoryLoad >= 65)
+            else if (memory.dwMemoryLoad >= 70)
             {
-                item.Recommendation = "Запас памяти есть, но при запуске тяжёлых задач лучше следить за потреблением.";
-                item.SetSignal(HealthLevel.Normal, "Загрузка ОЗУ приближается к высокой. Рекомендуется закрыть лишнее перед нагрузкой.");
+                item.Recommendation = "Запас памяти небольшой. Перед тяжёлыми задачами лучше закрыть лишние приложения.";
+                item.IsPriority = true;
+                item.SignalLevel = HealthLevel.Normal;
             }
             else
             {
                 item.Recommendation = "Запас памяти выглядит нормальным.";
-                item.SetSignal(HealthLevel.Good);
+                item.IsPriority = false;
+                item.SignalLevel = HealthLevel.Good;
             }
         }
 
@@ -2967,22 +2434,23 @@ namespace TweakWise.Services
 
             var hottest = readings.OrderByDescending(reading => reading.ValueCelsius).First();
             item.CurrentValue = $"{hottest.Title}: {HardwareTemperatureService.FormatTemperature(hottest.ValueCelsius)}";
-            item.Recommendation = hottest.ValueCelsius >= 95
-                ? "Температура критическая: прекратите нагрузку, проверьте охлаждение, пыль, обороты вентиляторов, пасту/прижим и лимиты питания."
-                : hottest.ValueCelsius >= 85
-                    ? "Температура высокая. Снизьте boost/EPP, проверьте активную политику охлаждения и вентиляцию корпуса."
-                    : hottest.ValueCelsius >= 78
-                        ? "Температура приближается к зоне ограничений. Следите за boost и охлаждением под длительной нагрузкой."
-                        : "Температурный запас выглядит нормальным.";
-
-            if (hottest.ValueCelsius >= 95)
-                item.SetSignal(HealthLevel.Critical, $"Критическая температура: {hottest.Title} достиг {HardwareTemperatureService.FormatTemperature(hottest.ValueCelsius)}.");
-            else if (hottest.ValueCelsius >= 85)
-                item.SetSignal(HealthLevel.Warning, $"Высокая температура: {hottest.Title} достиг {HardwareTemperatureService.FormatTemperature(hottest.ValueCelsius)}.");
-            else if (hottest.ValueCelsius >= 78)
-                item.SetSignal(HealthLevel.Normal, $"Есть тепловая рекомендация: {hottest.Title} уже {HardwareTemperatureService.FormatTemperature(hottest.ValueCelsius)}.");
+            if (hottest.ValueCelsius >= 92)
+                item.SignalLevel = HealthLevel.Critical;
+            else if (hottest.ValueCelsius >= 82)
+                item.SignalLevel = HealthLevel.Warning;
+            else if (hottest.ValueCelsius >= 75)
+                item.SignalLevel = HealthLevel.Normal;
             else
-                item.SetSignal(HealthLevel.Good);
+                item.SignalLevel = HealthLevel.Good;
+
+            item.IsPriority = item.SignalLevel != HealthLevel.Good;
+            item.Recommendation = hottest.ValueCelsius >= 90
+                ? "Температура высокая: проверьте пыль, вентиляцию корпуса и режим питания."
+                : hottest.ValueCelsius >= 82
+                    ? "Температура близка к зоне ограничений. Снизьте boost/EPP или включите активную политику охлаждения."
+                    : hottest.ValueCelsius >= 75
+                        ? "Температура повышена, но ещё не критична. Перед длительной нагрузкой проверьте вентиляцию и профиль питания."
+                        : "Температурный запас выглядит нормальным.";
         }
 
         private PerformanceTuningResult ApplyPowerPlan(PerformanceTuningItem item)
@@ -3186,14 +2654,9 @@ namespace TweakWise.Services
                 item.RestartReason);
         }
 
-        private PerformanceTuningResult ApplyMemoryAgentFeature(PerformanceTuningItem item, string featureName, string commandSwitch, string displayName)
+        private PerformanceTuningResult ApplyMemoryCompression(PerformanceTuningItem item)
         {
-            string safeFeatureName = Regex.Replace(featureName ?? string.Empty, @"[^A-Za-z]", string.Empty);
-            string safeSwitch = Regex.Replace(commandSwitch ?? string.Empty, @"[^A-Za-z]", string.Empty);
-            if (string.IsNullOrWhiteSpace(safeFeatureName) || string.IsNullOrWhiteSpace(safeSwitch))
-                return PerformanceTuningResult.Fail("Не удалось определить MMAgent-параметр.");
-
-            var read = RunPowerShell($"try {{ [bool]((Get-MMAgent).{safeFeatureName}) }} catch {{ Write-Error $_.Exception.Message; exit 1 }}");
+            var read = RunPowerShell("try { [bool]((Get-MMAgent).MemoryCompression) } catch { Write-Error $_.Exception.Message; exit 1 }");
             if (!read.Success)
                 return PerformanceTuningResult.Fail($"Не удалось сохранить состояние MMAgent: {BuildCommandError(read)}");
 
@@ -3206,17 +2669,15 @@ namespace TweakWise.Services
             bool backupSaved = SaveBackup(new PerformanceSettingBackupRecord
             {
                 SettingId = item.SettingId,
-                Kind = string.Equals(item.OperationKind, KindPageCombining, StringComparison.OrdinalIgnoreCase)
-                    ? nameof(PerformanceBackupKind.PageCombining)
-                    : nameof(PerformanceBackupKind.MemoryCompression),
+                Kind = nameof(PerformanceBackupKind.MemoryCompression),
                 Value = oldValue ? "true" : "false",
                 Label = oldValue ? "включено" : "отключено",
                 CreatedAtUtc = DateTime.UtcNow
             }, targetValue ? "true" : "false");
 
             string command = targetValue
-                ? $"Enable-MMAgent -{safeSwitch}"
-                : $"Disable-MMAgent -{safeSwitch}";
+                ? "Enable-MMAgent -MemoryCompression"
+                : "Disable-MMAgent -MemoryCompression";
 
             var result = RunPowerShell(command);
             if (!result.Success)
@@ -3227,7 +2688,7 @@ namespace TweakWise.Services
                 return PerformanceTuningResult.Fail($"MMAgent не применил изменение: {BuildCommandError(result)}");
             }
 
-            var verify = RunPowerShell($"try {{ [bool]((Get-MMAgent).{safeFeatureName}) }} catch {{ Write-Error $_.Exception.Message; exit 1 }}");
+            var verify = RunPowerShell("try { [bool]((Get-MMAgent).MemoryCompression) } catch { Write-Error $_.Exception.Message; exit 1 }");
             if (verify.Success)
             {
                 bool verifiedValue = verify.Output.IndexOf("True", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -3237,7 +2698,7 @@ namespace TweakWise.Services
 
             string backupText = backupSaved ? " Точка отката сохранена." : " Новая точка отката не создавалась.";
             return PerformanceTuningResult.Ok(
-                $"{displayName}: изменение применено. Перезагрузка рекомендуется.{backupText}",
+                $"Сжатие памяти изменено. Перезагрузка рекомендуется.{backupText}",
                 requiresRestart: true,
                 restartReason: item.RestartReason);
         }
@@ -3306,21 +2767,17 @@ namespace TweakWise.Services
             return PerformanceTuningResult.Ok("Параметр реестра возвращён из бэкапа. Если это системная настройка, перезагрузка может быть нужна.");
         }
 
-        private PerformanceTuningResult RollbackMemoryAgentFeature(PerformanceSettingBackupRecord backup, string commandSwitch, string displayName)
+        private PerformanceTuningResult RollbackMemoryCompression(PerformanceSettingBackupRecord backup)
         {
-            string safeSwitch = Regex.Replace(commandSwitch ?? string.Empty, @"[^A-Za-z]", string.Empty);
-            if (string.IsNullOrWhiteSpace(safeSwitch))
-                return PerformanceTuningResult.Fail("Не удалось определить MMAgent-параметр для отката.");
-
             bool enable = string.Equals(backup.Value, "true", StringComparison.OrdinalIgnoreCase);
-            var result = RunPowerShell(enable ? $"Enable-MMAgent -{safeSwitch}" : $"Disable-MMAgent -{safeSwitch}");
+            var result = RunPowerShell(enable ? "Enable-MMAgent -MemoryCompression" : "Disable-MMAgent -MemoryCompression");
             if (!result.Success)
                 return PerformanceTuningResult.Fail($"Не удалось откатить MMAgent: {BuildCommandError(result)}");
 
             return PerformanceTuningResult.Ok(
-                $"{displayName} возвращено: {backup.Label}.",
+                $"Сжатие памяти возвращено: {backup.Label}.",
                 requiresRestart: true,
-                restartReason: $"откат MMAgent: {displayName}");
+                restartReason: "откат сжатия памяти Windows");
         }
 
         private long ResolvePowerTargetValue(PerformanceTuningItem item)
@@ -3346,45 +2803,19 @@ namespace TweakWise.Services
             return (int)Math.Round(item.NumericValue);
         }
 
-        private void ApplyPowerItemSignal(PerformanceTuningItem item, long current)
+        private bool IsPowerItemPriority(PerformanceTuningItem item, long current)
         {
-            if (item == null)
-                return;
+            if (string.Equals(item.PowerSettingAlias, ProcessorMaxState, StringComparison.OrdinalIgnoreCase))
+                return current == 100 && GetHottestTemperature("Cpu") >= 82;
 
-            double cpuTemp = GetHottestTemperature("Cpu");
-            if (string.Equals(item.PowerSettingAlias, ProcessorMaxState, StringComparison.OrdinalIgnoreCase) && current >= 100 && cpuTemp >= 85)
-            {
-                item.SetSignal(HealthLevel.Warning, "CPU уже горячий, а максимальное состояние процессора оставлено на 100%. Для охлаждения проверьте лимит 95-99% или boost-режим.");
-                return;
-            }
+            if (string.Equals(item.PowerSettingAlias, SystemCoolingPolicy, StringComparison.OrdinalIgnoreCase))
+                return current == 0 && GetHottestTemperature("Cpu") >= 78;
 
-            if (string.Equals(item.PowerSettingAlias, ProcessorMaxState, StringComparison.OrdinalIgnoreCase) && current >= 100 && cpuTemp >= 78)
-            {
-                item.SetSignal(HealthLevel.Normal, "CPU нагревается. Можно заранее проверить тепловой лимит 95-99% для тихого режима.");
-                return;
-            }
+            if (string.Equals(item.PowerSettingAlias, PciExpressAspm, StringComparison.OrdinalIgnoreCase))
+                return current > 0;
 
-            if (string.Equals(item.PowerSettingAlias, SystemCoolingPolicy, StringComparison.OrdinalIgnoreCase) && current == 0 && cpuTemp >= 78)
-            {
-                item.SetSignal(HealthLevel.Warning, "При нагреве CPU включена пассивная политика охлаждения: Windows сначала снижает частоты, а не усиливает охлаждение.");
-                return;
-            }
-
-            if (string.Equals(item.PowerSettingAlias, ProcessorIdleDisable, StringComparison.OrdinalIgnoreCase) && current != 0)
-            {
-                item.SetSignal(HealthLevel.Warning, "Глубокие простои CPU отключены. Это повышает нагрев и расход, используйте только для диагностики задержек.");
-                return;
-            }
-
-            if (string.Equals(item.PowerSettingAlias, PciExpressAspm, StringComparison.OrdinalIgnoreCase) && current > 0 && !string.Equals(item.OperationKind, KindPowerDcSetting, StringComparison.OrdinalIgnoreCase))
-            {
-                item.SetSignal(HealthLevel.Normal, "От сети включено энергосбережение PCIe. Для производительного профиля можно проверить отключение Link State.");
-                return;
-            }
-
-            item.SetSignal(HealthLevel.Good);
+            return false;
         }
-
 
         private void InvalidatePowerRuntimeCache()
         {
@@ -3890,7 +3321,7 @@ namespace TweakWise.Services
             {
             }
 
-            return Encoding.Default;
+            return Console.OutputEncoding ?? Encoding.Default;
         }
 
         private static CommandResult RunPowerShell(string command)
@@ -4426,8 +3857,8 @@ namespace TweakWise.Services
         private bool _isSupported = true;
         private bool _isPriority;
         private bool _statusIsWarning;
-        private HealthLevel _signalLevel = HealthLevel.Good;
         private bool _requiresElevationWarning;
+        private HealthLevel _signalLevel = HealthLevel.Good;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -4465,6 +3896,22 @@ namespace TweakWise.Services
         public double Maximum { get; set; }
         public double NumericStep { get; set; } = 1;
         public bool RequiresElevation { get; set; }
+        public HealthLevel SignalLevel
+        {
+            get => _signalLevel;
+            set
+            {
+                if (_signalLevel == value)
+                    return;
+
+                _signalLevel = value;
+                OnPropertyChanged(nameof(SignalLevel));
+                OnPropertyChanged(nameof(HasActiveSignal));
+                OnPropertyChanged(nameof(SignalActionText));
+                OnPropertyChanged(nameof(SignalKindText));
+            }
+        }
+
         public bool RequiresElevationWarning
         {
             get => _requiresElevationWarning;
@@ -4557,8 +4004,8 @@ namespace TweakWise.Services
                 OnPropertyChanged(nameof(StatusMessage));
                 OnPropertyChanged(nameof(HasStatusMessage));
                 OnPropertyChanged(nameof(HasActiveSignal));
-                OnPropertyChanged(nameof(SignalBadgeText));
                 OnPropertyChanged(nameof(SignalActionText));
+                OnPropertyChanged(nameof(SignalKindText));
             }
         }
 
@@ -4573,24 +4020,8 @@ namespace TweakWise.Services
                 _statusIsWarning = value;
                 OnPropertyChanged(nameof(StatusIsWarning));
                 OnPropertyChanged(nameof(HasActiveSignal));
-                OnPropertyChanged(nameof(SignalBadgeText));
                 OnPropertyChanged(nameof(SignalActionText));
-            }
-        }
-
-        public HealthLevel SignalLevel
-        {
-            get => _signalLevel;
-            set
-            {
-                if (_signalLevel == value)
-                    return;
-
-                _signalLevel = value;
-                OnPropertyChanged(nameof(SignalLevel));
-                OnPropertyChanged(nameof(HasActiveSignal));
-                OnPropertyChanged(nameof(SignalBadgeText));
-                OnPropertyChanged(nameof(SignalActionText));
+                OnPropertyChanged(nameof(SignalKindText));
             }
         }
 
@@ -4630,8 +4061,11 @@ namespace TweakWise.Services
 
                 _isSupported = value;
                 OnPropertyChanged(nameof(IsSupported));
+                OnPropertyChanged(nameof(IsUnavailable));
             }
         }
+
+        public bool IsUnavailable => !IsSupported;
 
         public bool IsPriority
         {
@@ -4644,8 +4078,8 @@ namespace TweakWise.Services
                 _isPriority = value;
                 OnPropertyChanged(nameof(IsPriority));
                 OnPropertyChanged(nameof(HasActiveSignal));
-                OnPropertyChanged(nameof(SignalBadgeText));
                 OnPropertyChanged(nameof(SignalActionText));
+                OnPropertyChanged(nameof(SignalKindText));
             }
         }
 
@@ -4657,48 +4091,43 @@ namespace TweakWise.Services
         public bool HasRecommendation => !string.IsNullOrWhiteSpace(Recommendation);
         public bool HasRisk => !string.IsNullOrWhiteSpace(RiskLabel);
         public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
-        public bool HasActiveSignal => SignalLevel != HealthLevel.Good || IsPriority || (StatusIsWarning && HasStatusMessage);
-        public string SignalBadgeText => SignalLevel switch
-        {
-            HealthLevel.Critical => "критическая проблема",
-            HealthLevel.Warning => "проблема",
-            HealthLevel.Normal => "рекомендация",
-            _ => IsPriority ? "рекомендация" : string.Empty
-        };
+        public bool HasActiveSignal =>
+            SignalLevel == HealthLevel.Normal ||
+            SignalLevel == HealthLevel.Attention ||
+            SignalLevel == HealthLevel.Warning ||
+            SignalLevel == HealthLevel.Critical ||
+            IsPriority ||
+            (StatusIsWarning && HasStatusMessage);
         public string SignalActionText => "Игнорировать";
-
-        public void SetStatus(string message, bool isWarning)
+        public string SignalKindText
         {
-            StatusIsWarning = !string.IsNullOrWhiteSpace(message) && isWarning;
-            StatusMessage = message ?? string.Empty;
-
-            if (StatusIsWarning)
+            get
             {
-                SignalLevel = (message ?? string.Empty).IndexOf("крит", StringComparison.OrdinalIgnoreCase) >= 0
-                    ? HealthLevel.Critical
-                    : HealthLevel.Warning;
-            }
-            else if (string.IsNullOrWhiteSpace(message) && SignalLevel != HealthLevel.Good)
-            {
-                SignalLevel = HealthLevel.Good;
+                return SignalLevel switch
+                {
+                    HealthLevel.Critical => "критично",
+                    HealthLevel.Warning => "проблема",
+                    HealthLevel.Attention => "внимание",
+                    HealthLevel.Normal => "рекомендация",
+                    _ => IsPriority ? "рекомендация" : string.Empty
+                };
             }
         }
 
-        public void SetSignal(HealthLevel level, string message = "")
+        public void SetStatus(string message, bool isWarning)
         {
-            SignalLevel = level;
-            IsPriority = level == HealthLevel.Normal;
+            bool hasMessage = !string.IsNullOrWhiteSpace(message);
+            StatusIsWarning = hasMessage && isWarning;
+            if (hasMessage && isWarning)
+            {
+                SignalLevel = HealthLevel.Warning;
+            }
+            else if (!hasMessage && !IsPriority)
+            {
+                SignalLevel = HealthLevel.Good;
+            }
 
-            if (!string.IsNullOrWhiteSpace(message))
-            {
-                StatusIsWarning = level == HealthLevel.Warning || level == HealthLevel.Critical;
-                StatusMessage = message;
-            }
-            else if (level == HealthLevel.Good)
-            {
-                StatusIsWarning = false;
-                StatusMessage = string.Empty;
-            }
+            StatusMessage = message ?? string.Empty;
         }
 
         private void OnPropertyChanged(string propertyName)
@@ -4786,7 +4215,6 @@ namespace TweakWise.Services
         PowerDcSetting,
         PowerHibernation,
         RegistryDword,
-        MemoryCompression,
-        PageCombining
+        MemoryCompression
     }
 }

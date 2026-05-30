@@ -18,7 +18,19 @@ namespace TweakWise
             DialogMessageTextBlock.Text = message;
 
             ConfigureKind(kind);
+            ConfigureLayout(kind);
             ConfigureButtons(buttons);
+        }
+
+        private void ConfigureLayout(AppDialogKind kind)
+        {
+            if (kind != AppDialogKind.Error)
+                return;
+
+            Width = 720;
+            Height = 430;
+            MinWidth = 640;
+            DialogMessageScrollViewer.MaxHeight = 250;
         }
 
         private void ConfigureKind(AppDialogKind kind)

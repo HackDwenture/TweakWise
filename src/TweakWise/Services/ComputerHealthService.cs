@@ -23,6 +23,17 @@ namespace TweakWise.Services
         private HashSet<string> _lastProblemFindingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private ComputerHealthStatus _overallStatus;
 
+        static ComputerHealthService()
+        {
+            try
+            {
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            }
+            catch
+            {
+            }
+        }
+
         public ComputerHealthService(SettingsManager settingsManager)
         {
             _settingsManager = settingsManager;
@@ -388,9 +399,9 @@ namespace TweakWise.Services
                 string summary = SummarizePowerCfgOutput(requests.Output, 8);
                 findings.Add(new ModuleHealthFinding
                 {
-                    Id = "performance.setting.power-active-requests",
+                    Id = "performance.setting.power.active-requests",
                     ModuleId = CoreModuleId.Resources,
-                    Level = HealthLevel.Normal,
+                    Level = HealthLevel.Warning,
                     Title = "Активные запросы питания",
                     Description = string.IsNullOrWhiteSpace(summary)
                         ? "Обнаружены процессы, драйверы или устройства, которые сейчас блокируют сон, отключение экрана или idle-сценарии."
@@ -407,7 +418,7 @@ namespace TweakWise.Services
                 {
                     findings.Add(new ModuleHealthFinding
                     {
-                        Id = "performance.setting.power-wake-armed-devices",
+                        Id = "performance.setting.power.wake-armed-devices",
                         ModuleId = CoreModuleId.Resources,
                         Level = HealthLevel.Normal,
                         Title = "Устройства могут будить ПК",
@@ -455,28 +466,40 @@ namespace TweakWise.Services
                 if (!GlobalMemoryStatusEx(memory) || memory.ullTotalPhys == 0)
                     return;
 
-                if (memory.dwMemoryLoad >= 90)
+                if (memory.dwMemoryLoad >= 92)
                 {
                     findings.Add(new ModuleHealthFinding
                     {
-                        Id = "resources.ram.high-load",
+                        Id = "resources.ram.critical-load",
                         ModuleId = CoreModuleId.Resources,
-                        Level = HealthLevel.Warning,
-                        Title = "Оперативная память почти заполнена",
-                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. При таком уровне загрузки система может медленнее реагировать.",
-                        ActionText = "Закройте лишние тяжёлые приложения или проверьте автозагрузку перед включением производительных режимов."
+                        Level = HealthLevel.Critical,
+                        Title = "Оперативная память почти исчерпана",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Возможны подвисания и активная работа файла подкачки.",
+                        ActionText = "Закройте тяжёлые процессы и проверьте утечки памяти."
                     });
                 }
                 else if (memory.dwMemoryLoad >= 78)
                 {
                     findings.Add(new ModuleHealthFinding
                     {
+                        Id = "resources.ram.high-load",
+                        ModuleId = CoreModuleId.Resources,
+                        Level = HealthLevel.Warning,
+                        Title = "Оперативная память сильно загружена",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Для тяжёлых задач это уже проблема.",
+                        ActionText = "Освободите память или проверьте процессы, которые постоянно удерживают RAM."
+                    });
+                }
+                else if (memory.dwMemoryLoad >= 70)
+                {
+                    findings.Add(new ModuleHealthFinding
+                    {
                         Id = "resources.ram.elevated-load",
                         ModuleId = CoreModuleId.Resources,
                         Level = HealthLevel.Normal,
-                        Title = "Оперативная память сильно загружена",
-                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Это не ошибка, но запас памяти сейчас небольшой.",
-                        ActionText = "Перед играми, рендером или включением производительных профилей закройте ненужные тяжёлые приложения."
+                        Title = "Запас оперативной памяти небольшой",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Это не критично, но запас памяти сейчас ограничен.",
+                        ActionText = "Перед играми, рендером или виртуальными машинами закройте ненужные тяжёлые приложения."
                     });
                 }
             }
@@ -855,7 +878,7 @@ namespace TweakWise.Services
             {
             }
 
-            return Encoding.Default;
+            return Console.OutputEncoding ?? Encoding.Default;
         }
 
         private static CommandResult RunProcess(string fileName, IEnumerable<string> arguments, Encoding outputEncoding = null)

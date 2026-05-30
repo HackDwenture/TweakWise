@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Win32;
@@ -24,6 +25,8 @@ namespace TweakWise
 
         public App()
         {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
             SettingsManager = new SettingsManager();
             NotificationManager = new NotificationManager(SettingsManager);
             UpdateManager = new UpdateManager();
@@ -40,6 +43,8 @@ namespace TweakWise
         protected override void OnStartup(StartupEventArgs e)
         {
             DispatcherUnhandledException += App_DispatcherUnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
             base.OnStartup(e);
 
@@ -70,17 +75,114 @@ namespace TweakWise
             if (IsRecoverableWpfAnimationException(e.Exception))
             {
                 e.Handled = true;
+                ReportApplicationError(e.Exception, "Анимация интерфейса была остановлена безопасно.", showDialog: false);
+                return;
             }
+
+            e.Handled = true;
+            ReportApplicationError(e.Exception, "Ошибка обработана без закрытия приложения.", showDialog: true);
+        }
+
+        private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            if (e.ExceptionObject is Exception exception)
+                ReportApplicationError(exception, "Произошла критическая ошибка фонового потока.", showDialog: true);
+        }
+
+        private void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
+        {
+            e.SetObserved();
+            ReportApplicationError(e.Exception, "Ошибка фоновой задачи обработана.", showDialog: true);
+        }
+
+        private int _isReportingApplicationError;
+
+        private void ReportApplicationError(Exception exception, string context, bool showDialog)
+        {
+            if (exception == null || System.Threading.Interlocked.Exchange(ref _isReportingApplicationError, 1) == 1)
+                return;
+
+            try
+            {
+                string title = exception.GetType().Name;
+                string message = BuildApplicationErrorMessage(exception, context);
+
+                try
+                {
+                    NotificationManager?.AddNotification("Ошибка программы", $"{title}: {exception.Message}");
+                }
+                catch
+                {
+                }
+
+                if (!showDialog)
+                    return;
+
+                void ShowError()
+                {
+                    try
+                    {
+                        DialogManager?.Show(
+                            MainWindow,
+                            "Ошибка программы",
+                            "TweakWise перехватил исключение",
+                            message,
+                            AppDialogKind.Error,
+                            AppDialogButtons.Ok);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (Dispatcher == null || Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+                    return;
+
+                if (Dispatcher.CheckAccess())
+                    ShowError();
+                else
+                    Dispatcher.BeginInvoke((Action)ShowError, DispatcherPriority.Background);
+            }
+            finally
+            {
+                System.Threading.Interlocked.Exchange(ref _isReportingApplicationError, 0);
+            }
+        }
+
+        private static string BuildApplicationErrorMessage(Exception exception, string context)
+        {
+            string stack = exception.StackTrace ?? string.Empty;
+            if (stack.Length > 1600)
+                stack = stack.Substring(0, 1600) + "...";
+
+            return $"{context}\n\n" +
+                   $"Тип: {exception.GetType().FullName}\n" +
+                   $"Сообщение: {exception.Message}\n\n" +
+                   $"Стек:\n{stack}";
         }
 
         private static bool IsRecoverableWpfAnimationException(Exception exception)
         {
-            if (exception is not NullReferenceException)
-                return false;
-
+            string message = exception.Message ?? string.Empty;
             string stackTrace = exception.StackTrace ?? string.Empty;
-            return stackTrace.IndexOf("System.Windows.Media.Animation.Clock", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   stackTrace.IndexOf("System.Windows.Media.Animation.TimeManager", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            if (exception is NullReferenceException)
+            {
+                return stackTrace.IndexOf("System.Windows.Media.Animation.Clock", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                       stackTrace.IndexOf("System.Windows.Media.Animation.TimeManager", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+
+            if (exception is InvalidOperationException &&
+                (message.IndexOf("только чтение", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 message.IndexOf("read-only", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return stackTrace.IndexOf("System.Windows.Media.Animation", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                       stackTrace.IndexOf("System.Windows.Media.Freezable", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+
+            return exception is InvalidOperationException &&
+                   (message.IndexOf("собственный журнал", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    message.IndexOf("own journal", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         public void ChangeTheme(string themeName)

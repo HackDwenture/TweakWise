@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -24,6 +26,7 @@ namespace TweakWise.Pages
 {
     public partial class MonitoringPerformancePage : Page
     {
+        private const int MaxVisibleCallouts = 5;
         private HardwareTemperatureService _temperatureService;
         private PerformanceTuningService _performanceTuningService;
         private readonly DispatcherTimer _diagnosticsTimer = new DispatcherTimer();
@@ -36,7 +39,9 @@ namespace TweakWise.Pages
         private readonly SemaphoreSlim _settingsLoadGate = new SemaphoreSlim(1, 1);
         private readonly object _temperatureSync = new object();
         private CancellationTokenSource _settingsLoadCts;
+        private CancellationTokenSource _searchFilterCts;
         private int _settingsLoadVersion;
+        private int _searchFilterVersion;
         private IReadOnlyList<PerformanceTuningItem> _currentPerformanceItems = Array.Empty<PerformanceTuningItem>();
         private string _pendingSearchTargetSettingId = string.Empty;
         private string _pendingSearchTargetSectionTitle = string.Empty;
@@ -44,6 +49,8 @@ namespace TweakWise.Pages
         private WindowsPoint _nodeDetailsOrbTargetPoint;
         private string _nodeDetailsOrbSourceNodeKey = "Cpu";
         private List<BoardFinding> _findings = new List<BoardFinding>();
+        private readonly object _settingFindingsSync = new object();
+        private readonly Dictionary<string, List<BoardFinding>> _settingFindingsByNode = new Dictionary<string, List<BoardFinding>>(StringComparer.OrdinalIgnoreCase);
         private string _selectedNodeKey = "Cpu";
         private string _hoverNodeKey = string.Empty;
         private PerformanceSignalFilter _performanceSignalFilter = PerformanceSignalFilter.All;
@@ -51,13 +58,18 @@ namespace TweakWise.Pages
         private bool _isInitialized;
         private bool _isPageActive;
         private bool _diagnosticsRefreshRunning;
+        private bool _isPerformanceSettingsLoading;
 
-        private bool CanRunPageAnimations =>
-            _isPageActive &&
-            IsLoaded &&
-            Dispatcher != null &&
-            !Dispatcher.HasShutdownStarted &&
-            !Dispatcher.HasShutdownFinished;
+        static MonitoringPerformancePage()
+        {
+            try
+            {
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            }
+            catch
+            {
+            }
+        }
 
         public MonitoringPerformancePage()
         {
@@ -70,7 +82,7 @@ namespace TweakWise.Pages
             _searchDebounceTimer.Tick += (sender, args) =>
             {
                 _searchDebounceTimer.Stop();
-                ApplyPerformanceSearchFilter();
+                QueuePerformanceSearchFilter(showBusy: false);
             };
 
             InitializeMaps();
@@ -181,6 +193,8 @@ namespace TweakWise.Pages
 
             _diagnosticsTimer.Stop();
             _searchDebounceTimer.Stop();
+            CancelPerformanceSearchFilter();
+            CancelPerformanceSettingsLoad();
             StopAllNodeMicroAnimations();
             StopTransientAnimations();
 
@@ -351,9 +365,10 @@ namespace TweakWise.Pages
                 return;
 
             item.IsPriority = false;
-            item.SetSignal(HealthLevel.Good);
+            if (hasProblem)
+                item.SetStatus(string.Empty, isWarning: false);
 
-            ApplyPerformanceSearchFilter();
+            QueuePerformanceSearchFilter(showBusy: true);
         }
 
         private void PerformanceSignalFilter_Click(object sender, RoutedEventArgs e)
@@ -363,7 +378,7 @@ namespace TweakWise.Pages
 
             _performanceSignalFilter = ParsePerformanceSignalFilter(button.Tag?.ToString());
             UpdatePerformanceSignalFilterButtons();
-            ApplyPerformanceSearchFilter();
+            QueuePerformanceSearchFilter(showBusy: true);
         }
 
         private void Component_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
@@ -519,6 +534,13 @@ namespace TweakWise.Pages
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 });
 
+            if (element is Border border && element.DataContext is PerformanceTuningItem statusItem)
+            {
+                var level = GetPerformanceSignalLevel(statusItem);
+                if (level == HealthLevel.Normal || level == HealthLevel.Attention || level == HealthLevel.Warning || level == HealthLevel.Critical)
+                    border.SetResourceReference(Border.BorderBrushProperty, GetStatusBrushKey(level));
+            }
+
             if (element.DataContext is PerformanceTuningItem item &&
                 !string.IsNullOrWhiteSpace(_pendingSearchTargetSettingId) &&
                 string.Equals(item.SettingId, _pendingSearchTargetSettingId, StringComparison.OrdinalIgnoreCase))
@@ -529,6 +551,93 @@ namespace TweakWise.Pages
                     element.BringIntoView();
                     PlaySearchResultHighlight(element);
                 }), DispatcherPriority.Background);
+            }
+        }
+
+        private void SelectedFindingCard_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Border border || border.DataContext is not BoardFinding finding)
+                return;
+
+            string brushKey = GetStatusBrushKey(finding.Level);
+            border.SetResourceReference(Border.BorderBrushProperty, brushKey);
+
+            if (border.Child is StackPanel panel && panel.Children.Count > 0 && panel.Children[0] is TextBlock kindText)
+                kindText.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+        }
+
+        private void SelectedFindingCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (e.OriginalSource is DependencyObject original &&
+                FindVisualParent<System.Windows.Controls.Button>(original) != null)
+            {
+                return;
+            }
+
+            if (sender is not FrameworkElement element || element.DataContext is not BoardFinding finding)
+                return;
+
+            NavigateToFindingTarget(finding, openNode: false);
+            e.Handled = true;
+        }
+
+        private void DiagnosticCallout_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (e.OriginalSource is DependencyObject original &&
+                FindVisualParent<System.Windows.Controls.Button>(original) != null)
+            {
+                return;
+            }
+
+            if (sender is not FrameworkElement element || element.Tag is not BoardFinding finding)
+                return;
+
+            NavigateToFindingTarget(finding, openNode: true);
+            e.Handled = true;
+        }
+
+        private static T FindVisualParent<T>(DependencyObject source)
+            where T : DependencyObject
+        {
+            DependencyObject current = source;
+            while (current != null)
+            {
+                if (current is T typed)
+                    return typed;
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return null;
+        }
+
+        private void NavigateToFindingTarget(BoardFinding finding, bool openNode)
+        {
+            if (finding == null)
+                return;
+
+            if (openNode &&
+                !string.IsNullOrWhiteSpace(finding.NodeKey) &&
+                (!string.Equals(_selectedNodeKey, finding.NodeKey, StringComparison.OrdinalIgnoreCase) || !_isDetailsOpen))
+            {
+                SelectNode(finding.NodeKey, openDetails: true);
+            }
+
+            _pendingSearchTargetSettingId = finding.TargetSettingId ?? string.Empty;
+            _pendingSearchTargetSectionTitle = string.IsNullOrWhiteSpace(_pendingSearchTargetSettingId)
+                ? finding.TargetSectionTitle ?? string.Empty
+                : string.Empty;
+
+            if (PerformanceSearchTextBox != null)
+                PerformanceSearchTextBox.Text = string.Empty;
+
+            _performanceSignalFilter = PerformanceSignalFilter.All;
+            UpdatePerformanceSignalFilterButtons();
+
+            if ((_currentPerformanceItems?.Count ?? 0) > 0)
+            {
+                _searchDebounceTimer.Stop();
+                QueuePerformanceSearchFilter(showBusy: true);
             }
         }
 
@@ -614,7 +723,7 @@ namespace TweakWise.Pages
             PerformanceSearchTextBox.Focus();
             PerformanceSearchTextBox.CaretIndex = 0;
             _searchDebounceTimer.Stop();
-            ApplyPerformanceSearchFilter();
+            QueuePerformanceSearchFilter(showBusy: false);
         }
 
         private void PerformanceSearchSuggestion_Click(object sender, RoutedEventArgs e)
@@ -646,7 +755,7 @@ namespace TweakWise.Pages
             }
 
             _searchDebounceTimer.Stop();
-            ApplyPerformanceSearchFilter();
+            QueuePerformanceSearchFilter(showBusy: true);
 
             if (PerformanceSearchSuggestionsItemsControl != null)
                 PerformanceSearchSuggestionsItemsControl.Visibility = Visibility.Collapsed;
@@ -837,7 +946,6 @@ namespace TweakWise.Pages
                 CurrentValue = source.CurrentValue,
                 StatusMessage = source.StatusMessage,
                 StatusIsWarning = source.StatusIsWarning,
-                SignalLevel = source.SignalLevel,
                 CanApply = source.CanApply,
                 CanRollback = source.CanRollback,
                 IsSupported = source.IsSupported,
@@ -885,7 +993,6 @@ namespace TweakWise.Pages
             target.CurrentValue = source.CurrentValue;
             target.StatusMessage = source.StatusMessage;
             target.StatusIsWarning = source.StatusIsWarning;
-            target.SignalLevel = source.SignalLevel;
             target.CanRollback = source.CanRollback;
 
             string selectedValue = source.SelectedOption?.Value;
@@ -1091,6 +1198,7 @@ namespace TweakWise.Pages
                 _findings = findings;
                 ApplyCallouts();
                 UpdateSelectedFindings();
+                UpdateHighlights();
             }
             catch
             {
@@ -1100,6 +1208,7 @@ namespace TweakWise.Pages
                 _findings = new List<BoardFinding>();
                 ApplyCallouts();
                 UpdateSelectedFindings();
+                UpdateHighlights();
             }
             finally
             {
@@ -1110,12 +1219,131 @@ namespace TweakWise.Pages
         private List<BoardFinding> BuildDiagnosticFindings()
         {
             var findings = new List<BoardFinding>();
+            AddModuleHealthFindings(findings);
             AddTemperatureFindings(findings);
             AddPowerFindings(findings);
             AddRamFindings(findings);
-            return findings
+            AddCachedSettingFindings(findings);
+
+            return NormalizeDiagnosticFindings(findings);
+        }
+
+        private static List<BoardFinding> NormalizeDiagnosticFindings(IEnumerable<BoardFinding> findings)
+        {
+            return (findings ?? Array.Empty<BoardFinding>())
+                .Where(finding => finding != null)
                 .Where(finding => !App.SettingsManager.IsHealthSignalSuppressed(finding.Id))
+                .Select(NormalizeFindingTarget)
+                .GroupBy(BuildFindingDedupeKey, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group
+                    .OrderByDescending(item => GetSeverity(item.Level))
+                    .ThenByDescending(item => item.Description?.Length ?? 0)
+                    .First())
+                .OrderByDescending(finding => GetSeverity(finding.Level))
+                .ThenBy(finding => GetNodeDisplayOrder(finding.NodeKey))
+                .ThenBy(finding => finding.Title)
                 .ToList();
+        }
+
+        private static BoardFinding NormalizeFindingTarget(BoardFinding finding)
+        {
+            if (finding == null)
+                return null;
+
+            if (string.IsNullOrWhiteSpace(finding.TargetSettingId))
+                finding.TargetSettingId = ResolveFindingTargetSettingId(finding);
+
+            if (string.IsNullOrWhiteSpace(finding.TargetSectionTitle))
+                finding.TargetSectionTitle = ResolveFindingTargetSectionTitle(finding);
+
+            return finding;
+        }
+
+        private static string BuildFindingDedupeKey(BoardFinding finding)
+        {
+            if (!string.IsNullOrWhiteSpace(finding.TargetSettingId))
+                return $"{finding.NodeKey}|target|{NormalizeFindingIdPart(finding.TargetSettingId)}";
+
+            string source = !string.IsNullOrWhiteSpace(finding.Id)
+                ? finding.Id
+                : $"{finding.Title}.{finding.Description}";
+
+            return $"{finding.NodeKey}|signal|{NormalizeFindingIdPart(source)}";
+        }
+
+        private static int GetNodeDisplayOrder(string nodeKey)
+        {
+            return nodeKey switch
+            {
+                "Power" => 0,
+                "Cpu" => 1,
+                "Ram" => 2,
+                "Gpu" => 3,
+                "Cooling" => 4,
+                _ => 9
+            };
+        }
+
+        private static void AddModuleHealthFindings(List<BoardFinding> findings)
+        {
+            var module = App.ComputerHealthService?.GetModule(CoreModuleId.Resources);
+            var moduleFindings = module?.Status?.Findings;
+            if (moduleFindings == null || moduleFindings.Count == 0)
+                return;
+
+            foreach (var finding in moduleFindings)
+            {
+                if (finding == null)
+                    continue;
+
+                string description = string.IsNullOrWhiteSpace(finding.ActionText)
+                    ? finding.Description
+                    : string.IsNullOrWhiteSpace(finding.Description)
+                        ? finding.ActionText
+                        : $"{finding.Description} {finding.ActionText}";
+
+                findings.Add(new BoardFinding
+                {
+                    Id = string.IsNullOrWhiteSpace(finding.Id) ? BuildModuleFindingId(finding) : finding.Id,
+                    NodeKey = ResolveFindingNodeKey(finding),
+                    Level = NormalizeFindingLevel(finding.Level),
+                    Title = finding.Title,
+                    Description = description,
+                    TargetSettingId = ResolveModuleFindingTargetSettingId(finding),
+                    TargetSectionTitle = ResolveModuleFindingTargetSectionTitle(finding)
+                });
+            }
+        }
+
+        private void AddCachedSettingFindings(List<BoardFinding> findings)
+        {
+            List<BoardFinding> snapshot;
+            lock (_settingFindingsSync)
+            {
+                snapshot = _settingFindingsByNode.Values
+                    .SelectMany(items => items)
+                    .Select(CloneFinding)
+                    .ToList();
+            }
+
+            findings.AddRange(snapshot);
+        }
+
+        private static BoardFinding CloneFinding(BoardFinding finding)
+        {
+            return new BoardFinding
+            {
+                Id = finding.Id,
+                NodeKey = finding.NodeKey,
+                Level = finding.Level,
+                Title = finding.Title,
+                Description = finding.Description,
+                TargetSettingId = finding.TargetSettingId,
+                TargetSectionTitle = finding.TargetSectionTitle,
+                IsSummary = finding.IsSummary,
+                ExtraSignalCount = finding.ExtraSignalCount,
+                ExtraSignalSummary = finding.ExtraSignalSummary
+            };
         }
 
         private void AddTemperatureFindings(List<BoardFinding> findings)
@@ -1124,8 +1352,8 @@ namespace TweakWise.Pages
             if (readings.Count == 0)
                 return;
 
-            AddThermalFinding(findings, readings, "Cpu", "CPU нагревается", 95, 85, 78);
-            AddThermalFinding(findings, readings, "Gpu", "GPU нагревается", 92, 85, 78);
+            AddThermalFinding(findings, readings, "Cpu", "CPU нагревается", 90, 82);
+            AddThermalFinding(findings, readings, "Gpu", "GPU нагревается", 87, 80);
 
             float hottestPerformanceTemp = readings
                 .Where(item => item.Group == "Cpu" || item.Group == "Gpu" || item.Group == "Motherboard" || item.Group == "Other")
@@ -1133,18 +1361,7 @@ namespace TweakWise.Pages
                 .DefaultIfEmpty(0)
                 .Max();
 
-            if (hottestPerformanceTemp >= 95)
-            {
-                findings.Add(new BoardFinding
-                {
-                    Id = "resources.cooling.critical-temperature",
-                    NodeKey = "Cooling",
-                    Level = HealthLevel.Critical,
-                    Title = "Критическая температура",
-                    Description = $"Самый горячий датчик показывает {HardwareTemperatureService.FormatTemperature(hottestPerformanceTemp)}. Лучше остановить нагрузку и проверить охлаждение, пыль, прижим, вентиляторы и лимиты питания."
-                });
-            }
-            else if (hottestPerformanceTemp >= 85)
+            if (hottestPerformanceTemp >= 86)
             {
                 findings.Add(new BoardFinding
                 {
@@ -1152,7 +1369,8 @@ namespace TweakWise.Pages
                     NodeKey = "Cooling",
                     Level = HealthLevel.Warning,
                     Title = "Система сильно нагревается",
-                    Description = $"Самый горячий датчик показывает {HardwareTemperatureService.FormatTemperature(hottestPerformanceTemp)}. Проверьте вентиляцию, пыль в корпусе и текущий режим питания."
+                    Description = $"Самый горячий датчик показывает {HardwareTemperatureService.FormatTemperature(hottestPerformanceTemp)}. Проверьте вентиляцию, пыль в корпусе и текущий режим питания.",
+                    TargetSettingId = "cooling.overview"
                 });
             }
             else if (hottestPerformanceTemp >= 78)
@@ -1163,7 +1381,8 @@ namespace TweakWise.Pages
                     NodeKey = "Cooling",
                     Level = HealthLevel.Normal,
                     Title = "Охлаждение близко к высокой нагрузке",
-                    Description = $"Пик по датчикам: {HardwareTemperatureService.FormatTemperature(hottestPerformanceTemp)}. Перед тяжёлыми задачами стоит убедиться, что вентиляторы работают нормально."
+                    Description = $"Пик по датчикам: {HardwareTemperatureService.FormatTemperature(hottestPerformanceTemp)}. Перед тяжёлыми задачами стоит убедиться, что вентиляторы работают нормально.",
+                    TargetSettingId = "cooling.overview"
                 });
             }
         }
@@ -1173,7 +1392,6 @@ namespace TweakWise.Pages
             IReadOnlyList<TemperatureSensorReading> readings,
             string group,
             string title,
-            float criticalThreshold,
             float warningThreshold,
             float recommendationThreshold)
         {
@@ -1185,19 +1403,18 @@ namespace TweakWise.Pages
             if (hottest == null || hottest.ValueCelsius < recommendationThreshold)
                 return;
 
-            HealthLevel level = hottest.ValueCelsius >= criticalThreshold
-                ? HealthLevel.Critical
-                : hottest.ValueCelsius >= warningThreshold
-                    ? HealthLevel.Warning
-                    : HealthLevel.Normal;
-
             findings.Add(new BoardFinding
             {
                 Id = $"resources.{group.ToLowerInvariant()}.temperature",
                 NodeKey = group,
-                Level = level,
-                Title = level == HealthLevel.Critical ? $"{group}: критическая температура" : title,
-                Description = $"{hottest.Title}: {HardwareTemperatureService.FormatTemperature(hottest.ValueCelsius)}."
+                Level = hottest.ValueCelsius >= warningThreshold ? HealthLevel.Warning : HealthLevel.Normal,
+                Title = title,
+                Description = $"{hottest.Title}: {HardwareTemperatureService.FormatTemperature(hottest.ValueCelsius)}.",
+                TargetSettingId = string.Equals(group, "Cpu", StringComparison.OrdinalIgnoreCase)
+                    ? "cpu.temperatures"
+                    : string.Equals(group, "Gpu", StringComparison.OrdinalIgnoreCase)
+                        ? "gpu.temperatures"
+                        : "cooling.overview"
             });
         }
 
@@ -1206,20 +1423,56 @@ namespace TweakWise.Pages
             try
             {
                 var power = WinForms.SystemInformation.PowerStatus;
-                if (power.PowerLineStatus != WinForms.PowerLineStatus.Offline)
-                    return;
-
-                findings.Add(new BoardFinding
+                if (power.PowerLineStatus == WinForms.PowerLineStatus.Offline)
                 {
-                    Id = "resources.power.on-battery",
-                    NodeKey = "Power",
-                    Level = HealthLevel.Normal,
-                    Title = "Питание от батареи",
-                    Description = "Windows может ограничивать частоты и охлаждение. Для тяжёлых задач лучше включить питание от сети или производительный профиль."
-                });
+                    findings.Add(new BoardFinding
+                    {
+                        Id = "resources.power.on-battery",
+                        NodeKey = "Power",
+                        Level = HealthLevel.Normal,
+                        Title = "Питание от батареи",
+                        Description = "Windows может ограничивать частоты и охлаждение. Для тяжёлых задач лучше включить питание от сети или производительный профиль.",
+                        TargetSettingId = "power.source"
+                    });
+                }
             }
             catch
             {
+            }
+
+            var requests = RunPowerCfgForDiagnostics("/requests");
+            if (requests.Success && !IsEmptyPowerCfgDiagnostic(requests.Output))
+            {
+                string summary = SummarizePowerCfgOutput(requests.Output, 8);
+                findings.Add(new BoardFinding
+                {
+                    Id = "performance.setting.power.active-requests",
+                    NodeKey = "Power",
+                    Level = HealthLevel.Warning,
+                    Title = "Активные запросы питания",
+                    Description = string.IsNullOrWhiteSpace(summary)
+                        ? "Обнаружены процессы, драйверы или устройства, которые сейчас блокируют сон, отключение экрана или idle-сценарии."
+                        : summary,
+                    TargetSettingId = "power.active-requests"
+                });
+            }
+
+            var wakeArmed = RunPowerCfgForDiagnostics("/devicequery", "wake_armed");
+            if (wakeArmed.Success)
+            {
+                string summary = SummarizePowerCfgOutput(wakeArmed.Output, 6);
+                if (!string.IsNullOrWhiteSpace(summary) && !IsEmptyPowerCfgDiagnostic(summary))
+                {
+                    findings.Add(new BoardFinding
+                    {
+                        Id = "performance.setting.power.wake-armed-devices",
+                        NodeKey = "Power",
+                        Level = HealthLevel.Normal,
+                        Title = "Устройства могут будить ПК",
+                        Description = summary,
+                        TargetSettingId = "power.wake-armed-devices"
+                    });
+                }
             }
         }
 
@@ -1231,18 +1484,19 @@ namespace TweakWise.Pages
                 if (!GlobalMemoryStatusEx(memory) || memory.ullTotalPhys == 0)
                     return;
 
-                if (memory.dwMemoryLoad >= 90)
+                if (memory.dwMemoryLoad >= 92)
                 {
                     findings.Add(new BoardFinding
                     {
                         Id = "resources.ram.critical-load",
                         NodeKey = "Ram",
                         Level = HealthLevel.Critical,
-                        Title = "Оперативная память почти заполнена",
-                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Высок риск активной подкачки, зависаний и падения производительности."
+                        Title = "Оперативная память почти исчерпана",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Это критичный уровень для тяжёлых задач: возможны подвисания и активная работа файла подкачки.",
+                        TargetSettingId = "ram.load"
                     });
                 }
-                else if (memory.dwMemoryLoad >= 75)
+                else if (memory.dwMemoryLoad >= 78)
                 {
                     findings.Add(new BoardFinding
                     {
@@ -1250,18 +1504,20 @@ namespace TweakWise.Pages
                         NodeKey = "Ram",
                         Level = HealthLevel.Warning,
                         Title = "Оперативная память сильно загружена",
-                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Для тяжёлых задач это уже проблема: лучше закрыть лишние приложения или проверить утечки памяти."
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Для тяжёлых задач это уже проблема: лучше закрыть лишние приложения или проверить утечки памяти.",
+                        TargetSettingId = "ram.load"
                     });
                 }
-                else if (memory.dwMemoryLoad >= 65)
+                else if (memory.dwMemoryLoad >= 70)
                 {
                     findings.Add(new BoardFinding
                     {
                         Id = "resources.ram.elevated-load",
                         NodeKey = "Ram",
                         Level = HealthLevel.Normal,
-                        Title = "ОЗУ приближается к высокой загрузке",
-                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Перед нагрузкой стоит освободить память."
+                        Title = "Запас оперативной памяти небольшой",
+                        Description = $"Занято {memory.dwMemoryLoad}% ОЗУ. Перед играми, рендером или виртуальными машинами стоит освободить память.",
+                        TargetSettingId = "ram.load"
                     });
                 }
             }
@@ -1277,14 +1533,97 @@ namespace TweakWise.Pages
 
             CalloutLayer.Children.Clear();
 
-            var nodeCounters = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var finding in _findings)
+            foreach (var finding in BuildVisibleCallouts(_findings))
             {
-                nodeCounters.TryGetValue(finding.NodeKey, out int index);
-                nodeCounters[finding.NodeKey] = index + 1;
-                AddCallout(finding, index);
+                AddCallout(finding, 0);
             }
+
+            UpdateHighlights();
+        }
+
+        private static IReadOnlyList<BoardFinding> BuildVisibleCallouts(IReadOnlyList<BoardFinding> findings)
+        {
+            if (findings == null || findings.Count == 0)
+                return Array.Empty<BoardFinding>();
+
+            var visible = findings
+                .GroupBy(item => item.NodeKey, StringComparer.OrdinalIgnoreCase)
+                .Select(group =>
+                {
+                    var ordered = group
+                        .OrderByDescending(item => GetSeverity(item.Level))
+                        .ThenBy(item => item.Title)
+                        .ToList();
+
+                    var primary = CloneFinding(ordered[0]);
+                    primary.ExtraSignalCount = Math.Max(0, ordered.Count - 1);
+                    primary.ExtraSignalSummary = BuildExtraSignalSummary(ordered.Skip(1).ToList());
+                    return primary;
+                })
+                .ToList();
+
+            return visible
+                .OrderByDescending(item => GetSeverity(item.Level))
+                .ThenBy(item => GetNodeDisplayOrder(item.NodeKey))
+                .Take(MaxVisibleCallouts)
+                .ToList();
+        }
+
+        private static string BuildExtraSignalSummary(IReadOnlyList<BoardFinding> hidden)
+        {
+            if (hidden == null || hidden.Count == 0)
+                return string.Empty;
+
+            int problemCount = hidden.Count(item => item.Level == HealthLevel.Attention || item.Level == HealthLevel.Warning || item.Level == HealthLevel.Critical);
+            int recommendationCount = hidden.Count - problemCount;
+
+            var parts = new List<string>();
+            if (problemCount > 0)
+                parts.Add(FormatSignalCount(problemCount, "проблема", "проблемы", "проблем"));
+            if (recommendationCount > 0)
+                parts.Add(FormatSignalCount(recommendationCount, "рекомендация", "рекомендации", "рекомендаций"));
+
+            var titles = hidden
+                .OrderByDescending(item => GetSeverity(item.Level))
+                .Select(GetCompactFindingTitle)
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .Take(3)
+                .ToList();
+
+            string countText = parts.Count == 0
+                ? FormatSignalCount(hidden.Count, "сигнал", "сигнала", "сигналов")
+                : string.Join(" и ", parts);
+
+            return titles.Count == 0
+                ? $"Ещё {countText} внутри узла."
+                : $"Ещё {countText}: {string.Join("; ", titles)}.";
+        }
+
+        private static string GetCompactFindingTitle(BoardFinding finding)
+        {
+            if (finding == null)
+                return string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(finding.TargetSectionTitle))
+                return $"{finding.TargetSectionTitle}: {finding.Title}";
+
+            return finding.Title ?? string.Empty;
+        }
+
+        private static string FormatSignalCount(int count, string one, string few, string many)
+        {
+            int mod100 = Math.Abs(count) % 100;
+            int mod10 = Math.Abs(count) % 10;
+            string word = mod100 is >= 11 and <= 14
+                ? many
+                : mod10 == 1
+                    ? one
+                    : mod10 is >= 2 and <= 4
+                        ? few
+                        : many;
+
+            return $"{count} {word}";
         }
 
         private void AddCallout(BoardFinding finding, int index)
@@ -1322,9 +1661,12 @@ namespace TweakWise.Pages
                 MinHeight = 74,
                 Style = FindResource("DiagnosticCardStyle") as Style,
                 Opacity = 0,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Tag = finding,
                 RenderTransform = new TranslateTransform(layout.EntranceOffset.X, layout.EntranceOffset.Y)
             };
             card.SetResourceReference(Border.BorderBrushProperty, brushKey);
+            card.MouseLeftButtonUp += DiagnosticCallout_MouseLeftButtonUp;
 
             var panel = new StackPanel();
             var header = new TextBlock
@@ -1350,24 +1692,48 @@ namespace TweakWise.Pages
                 Margin = new Thickness(0, 6, 0, 0),
                 FontSize = 12,
                 LineHeight = 18,
+                MaxHeight = 72,
                 Opacity = 0.78,
                 TextWrapping = TextWrapping.Wrap
             };
 
-            var ignoreButton = new System.Windows.Controls.Button
-            {
-                Content = "Игнорировать",
-                Tag = finding.Id,
-                Margin = new Thickness(0, 10, 0, 0),
-                HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
-                Style = FindResource("PerformanceActionButtonStyle") as Style
-            };
-            ignoreButton.Click += IgnoreBoardFinding_Click;
-
             panel.Children.Add(header);
             panel.Children.Add(title);
             panel.Children.Add(description);
-            panel.Children.Add(ignoreButton);
+
+            if (finding.ExtraSignalCount > 0)
+            {
+                var moreSignals = new TextBlock
+                {
+                    Text = string.IsNullOrWhiteSpace(finding.ExtraSignalSummary)
+                        ? $"+ {FormatSignalCount(finding.ExtraSignalCount, "сигнал", "сигнала", "сигналов")} внутри узла"
+                        : finding.ExtraSignalSummary,
+                    Margin = new Thickness(0, 8, 0, 0),
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold,
+                    LineHeight = 15,
+                    MaxHeight = 48,
+                    Opacity = 0.72,
+                    TextWrapping = TextWrapping.Wrap
+                };
+                moreSignals.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+                panel.Children.Add(moreSignals);
+            }
+
+            if (!finding.IsSummary)
+            {
+                var ignoreButton = new System.Windows.Controls.Button
+                {
+                    Content = "Игнорировать",
+                    Tag = finding.Id,
+                    Margin = new Thickness(0, 10, 0, 0),
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+                    Style = FindResource("PerformanceSignalActionButtonStyle") as Style
+                };
+                ignoreButton.Click += IgnoreBoardFinding_Click;
+
+                panel.Children.Add(ignoreButton);
+            }
             card.Child = panel;
 
             Canvas.SetLeft(card, layout.Card.X);
@@ -1464,7 +1830,7 @@ namespace TweakWise.Pages
                 return;
             }
 
-            int problemCount = selected.Count(item => item.Level == HealthLevel.Warning || item.Level == HealthLevel.Critical);
+            int problemCount = selected.Count(item => item.Level == HealthLevel.Attention || item.Level == HealthLevel.Warning || item.Level == HealthLevel.Critical);
             int recommendationCount = selected.Count - problemCount;
             var highestLevel = selected.OrderByDescending(item => GetSeverity(item.Level)).First().Level;
 
@@ -1502,6 +1868,7 @@ namespace TweakWise.Pages
 
                 var items = await Task.Run(() => _performanceTuningService.BuildItemsForNode(nodeKey), token);
                 if (token.IsCancellationRequested ||
+                    !_isPageActive ||
                     loadVersion != _settingsLoadVersion ||
                     !string.Equals(nodeKey, _selectedNodeKey, StringComparison.OrdinalIgnoreCase))
                 {
@@ -1562,10 +1929,12 @@ namespace TweakWise.Pages
                 ApplyPerformanceSettingSignalSuppression(item);
 
             _currentPerformanceItems = preparedItems;
+            UpdateSettingSignalFindings(_selectedNodeKey, preparedItems);
             if (preparedItems.Any(item => item.HasActiveSignal))
                 _ = App.ComputerHealthService?.RefreshStatusAsync();
 
             ApplyPerformanceSearchFilter();
+            RefreshDiagnostics();
         }
 
         private static void ApplyPerformanceSettingSignalSuppression(PerformanceTuningItem item)
@@ -1590,7 +1959,28 @@ namespace TweakWise.Pages
             string source = !string.IsNullOrWhiteSpace(item.SettingId)
                 ? item.SettingId
                 : item.Title;
-            item.SignalId = $"performance.setting.{NormalizeSignalFragment(source)}";
+            item.SignalId = $"performance.setting.{NormalizeSettingSignalFragment(source)}";
+        }
+
+        private static string NormalizeSettingSignalFragment(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return "item";
+
+            string normalized = new string(value
+                .Trim()
+                .ToLowerInvariant()
+                .Select(ch => char.IsLetterOrDigit(ch) || ch == '.' || ch == '-' ? ch : '-')
+                .ToArray())
+                .Trim('.', '-');
+
+            while (normalized.Contains("--", StringComparison.Ordinal))
+                normalized = normalized.Replace("--", "-", StringComparison.Ordinal);
+
+            while (normalized.Contains("..", StringComparison.Ordinal))
+                normalized = normalized.Replace("..", ".", StringComparison.Ordinal);
+
+            return string.IsNullOrWhiteSpace(normalized) ? "item" : normalized;
         }
 
         private static string NormalizeSignalFragment(string value)
@@ -1628,6 +2018,7 @@ namespace TweakWise.Pages
         private void UnloadPerformanceSettingsView(bool clearSearch)
         {
             _searchDebounceTimer.Stop();
+            CancelPerformanceSearchFilter();
             _currentPerformanceItems = Array.Empty<PerformanceTuningItem>();
             _pendingSearchTargetSettingId = string.Empty;
             _pendingSearchTargetSectionTitle = string.Empty;
@@ -1662,6 +2053,12 @@ namespace TweakWise.Pages
             if (PerformanceSettingsLoadingPanel != null)
                 PerformanceSettingsLoadingPanel.Visibility = Visibility.Collapsed;
 
+            if (PerformanceNavigationBusyOverlay != null)
+            {
+                PerformanceNavigationBusyOverlay.Visibility = Visibility.Collapsed;
+                PerformanceNavigationBusyOverlay.Opacity = 0;
+            }
+
             if (PerformanceSettingsEmptyText != null)
                 PerformanceSettingsEmptyText.Visibility = Visibility.Collapsed;
 
@@ -1677,6 +2074,7 @@ namespace TweakWise.Pages
             if (PerformanceSettingsLoadingPanel == null)
                 return;
 
+            _isPerformanceSettingsLoading = isLoading;
             PerformanceSettingsLoadingPanel.Visibility = isLoading ? Visibility.Visible : Visibility.Collapsed;
 
             if (isLoading)
@@ -1686,11 +2084,112 @@ namespace TweakWise.Pages
                 PerformanceSettingsEmptyText.Visibility = Visibility.Collapsed;
                 PerformanceSearchEmptyText.Visibility = Visibility.Collapsed;
                 PerformanceSearchSuggestionsItemsControl.Visibility = Visibility.Collapsed;
-                StartLoadingSquares();
+                StartLoadingSquares(GetSettingsLoadingSquares());
             }
             else
             {
-                StopLoadingSquares();
+                StopLoadingSquares(GetSettingsLoadingSquares());
+            }
+        }
+
+        private async void QueuePerformanceSearchFilter(bool showBusy)
+        {
+            CancelPerformanceSearchFilter();
+            if (!showBusy)
+                SetPerformanceSettingsBusy(false);
+
+            _searchFilterCts = new CancellationTokenSource();
+            int filterVersion = ++_searchFilterVersion;
+            var token = _searchFilterCts.Token;
+
+            try
+            {
+                if (showBusy)
+                {
+                    SetPerformanceSettingsBusy(true);
+                    await Task.Delay(80, token);
+                }
+                else
+                {
+                    await Dispatcher.Yield(DispatcherPriority.Background);
+                }
+
+                if (token.IsCancellationRequested ||
+                    filterVersion != _searchFilterVersion ||
+                    !_isPageActive)
+                {
+                    return;
+                }
+
+                ApplyPerformanceSearchFilter();
+
+                if (showBusy)
+                {
+                    await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+                    await Task.Delay(140, token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                ShowPerformanceSettingsLoadError(ex.Message);
+            }
+            finally
+            {
+                if (showBusy && filterVersion == _searchFilterVersion)
+                    SetPerformanceSettingsBusy(false);
+            }
+        }
+
+        private void CancelPerformanceSearchFilter()
+        {
+            _searchFilterVersion++;
+
+            if (_searchFilterCts == null)
+                return;
+
+            try
+            {
+                _searchFilterCts.Cancel();
+                _searchFilterCts.Dispose();
+            }
+            catch
+            {
+            }
+
+            _searchFilterCts = null;
+        }
+
+        private void SetPerformanceSettingsBusy(bool isBusy)
+        {
+            if (PerformanceNavigationBusyOverlay == null && PerformanceSettingsLoadingPanel == null)
+                return;
+
+            if (!isBusy && _isPerformanceSettingsLoading && PerformanceNavigationBusyOverlay == null)
+                return;
+
+            var overlay = PerformanceNavigationBusyOverlay ?? PerformanceSettingsLoadingPanel;
+            overlay.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+            overlay.Opacity = isBusy ? 1 : 0;
+
+            if (isBusy)
+            {
+                if (PerformanceSettingsEmptyText != null)
+                    PerformanceSettingsEmptyText.Visibility = Visibility.Collapsed;
+
+                if (PerformanceSearchEmptyText != null)
+                    PerformanceSearchEmptyText.Visibility = Visibility.Collapsed;
+
+                if (PerformanceSearchSuggestionsItemsControl != null)
+                    PerformanceSearchSuggestionsItemsControl.Visibility = Visibility.Collapsed;
+
+                StartLoadingSquares(GetNavigationLoadingSquares());
+            }
+            else
+            {
+                StopLoadingSquares(GetNavigationLoadingSquares());
             }
         }
 
@@ -1746,7 +2245,7 @@ namespace TweakWise.Pages
             return filter switch
             {
                 PerformanceSignalFilter.Recommendations => items.Where(item => GetPerformanceSignalLevel(item) == HealthLevel.Normal),
-                PerformanceSignalFilter.Problems => items.Where(item => GetPerformanceSignalLevel(item) == HealthLevel.Warning),
+                PerformanceSignalFilter.Problems => items.Where(item => GetPerformanceSignalLevel(item) == HealthLevel.Warning || GetPerformanceSignalLevel(item) == HealthLevel.Attention),
                 PerformanceSignalFilter.Critical => items.Where(item => GetPerformanceSignalLevel(item) == HealthLevel.Critical),
                 _ => items
             };
@@ -1852,18 +2351,23 @@ namespace TweakWise.Pages
             if (item == null)
                 return HealthLevel.Good;
 
-            if (item.SignalLevel != HealthLevel.Good)
-                return item.SignalLevel;
+            var level = NormalizeFindingLevel(item.SignalLevel);
 
             if (item.StatusIsWarning && item.HasStatusMessage)
             {
                 string text = $"{item.StatusMessage} {item.Title}";
-                return text.IndexOf("крит", StringComparison.CurrentCultureIgnoreCase) >= 0
+                var statusLevel = text.IndexOf("крит", StringComparison.CurrentCultureIgnoreCase) >= 0
                     ? HealthLevel.Critical
                     : HealthLevel.Warning;
+
+                if (GetSeverity(statusLevel) > GetSeverity(level))
+                    level = statusLevel;
             }
 
-            return item.IsPriority ? HealthLevel.Normal : HealthLevel.Good;
+            if (item.IsPriority && GetSeverity(level) < GetSeverity(HealthLevel.Normal))
+                level = HealthLevel.Normal;
+
+            return level;
         }
 
         private static int GetPerformanceSignalSortScore(PerformanceTuningItem item)
@@ -1910,9 +2414,80 @@ namespace TweakWise.Pages
             return source.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0;
         }
 
-        private void StartLoadingSquares()
+        private void UpdateSettingSignalFindings(string nodeKey, IReadOnlyList<PerformanceTuningItem> items)
         {
-            FrameworkElement[] squares = { LoadingSquareA, LoadingSquareB, LoadingSquareC, LoadingSquareD };
+            if (string.IsNullOrWhiteSpace(nodeKey))
+                return;
+
+            var findings = (items ?? Array.Empty<PerformanceTuningItem>())
+                .Select(item => CreateSettingFinding(nodeKey, item))
+                .Where(finding => finding != null)
+                .ToList();
+
+            lock (_settingFindingsSync)
+            {
+                if (findings.Count == 0)
+                    _settingFindingsByNode.Remove(nodeKey);
+                else
+                    _settingFindingsByNode[nodeKey] = findings;
+            }
+        }
+
+        private static BoardFinding CreateSettingFinding(string nodeKey, PerformanceTuningItem item)
+        {
+            EnsurePerformanceSettingSignalId(item);
+            var level = GetPerformanceSignalLevel(item);
+            if (level != HealthLevel.Normal && level != HealthLevel.Attention && level != HealthLevel.Warning && level != HealthLevel.Critical)
+                return null;
+
+            string description = item.StatusIsWarning && !string.IsNullOrWhiteSpace(item.StatusMessage)
+                ? item.StatusMessage
+                : !string.IsNullOrWhiteSpace(item.Recommendation)
+                    ? item.Recommendation
+                    : item.CurrentValue;
+
+            if (string.IsNullOrWhiteSpace(description))
+                description = item.Description;
+
+            return new BoardFinding
+            {
+                Id = item.SignalId,
+                NodeKey = nodeKey,
+                Level = level,
+                Title = item.Title,
+                Description = description,
+                TargetSettingId = item.SettingId,
+                TargetSectionTitle = string.IsNullOrWhiteSpace(item.SectionTitle) ? string.Empty : item.SectionTitle
+            };
+        }
+
+        private FrameworkElement[] GetSettingsLoadingSquares()
+        {
+            return new FrameworkElement[] { LoadingSquareA, LoadingSquareB, LoadingSquareC, LoadingSquareD };
+        }
+
+        private FrameworkElement[] GetNavigationLoadingSquares()
+        {
+            if (PerformanceNavigationBusyOverlay == null)
+                return GetSettingsLoadingSquares();
+
+            return new FrameworkElement[] { SearchBusySquareA, SearchBusySquareB, SearchBusySquareC, SearchBusySquareD };
+        }
+
+        private FrameworkElement[] GetAllLoadingSquares()
+        {
+            return GetSettingsLoadingSquares()
+                .Concat(GetNavigationLoadingSquares())
+                .Where(square => square != null)
+                .Distinct()
+                .ToArray();
+        }
+
+        private void StartLoadingSquares(params FrameworkElement[] targets)
+        {
+            FrameworkElement[] squares = targets == null || targets.Length == 0
+                ? GetAllLoadingSquares()
+                : targets;
 
             for (int index = 0; index < squares.Length; index++)
             {
@@ -1947,9 +2522,11 @@ namespace TweakWise.Pages
             }
         }
 
-        private void StopLoadingSquares()
+        private void StopLoadingSquares(params FrameworkElement[] targets)
         {
-            FrameworkElement[] squares = { LoadingSquareA, LoadingSquareB, LoadingSquareC, LoadingSquareD };
+            FrameworkElement[] squares = targets == null || targets.Length == 0
+                ? GetAllLoadingSquares()
+                : targets;
 
             foreach (var square in squares)
             {
@@ -1966,44 +2543,65 @@ namespace TweakWise.Pages
             }
         }
 
+        private static Border FindBoardPartShell(DependencyObject root)
+        {
+            if (root == null)
+                return null;
+
+            int childCount = VisualTreeHelper.GetChildrenCount(root);
+            for (int index = 0; index < childCount; index++)
+            {
+                var child = VisualTreeHelper.GetChild(root, index);
+                if (child is Border border && !Equals(border.Background, System.Windows.Media.Brushes.Transparent))
+                    return border;
+
+                var nested = FindBoardPartShell(child);
+                if (nested != null)
+                    return nested;
+            }
+
+            return null;
+        }
+
         private void UpdateHighlights()
         {
-            bool animate = CanRunPageAnimations;
+            var nodeLevels = GetNodeSignalLevels();
 
             foreach (var pair in _glows)
             {
                 bool isHover = string.Equals(pair.Key, _hoverNodeKey, StringComparison.OrdinalIgnoreCase);
                 bool isSelected = string.Equals(pair.Key, _selectedNodeKey, StringComparison.OrdinalIgnoreCase);
-                double targetOpacity = isHover ? 0.18 : isSelected && _isDetailsOpen ? 0.14 : isSelected ? 0.08 : 0;
+                nodeLevels.TryGetValue(pair.Key, out var level);
+                bool hasSignal = level == HealthLevel.Normal || level == HealthLevel.Attention || level == HealthLevel.Warning || level == HealthLevel.Critical;
 
-                if (animate)
-                    AnimateOpacity(pair.Value, targetOpacity, 170);
-                else if (pair.Value != null)
-                    pair.Value.Opacity = targetOpacity;
+                if (hasSignal)
+                    pair.Value.SetResourceReference(Shape.FillProperty, GetStatusBrushKey(level));
+                else
+                    pair.Value.SetResourceReference(Shape.FillProperty, "PerformanceGlowBrush");
+
+                double signalOpacity = GetNodeSignalGlowOpacity(level);
+                double interactionOpacity = isHover ? 0.22 : isSelected && _isDetailsOpen ? 0.16 : isSelected ? 0.10 : 0;
+                double targetOpacity = Math.Max(signalOpacity, interactionOpacity);
+                AnimateOpacity(pair.Value, targetOpacity, 170);
             }
 
             foreach (var pair in _zones)
             {
                 bool isHover = string.Equals(pair.Key, _hoverNodeKey, StringComparison.OrdinalIgnoreCase);
                 bool isSelected = string.Equals(pair.Key, _selectedNodeKey, StringComparison.OrdinalIgnoreCase);
+                nodeLevels.TryGetValue(pair.Key, out var level);
+                bool hasSignal = level == HealthLevel.Normal || level == HealthLevel.Attention || level == HealthLevel.Warning || level == HealthLevel.Critical;
+
+                var shell = FindBoardPartShell(pair.Value);
+                if (shell != null)
+                    shell.SetResourceReference(Border.BorderBrushProperty, hasSignal ? GetStatusBrushKey(level) : "BorderBrush");
+
                 double targetScale = isHover ? 1.035 : isSelected && _isDetailsOpen ? 1.022 : isSelected ? 1.01 : 1;
                 double targetLift = isHover ? -7 : isSelected && _isDetailsOpen ? -4 : 0;
-
-                if (animate)
-                {
-                    AnimatePart(pair.Value, targetScale, targetLift);
-                }
-                else if (pair.Value != null)
-                {
-                    EnsurePartTransforms(pair.Value, out var scaleTransform, out var translateTransform);
-                    scaleTransform.ScaleX = targetScale;
-                    scaleTransform.ScaleY = targetScale;
-                    translateTransform.Y = targetLift;
-                }
+                AnimatePart(pair.Value, targetScale, targetLift);
             }
 
-            if (animate)
-                UpdateNodeMicroAnimations();
+            UpdateNodeMicroAnimations();
         }
 
         private void UpdateNodeMicroAnimations()
@@ -2227,22 +2825,16 @@ namespace TweakWise.Pages
             if (line == null)
                 return;
 
-            try
-            {
-                line.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0.90, TimeSpan.FromMilliseconds(120)));
-                line.BeginAnimation(
-                    Shape.StrokeDashOffsetProperty,
-                    new DoubleAnimation
-                    {
-                        From = fromCore ? 28 : -28,
-                        To = 0,
-                        Duration = TimeSpan.FromMilliseconds(620),
-                        RepeatBehavior = RepeatBehavior.Forever
-                    });
-            }
-            catch
-            {
-            }
+            line.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0.90, TimeSpan.FromMilliseconds(120)));
+            line.BeginAnimation(
+                Shape.StrokeDashOffsetProperty,
+                new DoubleAnimation
+                {
+                    From = fromCore ? 28 : -28,
+                    To = 0,
+                    Duration = TimeSpan.FromMilliseconds(620),
+                    RepeatBehavior = RepeatBehavior.Forever
+                });
         }
 
         private void StopRouteAnimations(bool clearSelected = false)
@@ -2267,19 +2859,12 @@ namespace TweakWise.Pages
             if (element == null)
                 return;
 
-            try
-            {
-                element.BeginAnimation(
-                    UIElement.OpacityProperty,
-                    new DoubleAnimation(opacity, TimeSpan.FromMilliseconds(milliseconds))
-                    {
-                        EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-                    });
-            }
-            catch
-            {
-                element.Opacity = opacity;
-            }
+            element.BeginAnimation(
+                UIElement.OpacityProperty,
+                new DoubleAnimation(opacity, TimeSpan.FromMilliseconds(milliseconds))
+                {
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                });
         }
 
         private static void AnimatePart(Border border, double scale, double yOffset)
@@ -2290,19 +2875,9 @@ namespace TweakWise.Pages
             EnsurePartTransforms(border, out var scaleTransform, out var translateTransform);
             var duration = TimeSpan.FromMilliseconds(170);
             var easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
-
-            try
-            {
-                scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
-                scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
-                translateTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(yOffset, duration) { EasingFunction = easing });
-            }
-            catch
-            {
-                scaleTransform.ScaleX = scale;
-                scaleTransform.ScaleY = scale;
-                translateTransform.Y = yOffset;
-            }
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(scale, duration) { EasingFunction = easing });
+            translateTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(yOffset, duration) { EasingFunction = easing });
         }
 
         private static void EnsurePartTransforms(
@@ -2333,6 +2908,256 @@ namespace TweakWise.Pages
         private static string GetNodeKey(object sender)
         {
             return sender is FrameworkElement element ? element.Tag?.ToString() ?? string.Empty : string.Empty;
+        }
+
+        private Dictionary<string, HealthLevel> GetNodeSignalLevels()
+        {
+            return _findings
+                .Where(finding => !string.IsNullOrWhiteSpace(finding.NodeKey))
+                .GroupBy(finding => finding.NodeKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.OrderByDescending(finding => GetSeverity(finding.Level)).First().Level,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static double GetNodeSignalGlowOpacity(HealthLevel level)
+        {
+            return level switch
+            {
+                HealthLevel.Critical => 0.34,
+                HealthLevel.Warning => 0.27,
+                HealthLevel.Attention => 0.22,
+                HealthLevel.Normal => 0.16,
+                _ => 0
+            };
+        }
+
+        private static string BuildModuleFindingId(ModuleHealthFinding finding)
+        {
+            string title = NormalizeFindingIdPart(finding?.Title);
+            string description = NormalizeFindingIdPart(finding?.Description);
+            string action = NormalizeFindingIdPart(finding?.ActionText);
+
+            string id = $"resources.module.{title}.{description}.{action}".Trim('.');
+            return string.IsNullOrWhiteSpace(id) ? "resources.module.finding" : id;
+        }
+
+        private static string NormalizeFindingIdPart(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            var chars = value
+                .Trim()
+                .ToLowerInvariant()
+                .Select(ch => char.IsLetterOrDigit(ch) ? ch : '.')
+                .ToArray();
+
+            string result = new string(chars);
+            while (result.Contains(".."))
+                result = result.Replace("..", ".");
+
+            return result.Trim('.');
+        }
+
+        private static HealthLevel NormalizeFindingLevel(HealthLevel level)
+        {
+            return level switch
+            {
+                HealthLevel.Critical => HealthLevel.Critical,
+                HealthLevel.Warning => HealthLevel.Warning,
+                HealthLevel.Attention => HealthLevel.Attention,
+                HealthLevel.Normal => HealthLevel.Normal,
+                _ => HealthLevel.Good
+            };
+        }
+
+        private static string ResolveFindingNodeKey(ModuleHealthFinding finding)
+        {
+            string source = $"{finding?.Title} {finding?.Description} {finding?.ActionText}".ToLowerInvariant();
+
+            if (source.Contains("ram") || source.Contains("озу") || source.Contains("памят"))
+                return "Ram";
+
+            if (source.Contains("gpu") || source.Contains("видеокарт") || source.Contains("граф"))
+                return "Gpu";
+
+            if (source.Contains("cpu") || source.Contains("процессор"))
+                return "Cpu";
+
+            if (source.Contains("battery") || source.Contains("power") || source.Contains("питан") || source.Contains("сон") || source.Contains("wake") || source.Contains("пробуж"))
+                return "Power";
+
+            if (source.Contains("cool") || source.Contains("thermal") || source.Contains("температур") || source.Contains("охлаж"))
+                return "Cooling";
+
+            return "Cooling";
+        }
+
+        private static string ResolveModuleFindingTargetSettingId(ModuleHealthFinding finding)
+        {
+            if (!string.IsNullOrWhiteSpace(finding?.Id))
+            {
+                return finding.Id switch
+                {
+                    "performance.setting.power.active-requests" => "power.active-requests",
+                    "performance.setting.power.wake-armed-devices" => "power.wake-armed-devices",
+                    "resources.power.on-battery" => "power.source",
+                    "resources.ram.critical-load" => "ram.load",
+                    "resources.ram.high-load" => "ram.load",
+                    "resources.ram.elevated-load" => "ram.load",
+                    "resources.cpu.temperature" => "cpu.temperatures",
+                    "resources.gpu.temperature" => "gpu.temperatures",
+                    "resources.cooling.high-temperature" => "cooling.overview",
+                    "resources.cooling.elevated-temperature" => "cooling.overview",
+                    _ => string.Empty
+                };
+            }
+
+            return ResolveFindingTargetSettingId(new BoardFinding
+            {
+                NodeKey = ResolveFindingNodeKey(finding),
+                Title = finding?.Title ?? string.Empty,
+                Description = $"{finding?.Description} {finding?.ActionText}"
+            });
+        }
+
+        private static string ResolveModuleFindingTargetSectionTitle(ModuleHealthFinding finding)
+        {
+            return ResolveFindingTargetSectionTitle(new BoardFinding
+            {
+                NodeKey = ResolveFindingNodeKey(finding),
+                Title = finding?.Title ?? string.Empty,
+                Description = $"{finding?.Description} {finding?.ActionText}"
+            });
+        }
+
+        private static string ResolveFindingTargetSettingId(BoardFinding finding)
+        {
+            string id = finding?.Id ?? string.Empty;
+            string source = $"{finding?.Title} {finding?.Description} {id}".ToLowerInvariant();
+
+            if (source.Contains("active-requests") || source.Contains("запрос") || source.Contains("/requests"))
+                return "power.active-requests";
+
+            if (source.Contains("wake-armed") || source.Contains("пробуж") || source.Contains("будить"))
+                return "power.wake-armed-devices";
+
+            if (source.Contains("батар") || source.Contains("источник питания"))
+                return "power.source";
+
+            if (source.Contains("ram") || source.Contains("озу") || source.Contains("памят"))
+                return "ram.load";
+
+            if (source.Contains("gpu") || source.Contains("видеокарт"))
+                return "gpu.temperatures";
+
+            if (source.Contains("cpu") || source.Contains("процессор"))
+                return "cpu.temperatures";
+
+            if (source.Contains("температур") || source.Contains("охлаж") || source.Contains("thermal"))
+                return "cooling.overview";
+
+            return string.Empty;
+        }
+
+        private static string ResolveFindingTargetSectionTitle(BoardFinding finding)
+        {
+            string source = $"{finding?.Title} {finding?.Description}".ToLowerInvariant();
+
+            if (source.Contains("запрос") || source.Contains("wake") || source.Contains("пробуж") || source.Contains("сон") || source.Contains("acpi"))
+                return "Платформа, ACPI и прошивка";
+
+            if (source.Contains("ram") || source.Contains("озу") || source.Contains("памят"))
+                return "Диагностика памяти";
+
+            if (source.Contains("температур") || source.Contains("датчик") || source.Contains("охлаж"))
+                return "Тепловое состояние";
+
+            return string.Empty;
+        }
+
+        private static PowerCfgDiagnosticResult RunPowerCfgForDiagnostics(params string[] arguments)
+        {
+            try
+            {
+                using var process = new Process();
+                process.StartInfo = new ProcessStartInfo
+                {
+                    FileName = "powercfg",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                var outputEncoding = GetPowerCfgEncoding();
+                process.StartInfo.StandardOutputEncoding = outputEncoding;
+                process.StartInfo.StandardErrorEncoding = outputEncoding;
+
+                foreach (string argument in arguments ?? Array.Empty<string>())
+                {
+                    if (!string.IsNullOrWhiteSpace(argument))
+                        process.StartInfo.ArgumentList.Add(argument);
+                }
+
+                process.Start();
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+                bool exited = process.WaitForExit(2200);
+                if (!exited)
+                {
+                    try { process.Kill(); } catch { }
+                    return new PowerCfgDiagnosticResult(false, output, "powercfg не завершился вовремя");
+                }
+
+                return new PowerCfgDiagnosticResult(process.ExitCode == 0, output, error);
+            }
+            catch (Exception ex)
+            {
+                return new PowerCfgDiagnosticResult(false, string.Empty, ex.Message);
+            }
+        }
+
+        private static Encoding GetPowerCfgEncoding()
+        {
+            try
+            {
+                uint codePage = GetOEMCP();
+                if (codePage > 0)
+                    return Encoding.GetEncoding((int)codePage);
+            }
+            catch
+            {
+            }
+
+            return Console.OutputEncoding ?? Encoding.Default;
+        }
+
+        private static string SummarizePowerCfgOutput(string output, int maxLines)
+        {
+            if (string.IsNullOrWhiteSpace(output))
+                return string.Empty;
+
+            return string.Join(" · ", output
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim())
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .Where(line => !line.EndsWith(":", StringComparison.Ordinal))
+                .Take(Math.Max(1, maxLines)));
+        }
+
+        private static bool IsEmptyPowerCfgDiagnostic(string output)
+        {
+            if (string.IsNullOrWhiteSpace(output))
+                return true;
+
+            string normalized = output.ToLowerInvariant();
+            return normalized.Contains("none") ||
+                   normalized.Contains("нет") ||
+                   normalized.Contains("no") && normalized.Contains("requests") ||
+                   normalized.Contains("отсутств");
         }
 
         private static string GetModuleStatusText(HealthLevel status, int problemCount, int recommendationCount)
@@ -2429,6 +3254,9 @@ namespace TweakWise.Pages
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern bool GlobalMemoryStatusEx([In, Out] MemoryStatusEx buffer);
 
+        [DllImport("kernel32.dll")]
+        private static extern uint GetOEMCP();
+
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
         private sealed class MemoryStatusEx
         {
@@ -2481,6 +3309,26 @@ namespace TweakWise.Pages
             public HealthLevel Level { get; set; } = HealthLevel.Normal;
             public string Title { get; set; } = string.Empty;
             public string Description { get; set; } = string.Empty;
+            public string TargetSettingId { get; set; } = string.Empty;
+            public string TargetSectionTitle { get; set; } = string.Empty;
+            public bool IsSummary { get; set; }
+            public int ExtraSignalCount { get; set; }
+            public string ExtraSignalSummary { get; set; } = string.Empty;
+            public string KindText => GetFindingKindText(Level);
+        }
+
+        private readonly struct PowerCfgDiagnosticResult
+        {
+            public PowerCfgDiagnosticResult(bool success, string output, string error)
+            {
+                Success = success;
+                Output = output ?? string.Empty;
+                Error = error ?? string.Empty;
+            }
+
+            public bool Success { get; }
+            public string Output { get; }
+            public string Error { get; }
         }
 
         private readonly struct BoardCalloutLayout

@@ -46,10 +46,20 @@ namespace TweakWise.Managers
 
             if (CurrentSettings == null)
                 CurrentSettings = new AppSettings();
+
+            NormalizeSettings();
+        }
+
+        private void NormalizeSettings()
+        {
+            CurrentSettings.Notifications ??= new System.Collections.Generic.List<NotificationData>();
+            CurrentSettings.HealthSignalSuppressions ??= new System.Collections.Generic.List<HealthSignalSuppression>();
+            CurrentSettings.PerformanceBackupRetentionDays = Math.Clamp(CurrentSettings.PerformanceBackupRetentionDays, 1, 30);
         }
 
         public void SaveSettings()
         {
+            NormalizeSettings();
             CurrentSettings.PerformanceBackupRetentionDays = Math.Clamp(CurrentSettings.PerformanceBackupRetentionDays, 1, 30);
             RemoveExpiredHealthSignalSuppressions(save: false);
 
