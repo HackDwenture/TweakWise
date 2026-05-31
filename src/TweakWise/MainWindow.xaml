@@ -154,9 +154,219 @@
 
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
-            <Setter Property="Margin" Value="0,7,0,0"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+            <Setter Property="FontSize" Value="12.5"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid MinHeight="28" Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="40"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="Track"
+                                    Width="34"
+                                    Height="18"
+                                    CornerRadius="9"
+                                    Background="{DynamicResource ContentBackground}"
+                                    BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                                    BorderThickness="1"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center">
+                                <Ellipse x:Name="Thumb"
+                                         Width="12"
+                                         Height="12"
+                                         Margin="2"
+                                         HorizontalAlignment="Left"
+                                         VerticalAlignment="Center"
+                                         Fill="{DynamicResource WindowForeground}"
+                                         Opacity="0.74"/>
+                            </Border>
+                            <ContentPresenter Grid.Column="1"
+                                              Margin="4,0,0,0"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="Thumb" Property="Opacity" Value="1"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SettingsSectionCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+
+        <Style x:Key="SettingsSearchTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Padding" Value="29,7,32,7"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SettingsComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Root"
+                                                MinHeight="34"
+                                                Background="{DynamicResource ContentBackground}"
+                                                BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="10"
+                                                Padding="10,6">
+                                            <Grid>
+                                                <TextBlock Margin="0,0,22,0"
+                                                           HorizontalAlignment="Left"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource WindowForeground}"
+                                                           Text="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="&#xE70D;"
+                                                           FontFamily="Segoe MDL2 Assets"
+                                                           FontSize="10"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center"
+                                                           Opacity="0.72"/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="Root" Property="Opacity" Value="0.5"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Fade">
+                                <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="240"
+                                        Background="{DynamicResource ContentBackground}"
+                                        BorderBrush="{DynamicResource CoreLineActiveBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="4">
+                                    <ScrollViewer CanContentScroll="True">
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+                        <Setter Property="Padding" Value="10,6"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DockSecondaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <DataTemplate x:Key="NotificationTemplate">
@@ -347,152 +557,207 @@
                    StaysOpen="False"
                    PopupAnimation="Fade"
                    AllowsTransparency="True"
-                   HorizontalOffset="-320"
+                   HorizontalOffset="-430"
                    VerticalOffset="6"
                    Closed="SettingsPopup_Closed">
                 <Border Background="{DynamicResource MenuBackground}"
                         BorderBrush="{DynamicResource BorderBrush}"
                         BorderThickness="1"
-                        CornerRadius="12"
+                        CornerRadius="16"
                         Padding="16"
-                        Width="340"
-                        MaxHeight="560">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel>
-                            <TextBlock Text="Настройки"
-                                       FontSize="17"
-                                       FontWeight="SemiBold"/>
+                        Width="455"
+                        MaxHeight="620">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
 
-                            <TextBlock Text="Внешний вид"
-                                       Margin="0,18,0,8"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Opacity="0.78"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="8"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="8"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Настройки" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Text="Только реальные параметры приложения и системы."
+                                           Margin="0,5,0,0"
+                                           FontSize="12"
+                                           Opacity="0.68"/>
+                            </StackPanel>
+                        </Grid>
 
-                                <RadioButton x:Name="ThemeSystem"
-                                             Grid.Column="0"
-                                             Content="Системная"
-                                             GroupName="Theme"
-                                             Checked="ThemeRadio_Checked"
-                                             IsChecked="True"
-                                             Style="{StaticResource ThemeChoiceRadioStyle}"/>
-                                <RadioButton x:Name="ThemeLight"
-                                             Grid.Column="2"
-                                             Content="Светлая"
-                                             GroupName="Theme"
-                                             Checked="ThemeRadio_Checked"
-                                             Style="{StaticResource ThemeChoiceRadioStyle}"/>
-                                <RadioButton x:Name="ThemeDark"
-                                             Grid.Column="4"
-                                             Content="Тёмная"
-                                             GroupName="Theme"
-                                             Checked="ThemeRadio_Checked"
-                                             Style="{StaticResource ThemeChoiceRadioStyle}"/>
-                            </Grid>
+                        <Grid Grid.Row="1" Margin="0,14,0,12">
+                            <TextBox x:Name="SettingsSearchTextBox"
+                                     Style="{StaticResource SettingsSearchTextBoxStyle}"
+                                     TextChanged="SettingsSearchTextBox_TextChanged"/>
+                            <TextBlock Text="&#xE721;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       Margin="11,0,0,0"
+                                       FontSize="12"
+                                       Opacity="0.72"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Left"
+                                       IsHitTestVisible="False"/>
+                            <TextBlock x:Name="SettingsSearchPlaceholder"
+                                       Text="Поиск по настройкам"
+                                       Margin="32,0,0,0"
+                                       FontSize="12.5"
+                                       Opacity="0.52"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Left"
+                                       IsHitTestVisible="False"/>
+                            <Button x:Name="ClearSettingsSearchButton"
+                                    Content="&#xE711;"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    Width="28"
+                                    Height="28"
+                                    Margin="0,0,7,0"
+                                    Padding="0"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource DockSecondaryButtonStyle}"
+                                    Visibility="Collapsed"
+                                    Click="ClearSettingsSearchButton_Click"/>
+                        </Grid>
 
-                            <TextBlock Text="Поведение"
-                                       Margin="0,18,0,4"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Opacity="0.78"/>
-                            <CheckBox x:Name="RunOnStartupCheckBox"
-                                      Content="Запускать вместе с Windows"
-                                      Checked="SettingsCheckBox_Changed"
-                                      Unchecked="SettingsCheckBox_Changed"/>
-                            <CheckBox x:Name="StartMinimizedToTrayCheckBox"
-                                      Content="Запускать свернутым в трей"
-                                      Checked="SettingsCheckBox_Changed"
-                                      Unchecked="SettingsCheckBox_Changed"/>
-                            <CheckBox x:Name="MinimizeToTrayOnCloseCheckBox"
-                                      Content="Сворачивать в трей при закрытии"
-                                      Checked="SettingsCheckBox_Changed"
-                                      Unchecked="SettingsCheckBox_Changed"/>
-                            <CheckBox x:Name="ShowTrayTemperatureCheckBox"
-                                      Content="Показывать температуру в трее"
-                                      Checked="SettingsCheckBox_Changed"
-                                      Unchecked="SettingsCheckBox_Changed"/>
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="SettingsSectionsHost">
+                                <Border x:Name="SettingsAppearanceSection"
+                                        Style="{StaticResource SettingsSectionCardStyle}"
+                                        Tag="внешний вид тема светлая темная системная интерфейс оформление">
+                                    <StackPanel>
+                                        <TextBlock Text="Внешний вид" FontSize="13" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Тема интерфейса TweakWise."
+                                                   Margin="0,4,0,10"
+                                                   FontSize="12"
+                                                   Opacity="0.68"
+                                                   TextWrapping="Wrap"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <RadioButton x:Name="ThemeSystem" Grid.Column="0" Content="Системная" GroupName="Theme" Checked="ThemeRadio_Checked" IsChecked="True" Style="{StaticResource ThemeChoiceRadioStyle}"/>
+                                            <RadioButton x:Name="ThemeLight" Grid.Column="2" Content="Светлая" GroupName="Theme" Checked="ThemeRadio_Checked" Style="{StaticResource ThemeChoiceRadioStyle}"/>
+                                            <RadioButton x:Name="ThemeDark" Grid.Column="4" Content="Тёмная" GroupName="Theme" Checked="ThemeRadio_Checked" Style="{StaticResource ThemeChoiceRadioStyle}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
 
-                            <TextBlock Text="Температуры на главном экране"
-                                       Margin="0,14,0,4"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Opacity="0.78"/>
-                            <CheckBox x:Name="ShowCoreCpuTemperatureCheckBox"
-                                      Content="CPU"
-                                      Checked="SettingsCheckBox_Changed"
-                                      Unchecked="SettingsCheckBox_Changed"/>
-                            <CheckBox x:Name="ShowCoreGpuTemperatureCheckBox"
-                                      Content="GPU"
-                                      Checked="SettingsCheckBox_Changed"
-                                      Unchecked="SettingsCheckBox_Changed"/>
-                            <CheckBox x:Name="ShowCoreStorageTemperatureCheckBox"
-                                      Content="Накопители"
-                                      Checked="SettingsCheckBox_Changed"
-                                      Unchecked="SettingsCheckBox_Changed"/>
-                            <CheckBox x:Name="ShowCoreMotherboardTemperatureCheckBox"
-                                      Content="Плата / VRM"
-                                      Checked="SettingsCheckBox_Changed"
-                                      Unchecked="SettingsCheckBox_Changed"/>
-                            <CheckBox x:Name="ShowCoreOtherTemperatureCheckBox"
-                                      Content="Прочие датчики"
-                                      Checked="SettingsCheckBox_Changed"
-                                      Unchecked="SettingsCheckBox_Changed"/>
+                                <Border x:Name="SettingsBehaviorSection"
+                                        Style="{StaticResource SettingsSectionCardStyle}"
+                                        Tag="поведение запуск windows автозапуск трей свернуть закрытие температура трее">
+                                    <StackPanel>
+                                        <TextBlock Text="Поведение" FontSize="13" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Запуск приложения и работа в области уведомлений."
+                                                   Margin="0,4,0,8"
+                                                   FontSize="12"
+                                                   Opacity="0.68"
+                                                   TextWrapping="Wrap"/>
+                                        <CheckBox x:Name="RunOnStartupCheckBox" Content="Запускать вместе с Windows" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                                        <CheckBox x:Name="StartMinimizedToTrayCheckBox" Content="Запускать свернутым в трей" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                                        <CheckBox x:Name="MinimizeToTrayOnCloseCheckBox" Content="Сворачивать в трей при закрытии" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                                        <CheckBox x:Name="ShowTrayTemperatureCheckBox" Content="Показывать температуру в трее" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                                    </StackPanel>
+                                </Border>
 
-                            <TextBlock Text="Уведомления"
-                                       Margin="0,18,0,4"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Opacity="0.78"/>
-                            <CheckBox x:Name="ShowNotificationsCheckBox"
-                                      Content="Показывать события состояния"
-                                      Checked="SettingsCheckBox_Changed"
-                                      Unchecked="SettingsCheckBox_Changed"/>
+                                <Border x:Name="SettingsTemperatureSection"
+                                        Style="{StaticResource SettingsSectionCardStyle}"
+                                        Tag="температуры главный экран cpu gpu накопители диск плата vrm датчики прочие">
+                                    <StackPanel>
+                                        <TextBlock Text="Температуры на главном экране" FontSize="13" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Какие группы датчиков отображать в нижней плашке главного экрана."
+                                                   Margin="0,4,0,8"
+                                                   FontSize="12"
+                                                   Opacity="0.68"
+                                                   TextWrapping="Wrap"/>
+                                        <UniformGrid Columns="2">
+                                            <CheckBox x:Name="ShowCoreCpuTemperatureCheckBox" Content="CPU" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                                            <CheckBox x:Name="ShowCoreGpuTemperatureCheckBox" Content="GPU" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                                            <CheckBox x:Name="ShowCoreStorageTemperatureCheckBox" Content="Накопители" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                                            <CheckBox x:Name="ShowCoreMotherboardTemperatureCheckBox" Content="Плата / VRM" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                                        </UniformGrid>
+                                        <CheckBox x:Name="ShowCoreOtherTemperatureCheckBox" Content="Прочие датчики" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                                    </StackPanel>
+                                </Border>
 
-                            <TextBlock Text="Обновления"
-                                       Margin="0,18,0,4"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Opacity="0.78"/>
-                            <CheckBox x:Name="AutoCheckUpdatesCheckBox"
-                                      Content="Автоматически проверять обновления"
-                                      Checked="SettingsCheckBox_Changed"
-                                      Unchecked="SettingsCheckBox_Changed"/>
-                            <Button x:Name="CheckUpdatesButton"
-                                    Content="Проверить обновления"
-                                    Margin="0,12,0,0"
-                                    HorizontalAlignment="Left"
-                                    Padding="14,7"
-                                    Click="CheckUpdatesButton_Click"/>
-                            <TextBlock Text="Бэкапы"
-                                       Margin="0,18,0,4"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Opacity="0.78"/>
-                            <TextBlock Text="Срок хранения точек отката производительности"
-                                       FontSize="12"
-                                       Opacity="0.68"
-                                       TextWrapping="Wrap"/>
-                            <ComboBox x:Name="BackupRetentionComboBox"
-                                      Margin="0,8,0,0"
-                                      Width="120"
-                                      HorizontalAlignment="Left"
-                                      SelectionChanged="BackupRetentionComboBox_SelectionChanged"/>
-                            <Button x:Name="ClearPerformanceBackupsButton"
-                                    Content="Удалить все бэкапы"
-                                    Margin="0,10,0,0"
-                                    HorizontalAlignment="Left"
-                                    Padding="14,7"
-                                    Click="ClearPerformanceBackupsButton_Click"/>
-                        </StackPanel>
-                    </ScrollViewer>
+                                <Border x:Name="SettingsNotificationsSection"
+                                        Style="{StaticResource SettingsSectionCardStyle}"
+                                        Tag="уведомления события рекомендации проблемы центр уведомлений очистка">
+                                    <StackPanel>
+                                        <TextBlock Text="Уведомления" FontSize="13" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Сигналы состояния, рекомендации и плановое обслуживание."
+                                                   Margin="0,4,0,8"
+                                                   FontSize="12"
+                                                   Opacity="0.68"
+                                                   TextWrapping="Wrap"/>
+                                        <CheckBox x:Name="ShowNotificationsCheckBox" Content="Показывать события состояния" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border x:Name="SettingsUpdatesSection"
+                                        Style="{StaticResource SettingsSectionCardStyle}"
+                                        Tag="обновления автообновление проверить версия релиз">
+                                    <StackPanel>
+                                        <TextBlock Text="Обновления" FontSize="13" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Проверка доступных версий приложения."
+                                                   Margin="0,4,0,8"
+                                                   FontSize="12"
+                                                   Opacity="0.68"
+                                                   TextWrapping="Wrap"/>
+                                        <CheckBox x:Name="AutoCheckUpdatesCheckBox" Content="Автоматически проверять обновления" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
+                                        <Button x:Name="CheckUpdatesButton"
+                                                Content="Проверить обновления"
+                                                Margin="0,10,0,0"
+                                                HorizontalAlignment="Left"
+                                                Padding="14,7"
+                                                Style="{StaticResource DockSecondaryButtonStyle}"
+                                                Click="CheckUpdatesButton_Click"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border x:Name="SettingsBackupsSection"
+                                        Style="{StaticResource SettingsSectionCardStyle}"
+                                        Tag="бэкапы резервные копии откат производительность хранение удалить очистить">
+                                    <StackPanel>
+                                        <TextBlock Text="Бэкапы" FontSize="13" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Срок хранения точек отката для изменений производительности."
+                                                   Margin="0,4,0,8"
+                                                   FontSize="12"
+                                                   Opacity="0.68"
+                                                   TextWrapping="Wrap"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox x:Name="BackupRetentionComboBox"
+                                                      Width="126"
+                                                      Style="{StaticResource SettingsComboBoxStyle}"
+                                                      SelectionChanged="BackupRetentionComboBox_SelectionChanged"/>
+                                            <Button x:Name="ClearPerformanceBackupsButton"
+                                                    Grid.Column="2"
+                                                    Content="Удалить все бэкапы"
+                                                    HorizontalAlignment="Left"
+                                                    Padding="14,7"
+                                                    Style="{StaticResource DockSecondaryButtonStyle}"
+                                                    Click="ClearPerformanceBackupsButton_Click"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock x:Name="SettingsSearchEmptyText"
+                                           Text="По этому запросу настройки не найдены."
+                                           Margin="0,10,0,4"
+                                           FontSize="12"
+                                           Opacity="0.68"
+                                           TextAlignment="Center"
+                                           Visibility="Collapsed"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
                 </Border>
             </Popup>
 

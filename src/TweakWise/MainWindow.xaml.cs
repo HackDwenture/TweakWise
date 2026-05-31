@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Specialized;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using TweakWise.Managers;
 using TweakWise.Models;
 using TweakWise.Pages;
@@ -42,6 +44,7 @@ namespace TweakWise
                 if (ClearPerformanceBackupsButton != null)
                     ClearPerformanceBackupsButton.Content = "Удалить все бэкапы";
 
+                ResetSettingsSearch();
                 SettingsPopup.IsOpen = true;
             };
             SettingsButton.Unchecked += (s, e) => SettingsPopup.IsOpen = false;
@@ -67,7 +70,12 @@ namespace TweakWise
 
         public void OpenModuleWorkspace(CoreModuleId moduleId)
         {
-            NavigateFresh(CreateModulePage(moduleId));
+            OpenModuleWorkspace(moduleId, string.Empty);
+        }
+
+        public void OpenModuleWorkspace(CoreModuleId moduleId, string targetFindingId)
+        {
+            NavigateFresh(CreateModulePage(moduleId, targetFindingId));
         }
 
         public void NavigateToPage(string pageName)
@@ -88,10 +96,10 @@ namespace TweakWise
             NavigateToModuleFromPageKey(result.NavigationTarget.PageKey);
         }
 
-        private static Page CreateModulePage(CoreModuleId moduleId)
+        private static Page CreateModulePage(CoreModuleId moduleId, string targetFindingId = "")
         {
             return moduleId == CoreModuleId.Resources
-                ? new MonitoringPerformancePage()
+                ? new MonitoringPerformancePage(targetFindingId)
                 : new ModuleWorkspacePage(moduleId);
         }
 
@@ -262,6 +270,89 @@ namespace TweakWise
         {
             if (SettingsButton.IsChecked == true)
                 SettingsButton.IsChecked = false;
+        }
+
+        private void SettingsSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ApplySettingsSearch(SettingsSearchTextBox?.Text);
+        }
+
+        private void ClearSettingsSearchButton_Click(object sender, RoutedEventArgs e)
+        {
+            ResetSettingsSearch();
+            SettingsSearchTextBox?.Focus();
+        }
+
+        private void ResetSettingsSearch()
+        {
+            if (SettingsSearchTextBox != null)
+                SettingsSearchTextBox.Text = string.Empty;
+
+            ApplySettingsSearch(string.Empty);
+        }
+
+        private void ApplySettingsSearch(string query)
+        {
+            if (SettingsSearchPlaceholder == null ||
+                ClearSettingsSearchButton == null ||
+                SettingsSearchEmptyText == null)
+            {
+                return;
+            }
+
+            string normalized = (query ?? string.Empty).Trim();
+            bool hasQuery = normalized.Length > 0;
+            SettingsSearchPlaceholder.Visibility = hasQuery ? Visibility.Collapsed : Visibility.Visible;
+            ClearSettingsSearchButton.Visibility = hasQuery ? Visibility.Visible : Visibility.Collapsed;
+
+            var sections = new[]
+            {
+                SettingsAppearanceSection,
+                SettingsBehaviorSection,
+                SettingsTemperatureSection,
+                SettingsNotificationsSection,
+                SettingsUpdatesSection,
+                SettingsBackupsSection
+            };
+
+            int visibleCount = 0;
+            foreach (var section in sections.Where(item => item != null))
+            {
+                bool visible = !hasQuery || IsSettingsSectionMatch(section, normalized);
+                section.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+                if (visible)
+                    visibleCount++;
+            }
+
+            SettingsSearchEmptyText.Visibility = visibleCount == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private static bool IsSettingsSectionMatch(FrameworkElement section, string query)
+        {
+            string searchText = BuildSettingsSearchText(section);
+            string[] terms = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            return terms.All(term => searchText.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        private static string BuildSettingsSearchText(DependencyObject root)
+        {
+            if (root == null)
+                return string.Empty;
+
+            var parts = new System.Text.StringBuilder();
+            if (root is FrameworkElement element && element.Tag is string tag)
+                parts.Append(tag).Append(' ');
+
+            if (root is TextBlock textBlock)
+                parts.Append(textBlock.Text).Append(' ');
+            else if (root is ContentControl contentControl && contentControl.Content is string content)
+                parts.Append(content).Append(' ');
+
+            int childCount = VisualTreeHelper.GetChildrenCount(root);
+            for (int index = 0; index < childCount; index++)
+                parts.Append(BuildSettingsSearchText(VisualTreeHelper.GetChild(root, index))).Append(' ');
+
+            return parts.ToString();
         }
 
         private void ThemeRadio_Checked(object sender, RoutedEventArgs e)

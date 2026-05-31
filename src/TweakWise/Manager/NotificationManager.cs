@@ -15,6 +15,9 @@ namespace TweakWise.Managers
         private readonly SettingsManager _settingsManager;
         private int _unreadCount;
 
+        public const string ActionOpenCoreHome = "OpenCoreHome";
+        public const string ActionOpenCoreModule = "OpenCoreModule";
+
         public NotificationManager(SettingsManager settingsManager)
         {
             _settingsManager = settingsManager;
@@ -47,7 +50,9 @@ namespace TweakWise.Managers
                     Title = data.Title,
                     Message = data.Message,
                     IsRead = data.IsRead,
-                    Action = data.HasAction ? CreateDemoAction(data) : null
+                    ActionKey = data.ActionKey ?? string.Empty,
+                    ActionTarget = data.ActionTarget ?? string.Empty,
+                    Action = data.HasAction ? CreateAction(data) : null
                 };
                 _notifications.Add(notification);
             }
@@ -55,8 +60,32 @@ namespace TweakWise.Managers
             UpdateUnreadCount();
         }
 
-        private Action CreateDemoAction(NotificationData data)
+        private Action CreateAction(NotificationData data)
         {
+            if (string.Equals(data.ActionKey, ActionOpenCoreHome, StringComparison.OrdinalIgnoreCase))
+            {
+                return () =>
+                {
+                    var mainWindow = Application.Current.MainWindow as MainWindow;
+                    mainWindow?.NavigateToCoreHome();
+                };
+            }
+
+            if (string.Equals(data.ActionKey, ActionOpenCoreModule, StringComparison.OrdinalIgnoreCase))
+            {
+                string target = data.ActionTarget ?? string.Empty;
+                string[] parts = target.Split(new[] { '|' }, 2, StringSplitOptions.None);
+                if (Enum.TryParse(parts[0], ignoreCase: true, out CoreModuleId moduleId))
+                {
+                    string targetFindingId = parts.Length > 1 ? parts[1] : string.Empty;
+                    return () =>
+                    {
+                        var mainWindow = Application.Current.MainWindow as MainWindow;
+                        mainWindow?.OpenModuleWorkspace(moduleId, targetFindingId);
+                    };
+                }
+            }
+
             if (data.Title == "Новые настройки")
             {
                 return () =>
@@ -82,6 +111,15 @@ namespace TweakWise.Managers
             if (data.Title == "Доступно обновление")
                 return () => App.UpdateManager?.OpenLatestReleasePage();
 
+            if (data.Title == "Плановая очистка")
+            {
+                return () =>
+                {
+                    var mainWindow = Application.Current.MainWindow as MainWindow;
+                    mainWindow?.NavigateToCoreHome();
+                };
+            }
+
             return null;
         }
 
@@ -92,6 +130,31 @@ namespace TweakWise.Managers
                 Title = title,
                 Message = message,
                 Action = action,
+                IsRead = false
+            };
+
+            _notifications.Add(notification);
+            SaveToSettings();
+        }
+
+        public void AddNotification(string title, string message, string actionKey, string actionTarget = "")
+        {
+            var data = new NotificationData
+            {
+                Title = title,
+                Message = message,
+                ActionKey = actionKey ?? string.Empty,
+                ActionTarget = actionTarget ?? string.Empty,
+                HasAction = true
+            };
+
+            var notification = new Notification
+            {
+                Title = title,
+                Message = message,
+                ActionKey = data.ActionKey,
+                ActionTarget = data.ActionTarget,
+                Action = CreateAction(data),
                 IsRead = false
             };
 
@@ -141,7 +204,9 @@ namespace TweakWise.Managers
                 Title = notification.Title,
                 Message = notification.Message,
                 IsRead = notification.IsRead,
-                HasAction = notification.Action != null
+                HasAction = notification.Action != null || !string.IsNullOrWhiteSpace(notification.ActionKey),
+                ActionKey = notification.ActionKey ?? string.Empty,
+                ActionTarget = notification.ActionTarget ?? string.Empty
             }).ToList();
 
             _settingsManager.SaveSettings();
@@ -165,6 +230,8 @@ namespace TweakWise.Managers
 
         public string Title { get; set; }
         public string Message { get; set; }
+        public string ActionKey { get; set; } = string.Empty;
+        public string ActionTarget { get; set; } = string.Empty;
         public Action Action { get; set; }
 
         public bool IsRead

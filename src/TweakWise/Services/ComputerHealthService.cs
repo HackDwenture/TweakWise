@@ -1023,14 +1023,15 @@ namespace TweakWise.Services
                     return;
                 }
 
+                string actionTarget = string.IsNullOrWhiteSpace(finding.Id)
+                    ? moduleId.ToString()
+                    : $"{moduleId}|{finding.Id}";
+
                 App.NotificationManager.AddNotification(
                     title,
                     message,
-                    () =>
-                    {
-                        if (Application.Current?.MainWindow is MainWindow mainWindow)
-                            mainWindow.OpenModuleWorkspace(moduleId);
-                    });
+                    NotificationManager.ActionOpenCoreModule,
+                    actionTarget);
             }));
         }
 

@@ -53,6 +53,7 @@ namespace TweakWise.Pages
         private readonly Dictionary<string, List<BoardFinding>> _settingFindingsByNode = new Dictionary<string, List<BoardFinding>>(StringComparer.OrdinalIgnoreCase);
         private string _selectedNodeKey = "Cpu";
         private string _hoverNodeKey = string.Empty;
+        private string _pendingExternalFindingId = string.Empty;
         private PerformanceSignalFilter _performanceSignalFilter = PerformanceSignalFilter.All;
         private bool _isDetailsOpen;
         private bool _isInitialized;
@@ -90,6 +91,12 @@ namespace TweakWise.Pages
             _isInitialized = true;
             SelectNode(_selectedNodeKey, openDetails: false);
             UpdateModuleStatus();
+        }
+
+        public MonitoringPerformancePage(string targetFindingId)
+            : this()
+        {
+            _pendingExternalFindingId = targetFindingId ?? string.Empty;
         }
 
         private Border DetailsScrimElement => FindName("DetailsScrim") as Border;
@@ -1199,6 +1206,7 @@ namespace TweakWise.Pages
                 ApplyCallouts();
                 UpdateSelectedFindings();
                 UpdateHighlights();
+                TryOpenPendingExternalFindingTarget();
             }
             catch
             {
@@ -1214,6 +1222,23 @@ namespace TweakWise.Pages
             {
                 _diagnosticsRefreshRunning = false;
             }
+        }
+
+        private void TryOpenPendingExternalFindingTarget()
+        {
+            if (string.IsNullOrWhiteSpace(_pendingExternalFindingId) || _findings.Count == 0)
+                return;
+
+            string targetId = _pendingExternalFindingId;
+            var finding = _findings.FirstOrDefault(item =>
+                string.Equals(item.Id, targetId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(item.TargetSettingId, targetId, StringComparison.OrdinalIgnoreCase));
+
+            if (finding == null)
+                return;
+
+            _pendingExternalFindingId = string.Empty;
+            NavigateToFindingTarget(finding, openNode: true);
         }
 
         private List<BoardFinding> BuildDiagnosticFindings()

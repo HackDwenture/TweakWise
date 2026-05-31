@@ -28,6 +28,9 @@ namespace TweakWise.Models
         public System.DateTime? LastHealthCheckedAt { get; set; }
         public string LastNotifiedUpdateVersion { get; set; } = string.Empty;
         public string LastNotifiedReleaseCommit { get; set; } = string.Empty;
+        public System.DateTime? LastCoreCleanupCompletedAtUtc { get; set; }
+        public System.DateTime? LastCoreCleanupRecommendationNotifiedAtUtc { get; set; }
+        public System.DateTime? CoreCleanupRecommendationDismissedUntilUtc { get; set; }
         public List<NotificationData> Notifications { get; set; } = new List<NotificationData>();
         public List<HealthSignalSuppression> HealthSignalSuppressions { get; set; } = new List<HealthSignalSuppression>();
     }
@@ -38,6 +41,8 @@ namespace TweakWise.Models
         public string Message { get; set; }
         public bool IsRead { get; set; }
         public bool HasAction { get; set; }
+        public string ActionKey { get; set; } = string.Empty;
+        public string ActionTarget { get; set; } = string.Empty;
     }
 
     public class HealthSignalSuppression

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -45,7 +45,17 @@ namespace TweakWise.Services
                 var hardwareItems = GetRootHardware().ToList();
 
                 foreach (var hardware in hardwareItems)
-                    UpdateHardwareRecursive(hardware);
+                {
+                    try
+                    {
+                        UpdateHardwareRecursive(hardware);
+                    }
+                    catch
+                    {
+                        if (hardware != null)
+                            _faultedHardwareKeys.Add(GetHardwareKey(hardware));
+                    }
+                }
 
                 return hardwareItems
                     .SelectMany(FlattenHardware)

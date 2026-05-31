@@ -219,6 +219,7 @@ namespace TweakWise.Services
                     break;
 
                 case "Cpu":
+                    items.Add(CreateCpuLoadItem(5));
                     items.Add(CreateProcessorMaxStateItem("Максимальное состояние CPU", 10, false));
                     items.Add(CreateProcessorMinStateItem(20));
                     items.Add(CreateProcessorBoostModeItem(30));
@@ -232,6 +233,7 @@ namespace TweakWise.Services
                     break;
 
                 case "Gpu":
+                    items.Add(CreateGpuLoadItem(5));
                     items.Add(CreateHardwareSchedulingItem(10));
                     items.Add(CreateGpuPreferencePolicyItem(20));
                     items.Add(CreateGameDvrItem(30));
@@ -251,6 +253,7 @@ namespace TweakWise.Services
 
                 case "Cooling":
                     items.Add(CreateThermalOverviewItem(10));
+                    items.Add(CreateCoolingSensorAvailabilityItem(12));
                     items.Add(CreateSystemCoolingPolicyItem(20));
                     items.Add(CreateProcessorMaxStateItem("Тепловой лимит CPU", 30, true));
                     items.Add(CreateProcessorEppItem(40, true));
@@ -1018,6 +1021,54 @@ namespace TweakWise.Services
             item.Options.Add(new PerformanceTuningOption("Активная", "1", "Лучше держит производительность, может быть шумнее."));
             item.Recommendation = "Для производительности и охлаждения обычно лучше активная политика.";
             FillPowerAcSettingState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateCpuLoadItem(int order)
+        {
+            var item = CreateBaseItem(
+                "cpu.load",
+                "Текущая загрузка CPU",
+                "Считывает реальную суммарную загрузку процессора через системные счётчики Windows без изменения параметров.",
+                "системный счётчик",
+                PerformanceSettingControlKind.ReadOnly,
+                order);
+
+            item.OperationKind = KindReadOnly;
+            item.ReadOnlyKind = "CpuLoad";
+            FillCpuLoadState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateGpuLoadItem(int order)
+        {
+            var item = CreateBaseItem(
+                "gpu.load",
+                "Текущая загрузка GPU",
+                "Считывает загрузку графических движков через Windows Performance Counters. Если драйвер не публикует счётчики, блок будет отмечен как недоступный.",
+                "счётчики GPU",
+                PerformanceSettingControlKind.ReadOnly,
+                order);
+
+            item.OperationKind = KindReadOnly;
+            item.ReadOnlyKind = "GpuLoad";
+            FillGpuLoadState(item);
+            return item;
+        }
+
+        private PerformanceTuningItem CreateCoolingSensorAvailabilityItem(int order)
+        {
+            var item = CreateBaseItem(
+                "cooling.sensor-availability",
+                "Доступность датчиков",
+                "Проверяет, какие реальные температурные датчики доступны приложению. Недоступность датчика сама по себе не считается проблемой.",
+                "датчики",
+                PerformanceSettingControlKind.ReadOnly,
+                order);
+
+            item.OperationKind = KindReadOnly;
+            item.ReadOnlyKind = "TemperatureAvailability";
+            FillTemperatureAvailabilityState(item);
             return item;
         }
 
@@ -2070,6 +2121,15 @@ namespace TweakWise.Services
                 case "Temperature":
                     FillTemperatureState(item);
                     break;
+                case "CpuLoad":
+                    FillCpuLoadState(item);
+                    break;
+                case "GpuLoad":
+                    FillGpuLoadState(item);
+                    break;
+                case "TemperatureAvailability":
+                    FillTemperatureAvailabilityState(item);
+                    break;
             }
         }
 
@@ -2451,6 +2511,86 @@ namespace TweakWise.Services
                     : hottest.ValueCelsius >= 75
                         ? "Температура повышена, но ещё не критична. Перед длительной нагрузкой проверьте вентиляцию и профиль питания."
                         : "Температурный запас выглядит нормальным.";
+        }
+
+        private void FillTemperatureAvailabilityState(PerformanceTuningItem item)
+        {
+            IReadOnlyList<TemperatureSensorReading> readings;
+            try
+            {
+                readings = _temperatureReader?.Invoke() ?? Array.Empty<TemperatureSensorReading>();
+            }
+            catch
+            {
+                readings = Array.Empty<TemperatureSensorReading>();
+            }
+
+            if (readings.Count == 0)
+            {
+                item.IsSupported = false;
+                item.CurrentValue = "Датчики не найдены";
+                item.Recommendation = "Это не ошибка Windows. Возможные причины: производитель закрыл датчики, драйвер ACPI/чипсета не отдаёт данные, приложение запущено без доступа к аппаратному мониторингу или включена переменная TW_SUPPRESS_HARDWARE_MONITORING.";
+                item.SignalLevel = HealthLevel.Good;
+                item.IsPriority = false;
+                item.SetStatus("Недоступно на этой конфигурации или в текущем режиме запуска. Проверьте права администратора, драйверы чипсета/видеокарты и отключите TW_SUPPRESS_HARDWARE_MONITORING, если она задана.", isWarning: false);
+                return;
+            }
+
+            var groups = readings
+                .GroupBy(reading => reading.Group)
+                .Select(group => $"{TranslateSensorGroup(group.Key)}: {group.Count()}")
+                .ToList();
+
+            item.IsSupported = true;
+            item.CurrentValue = string.Join(" · ", groups);
+            item.Recommendation = "Датчики доступны. Для оценки охлаждения TweakWise использует самые горячие значения CPU, GPU, платы и других опубликованных контроллеров.";
+            item.SignalLevel = HealthLevel.Good;
+            item.IsPriority = false;
+            item.StatusMessage = string.Empty;
+        }
+
+        private void FillCpuLoadState(PerformanceTuningItem item)
+        {
+            var usage = TryReadCpuUsagePercent();
+            if (!usage.HasValue)
+            {
+                item.IsSupported = false;
+                item.CurrentValue = "Не удалось прочитать загрузку CPU";
+                item.Recommendation = "Windows не вернула системное время процессора. Это возможно при ограниченных правах или в некоторых виртуальных средах.";
+                item.SetStatus("Диагностический счётчик недоступен. Это не считается проблемой производительности.", isWarning: false);
+                return;
+            }
+
+            item.IsSupported = true;
+            item.CurrentValue = $"{usage.Value:0}%";
+            item.SignalLevel = usage.Value >= 95 ? HealthLevel.Normal : HealthLevel.Good;
+            item.IsPriority = item.SignalLevel != HealthLevel.Good;
+            item.Recommendation = usage.Value >= 95
+                ? "CPU сейчас занят почти полностью. Если это происходит без тяжёлой задачи, проверьте процессы в диспетчере задач и фоновые службы."
+                : "Текущая загрузка CPU не выглядит проблемной.";
+            item.StatusMessage = string.Empty;
+        }
+
+        private void FillGpuLoadState(PerformanceTuningItem item)
+        {
+            var load = TryReadGpuUsagePercent();
+            if (!load.HasValue)
+            {
+                item.IsSupported = false;
+                item.CurrentValue = "Счётчики GPU недоступны";
+                item.Recommendation = "Windows публикует GPU Performance Counters не на всех драйверах и не во всех виртуальных средах. Это не проблема, если игры и графические приложения работают штатно.";
+                item.SetStatus("Недоступно на этой конфигурации: драйвер GPU не отдал счётчики Utilization Percentage.", isWarning: false);
+                return;
+            }
+
+            item.IsSupported = true;
+            item.CurrentValue = $"{load.Value:0}%";
+            item.SignalLevel = load.Value >= 95 ? HealthLevel.Normal : HealthLevel.Good;
+            item.IsPriority = item.SignalLevel != HealthLevel.Good;
+            item.Recommendation = load.Value >= 95
+                ? "GPU сейчас почти полностью загружен. Если тяжёлой графической задачи нет, проверьте фоновые приложения, запись экрана и браузерное аппаратное ускорение."
+                : "Текущая загрузка GPU не выглядит проблемной.";
+            item.StatusMessage = string.Empty;
         }
 
         private PerformanceTuningResult ApplyPowerPlan(PerformanceTuningItem item)
@@ -3309,6 +3449,83 @@ namespace TweakWise.Services
             return RunProcess("powercfg.exe", arguments, GetPowerCfgEncoding());
         }
 
+        private static double? TryReadCpuUsagePercent()
+        {
+            if (!TryReadSystemTimes(out var idle1, out var kernel1, out var user1))
+                return null;
+
+            Thread.Sleep(160);
+
+            if (!TryReadSystemTimes(out var idle2, out var kernel2, out var user2))
+                return null;
+
+            ulong idle = idle2 - idle1;
+            ulong kernel = kernel2 - kernel1;
+            ulong user = user2 - user1;
+            ulong total = kernel + user;
+            if (total == 0 || total < idle)
+                return null;
+
+            return Math.Clamp((total - idle) * 100d / total, 0, 100);
+        }
+
+        private static bool TryReadSystemTimes(out ulong idle, out ulong kernel, out ulong user)
+        {
+            idle = 0;
+            kernel = 0;
+            user = 0;
+
+            if (!GetSystemTimes(out var idleTime, out var kernelTime, out var userTime))
+                return false;
+
+            idle = ToUInt64(idleTime);
+            kernel = ToUInt64(kernelTime);
+            user = ToUInt64(userTime);
+            return true;
+        }
+
+        private static double? TryReadGpuUsagePercent()
+        {
+            string command = @"
+$samples = (Get-Counter '\GPU Engine(*)\Utilization Percentage' -ErrorAction Stop).CounterSamples |
+    Where-Object { $_.InstanceName -notmatch '_engtype_copy|_engtype_video' }
+$sum = ($samples | Measure-Object CookedValue -Sum).Sum
+if ($null -eq $sum) { $sum = 0 }
+[Math]::Round([Math]::Min(100, [Math]::Max(0, $sum)), 1)
+";
+
+            var result = RunPowerShell(command);
+            if (!result.Success || string.IsNullOrWhiteSpace(result.Output))
+                return null;
+
+            var first = SplitLines(result.Output).LastOrDefault(line => !string.IsNullOrWhiteSpace(line));
+            if (double.TryParse(first, NumberStyles.Float, CultureInfo.InvariantCulture, out double invariant))
+                return Math.Clamp(invariant, 0, 100);
+
+            if (double.TryParse(first, NumberStyles.Float, CultureInfo.CurrentCulture, out double current))
+                return Math.Clamp(current, 0, 100);
+
+            return null;
+        }
+
+        private static string TranslateSensorGroup(string group)
+        {
+            return group switch
+            {
+                "Cpu" => "CPU",
+                "Gpu" => "GPU",
+                "Storage" => "накопители",
+                "Motherboard" => "плата",
+                "Other" => "прочее",
+                _ => string.IsNullOrWhiteSpace(group) ? "прочее" : group
+            };
+        }
+
+        private static ulong ToUInt64(FileTime value)
+        {
+            return ((ulong)value.HighDateTime << 32) | value.LowDateTime;
+        }
+
         private static Encoding GetPowerCfgEncoding()
         {
             try
@@ -3714,6 +3931,9 @@ namespace TweakWise.Services
         [DllImport("kernel32.dll")]
         private static extern uint GetOEMCP();
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetSystemTimes(out FileTime idleTime, out FileTime kernelTime, out FileTime userTime);
+
         private sealed class CommandResult
         {
             public CommandResult(bool success, string output, string error, int exitCode)
@@ -3733,6 +3953,13 @@ namespace TweakWise.Services
             {
                 return new CommandResult(false, output, error, -1);
             }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FileTime
+        {
+            public uint LowDateTime;
+            public uint HighDateTime;
         }
 
         private sealed class DiscoveredPowerSetting

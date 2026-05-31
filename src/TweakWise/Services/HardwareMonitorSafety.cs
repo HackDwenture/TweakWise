@@ -8,33 +8,20 @@ namespace TweakWise.Services
         public static bool IsHardwareBackendSuppressed()
         {
             string suppressHardware = Environment.GetEnvironmentVariable("TW_SUPPRESS_HARDWARE_MONITORING") ?? string.Empty;
-            if (IsTruthy(suppressHardware))
-                return true;
-
-            string allowDebugHardware = Environment.GetEnvironmentVariable("TW_ALLOW_HARDWARE_DEBUG") ?? string.Empty;
-            if (IsTruthy(allowDebugHardware))
-                return false;
-
-#if DEBUG
-            return Debugger.IsAttached;
-#else
-            return false;
-#endif
+            return IsTruthy(suppressHardware);
         }
 
         public static bool ShouldSkipUnsafeHardwareUpdates()
         {
-            string allowUnsafeUpdate = Environment.GetEnvironmentVariable("TW_ALLOW_UNSAFE_HARDWARE_UPDATE") ?? string.Empty;
-            string allowDebugTelemetry = Environment.GetEnvironmentVariable("TW_ALLOW_HARDWARE_DEBUG") ?? string.Empty;
+            string skipUnsafeUpdate = Environment.GetEnvironmentVariable("TW_SKIP_UNSAFE_HARDWARE_UPDATE") ?? string.Empty;
+            if (IsTruthy(skipUnsafeUpdate))
+                return true;
 
-            if (IsTruthy(allowUnsafeUpdate) || IsTruthy(allowDebugTelemetry))
+            string allowUnsafeUpdate = Environment.GetEnvironmentVariable("TW_ALLOW_UNSAFE_HARDWARE_UPDATE") ?? string.Empty;
+            if (IsTruthy(allowUnsafeUpdate))
                 return false;
 
-#if DEBUG
             return Debugger.IsAttached;
-#else
-            return false;
-#endif
         }
 
         private static bool IsTruthy(string value)
