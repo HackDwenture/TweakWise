@@ -95,7 +95,7 @@ namespace TweakWise.Controls
         private static bool IsSameTopLevelPage(Page page, string targetPageKey)
         {
             return (page is DashboardPage && targetPageKey == "Dashboard") ||
-                   (page is WindowsInterfacePage && targetPageKey == "WindowsInterface") ||
+                   ((page is WindowsInterfacePage || page is WorkEnvironmentPage) && targetPageKey == "WindowsInterface") ||
                    (page is SystemHubPage && targetPageKey == "System") ||
                    (page is MaintenancePage && targetPageKey == "Maintenance") ||
                    (page is MonitoringPerformancePage && targetPageKey == "MonitoringPerformance");

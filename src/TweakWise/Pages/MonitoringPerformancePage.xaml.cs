@@ -2610,6 +2610,13 @@ namespace TweakWise.Pages
                 AnimateOpacity(pair.Value, targetOpacity, 170);
             }
 
+            foreach (var pair in _routes)
+            {
+                nodeLevels.TryGetValue(pair.Key, out var level);
+                bool hasSignal = level == HealthLevel.Normal || level == HealthLevel.Attention || level == HealthLevel.Warning || level == HealthLevel.Critical;
+                pair.Value.SetResourceReference(Shape.StrokeProperty, hasSignal ? GetStatusBrushKey(level) : "CoreLineActiveBrush");
+            }
+
             foreach (var pair in _zones)
             {
                 bool isHover = string.Equals(pair.Key, _hoverNodeKey, StringComparison.OrdinalIgnoreCase);

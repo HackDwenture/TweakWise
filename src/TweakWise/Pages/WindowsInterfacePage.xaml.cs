@@ -1,5 +1,7 @@
-using System.Collections.Generic;
+using System.Windows;
 using System.Windows.Controls;
+using Application = System.Windows.Application;
+using TweakWise.Models;
 
 namespace TweakWise.Pages
 {
@@ -8,22 +10,13 @@ namespace TweakWise.Pages
         public WindowsInterfacePage()
         {
             InitializeComponent();
-
-            SectionsItemsControl.ItemsSource = new List<PlaceholderSection>
-            {
-                new() { Title = "Проводник" },
-                new() { Title = "Меню Пуск" },
-                new() { Title = "Панель задач" },
-                new() { Title = "Контекстное меню" },
-                new() { Title = "Поиск" },
-                new() { Title = "Рабочий стол" },
-                new() { Title = "Уведомления" }
-            };
+            Loaded += WindowsInterfacePage_Loaded;
         }
 
-        private sealed class PlaceholderSection
+        private void WindowsInterfacePage_Loaded(object sender, RoutedEventArgs e)
         {
-            public string Title { get; set; } = string.Empty;
+            if (Application.Current.MainWindow is MainWindow mainWindow)
+                mainWindow.OpenModuleWorkspace(CoreModuleId.WindowsSetup);
         }
     }
 }

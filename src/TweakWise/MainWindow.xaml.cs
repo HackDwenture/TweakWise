@@ -98,9 +98,12 @@ namespace TweakWise
 
         private static Page CreateModulePage(CoreModuleId moduleId, string targetFindingId = "")
         {
-            return moduleId == CoreModuleId.Resources
-                ? new MonitoringPerformancePage(targetFindingId)
-                : new ModuleWorkspacePage(moduleId);
+            return moduleId switch
+            {
+                CoreModuleId.Resources => new MonitoringPerformancePage(targetFindingId),
+                CoreModuleId.WindowsSetup => new WorkEnvironmentPage(targetFindingId),
+                _ => new ModuleWorkspacePage(moduleId)
+            };
         }
 
         private void NavigateFresh(Page page)
@@ -125,6 +128,7 @@ namespace TweakWise
                 "Explorer" => CoreModuleId.WindowsSetup,
                 "StartMenu" => CoreModuleId.WindowsSetup,
                 "Taskbar" => CoreModuleId.WindowsSetup,
+                "WorkEnvironment" => CoreModuleId.WindowsSetup,
                 "WindowsInterface" => CoreModuleId.WindowsSetup,
                 "System" => CoreModuleId.SystemParameters,
                 "Maintenance" => CoreModuleId.Maintenance,

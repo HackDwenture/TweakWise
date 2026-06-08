@@ -19,6 +19,7 @@ using System.Windows;
 using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 using LibreHardwareMonitor.Hardware;
+using TweakWise.Models;
 using TweakWise.Services;
 using Application = System.Windows.Application;
 
@@ -120,35 +121,43 @@ namespace TweakWise.Managers
             if (!_enabled)
                 return;
 
-            if (!_showTemperature || _suppressHardwareBackend || !EnsureComputerOpened())
+            if (!_showTemperature)
             {
                 UpdateIcon("TW");
-                _notifyIcon.Text = _showTemperature
-                    ? "TweakWise работает в трее | датчики недоступны"
-                    : "TweakWise работает в трее";
+                _notifyIcon.Text = "TweakWise работает в трее";
                 _notifyIcon.Visible = true;
                 return;
             }
 
-            var hardwareItems = GetRootHardware();
+            var readings = ReadTemperatureSnapshot();
+            if (readings.Count == 0)
+            {
+                UpdateIcon("TW");
+                _notifyIcon.Text = "TweakWise работает в трее | датчики недоступны";
+                _notifyIcon.Visible = true;
+                return;
+            }
 
-            foreach (var hardware in hardwareItems)
-                UpdateHardwareRecursive(hardware);
-
-            var sensors = hardwareItems
-                .SelectMany(FlattenHardware)
-                .SelectMany(GetSensors)
-                .Where(sensor => sensor != null && TryGetSensorType(sensor, out var type) && type == SensorType.Temperature)
-                .Where(sensor => TryGetSensorValue(sensor, out _))
-                .ToList();
-
-            string cpuText = BuildPreferredTemperatureText(sensors, "CPU", "Package", "Tctl/Tdie", "CCD", "Core");
-            string gpuText = BuildPreferredTemperatureText(sensors, "GPU", "Hot Spot", "GPU Core", "Core", "Memory");
+            string cpuText = BuildPreferredTemperatureText(readings, "Cpu", "Package", "Tctl/Tdie", "CCD", "Core");
+            string gpuText = BuildPreferredTemperatureText(readings, "Gpu", "Hot Spot", "GPU Core", "Core", "Memory");
             string display = cpuText != "--" ? cpuText : gpuText;
 
             UpdateIcon(display);
             _notifyIcon.Text = $"TweakWise | CPU: {cpuText}°C | GPU: {gpuText}°C";
             _notifyIcon.Visible = true;
+        }
+
+        private static IReadOnlyList<TemperatureSensorReading> ReadTemperatureSnapshot()
+        {
+            try
+            {
+                using var service = new HardwareTemperatureService();
+                return service.GetTemperatures() ?? Array.Empty<TemperatureSensorReading>();
+            }
+            catch
+            {
+                return Array.Empty<TemperatureSensorReading>();
+            }
         }
 
         private bool EnsureComputerOpened()
@@ -192,6 +201,30 @@ namespace TweakWise.Managers
         private static bool ShouldSuppressLibreHardwareMonitor() => HardwareMonitorSafety.IsHardwareBackendSuppressed();
 
         private static bool ShouldSkipUnsafeHardwareUpdates() => HardwareMonitorSafety.ShouldSkipUnsafeHardwareUpdates();
+
+        private static string BuildPreferredTemperatureText(
+            IReadOnlyList<TemperatureSensorReading> readings,
+            string group,
+            params string[] preferredNames)
+        {
+            var filtered = (readings ?? Array.Empty<TemperatureSensorReading>())
+                .Where(reading => reading != null)
+                .Where(reading => string.Equals(reading.Group, group, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            foreach (var name in preferredNames)
+            {
+                var match = filtered.FirstOrDefault(reading =>
+                    (reading.Title ?? string.Empty).IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    (reading.SensorName ?? string.Empty).IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
+
+                if (match != null)
+                    return $"{Math.Round(match.ValueCelsius):0}";
+            }
+
+            var fallback = filtered.OrderByDescending(reading => reading.ValueCelsius).FirstOrDefault();
+            return fallback != null ? $"{Math.Round(fallback.ValueCelsius):0}" : "--";
+        }
 
         private static string BuildPreferredTemperatureText(
             List<ISensor> sensors,

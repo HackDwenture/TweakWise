@@ -1,0 +1,1218 @@
+﻿<Page x:Class="TweakWise.Pages.WorkEnvironmentPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:models="clr-namespace:TweakWise.Models"
+      Loaded="Page_Loaded"
+      Unloaded="Page_Unloaded"
+      PreviewKeyDown="Page_PreviewKeyDown"
+      Title="Рабочая среда"
+      Focusable="True"
+      Background="{DynamicResource WindowBackground}">
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
+        <Style x:Key="BackButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="38"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BoardPartHitStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <Style x:Key="BoardNodeGlowStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+        </Style>
+
+        <Style x:Key="BoardPartShellStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1.25"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Opacity" Value="0.97"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="16" ShadowDepth="0" Opacity="0.14" Color="#05080D"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BoardLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="BoardSmallLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Opacity" Value="0.76"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="BoardTraceLineStyle" TargetType="Line">
+            <Setter Property="Stroke" Value="{DynamicResource CoreLineBrush}"/>
+            <Setter Property="StrokeThickness" Value="0.95"/>
+            <Setter Property="Opacity" Value="0.18"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <Style x:Key="BoardTracePolylineStyle" TargetType="Polyline">
+            <Setter Property="Stroke" Value="{DynamicResource CoreLineBrush}"/>
+            <Setter Property="StrokeThickness" Value="1"/>
+            <Setter Property="Opacity" Value="0.20"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <Style x:Key="BoardOutlineStyle" TargetType="Rectangle">
+            <Setter Property="Stroke" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="StrokeThickness" Value="1.15"/>
+            <Setter Property="Opacity" Value="0.28"/>
+            <Setter Property="Fill" Value="Transparent"/>
+        </Style>
+
+        <Style x:Key="DiagnosticCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="14,12"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.22" Color="#05080D"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DetailsCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+
+        <Style x:Key="EnvironmentSearchBoxStyle" TargetType="TextBox">
+            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="TextAlignment" Value="Left"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10"
+                                Padding="0">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="40,0,40,0"
+                                          HorizontalAlignment="Stretch"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <LinearGradientBrush x:Key="SearchHighlightGradientBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#254EA8FF" Offset="0"/>
+            <GradientStop Color="#343CC7B7" Offset="0.46"/>
+            <GradientStop Color="#1BFFFFFF" Offset="1"/>
+        </LinearGradientBrush>
+
+        <Style x:Key="EnvironmentLoadingSquareStyle" TargetType="Border">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Background" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNormalBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="14" ShadowDepth="0" Opacity="0.42" Color="#3CC7B7"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BoardToolTipStyle" TargetType="ToolTip">
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="MaxWidth" Value="300"/>
+        </Style>
+
+        <Style x:Key="EnvironmentActionButtonStyle" TargetType="Button">
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="EnvironmentPrimaryActionButtonStyle" TargetType="Button" BasedOn="{StaticResource EnvironmentActionButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource CoreOrbForegroundBrush}"/>
+        </Style>
+
+        <Style x:Key="EnvironmentSignalActionButtonStyle" TargetType="Button" BasedOn="{StaticResource EnvironmentActionButtonStyle}">
+            <Setter Property="MinHeight" Value="24"/>
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Opacity" Value="0.92"/>
+        </Style>
+
+        <Style x:Key="EnvironmentSettingCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="12" ShadowDepth="0" Opacity="0.12" Color="#05080D"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="EnvironmentBadgeStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="7,3"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+        </Style>
+
+        <Style x:Key="EnvironmentFilterToggleStyle" TargetType="ToggleButton">
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Padding" Value="12,4"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource CoreLineActiveBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="EnvironmentComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Root"
+                                                MinHeight="34"
+                                                Background="{DynamicResource CoreNodeBackgroundBrush}"
+                                                BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="9"
+                                                Padding="10,6">
+                                            <Grid>
+                                                <TextBlock Margin="0,0,22,0"
+                                                           HorizontalAlignment="Left"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource WindowForeground}"
+                                                           Text="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="&#xE70D;"
+                                                           FontFamily="Segoe MDL2 Assets"
+                                                           FontSize="10"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center"
+                                                           Opacity="0.72"/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="Root" Property="Opacity" Value="0.48"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Fade">
+                                <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="260"
+                                        Background="{DynamicResource ContentBackground}"
+                                        BorderBrush="{DynamicResource CoreLineActiveBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="4">
+                                    <ScrollViewer CanContentScroll="True">
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+                        <Setter Property="Padding" Value="10,6"/>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="EnvironmentToggleStyle" TargetType="CheckBox">
+            <Setter Property="Width" Value="56"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Width="56" Height="30" SnapsToDevicePixels="True">
+                            <Border x:Name="Track"
+                                    Width="54"
+                                    Height="28"
+                                    CornerRadius="14"
+                                    Background="{DynamicResource ButtonBackground}"
+                                    BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                                    BorderThickness="1"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                            <Ellipse x:Name="Thumb"
+                                     Width="20"
+                                     Height="20"
+                                     Fill="{DynamicResource WindowForeground}"
+                                     Margin="5,0,5,0"
+                                     HorizontalAlignment="Left"
+                                     VerticalAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.92"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.45"/>
+                                <Setter TargetName="Thumb" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="EnergyOrbButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource CoreOrbForegroundBrush}"/>
+            <Setter Property="Background">
+                <Setter.Value>
+                    <RadialGradientBrush Center="0.44,0.38" GradientOrigin="0.36,0.30" RadiusX="0.78" RadiusY="0.78">
+                        <GradientStop Color="#F14FE8D8" Offset="0"/>
+                        <GradientStop Color="#C531B9D0" Offset="0.44"/>
+                        <GradientStop Color="#702D6EA7" Offset="0.78"/>
+                        <GradientStop Color="#25203B54" Offset="1"/>
+                    </RadialGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse Margin="-7,24,-7,-9" Opacity="0.22">
+                                <Ellipse.Fill>
+                                    <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.66" RadiusY="0.42">
+                                        <GradientStop Color="#7A4FE8D8" Offset="0"/>
+                                        <GradientStop Color="#243CC7B7" Offset="0.55"/>
+                                        <GradientStop Color="#00000000" Offset="1"/>
+                                    </RadialGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <Ellipse x:Name="OuterRing" Stroke="{TemplateBinding BorderBrush}" StrokeThickness="1" Opacity="0.34"/>
+                            <Ellipse Margin="4" Fill="{TemplateBinding Background}">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect BlurRadius="14" ShadowDepth="0" Opacity="0.34" Color="#3CC7B7"/>
+                                </Ellipse.Effect>
+                            </Ellipse>
+                            <Ellipse Margin="9" Opacity="0.24">
+                                <Ellipse.Fill>
+                                    <RadialGradientBrush Center="0.36,0.30" GradientOrigin="0.22,0.18" RadiusX="0.92" RadiusY="0.92">
+                                        <GradientStop Color="#D8FFFFFF" Offset="0"/>
+                                        <GradientStop Color="#7A5DEBE2" Offset="0.30"/>
+                                        <GradientStop Color="#2835A7C8" Offset="0.72"/>
+                                        <GradientStop Color="#00000000" Offset="1"/>
+                                    </RadialGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <Ellipse Margin="14,10,19,23" Fill="#DFFFFFFF" Opacity="0.32"/>
+                            <Ellipse Margin="20,20,15,15" Fill="#7EE9FFF7" Opacity="0.18"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="OuterRing" Property="Opacity" Value="0.92"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.78"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <Grid x:Name="RootContent" Background="{DynamicResource WindowBackground}" ClipToBounds="True" Opacity="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="28,18,28,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="18"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0"
+                    Content="&#xE72B;"
+                    Style="{StaticResource BackButtonStyle}"
+                    ToolTip="Назад на главный экран"
+                    Click="BackButton_Click"/>
+
+            <StackPanel Grid.Column="2">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse x:Name="ModuleStatusIndicator"
+                             Width="9"
+                             Height="9"
+                             Margin="0,1,10,0"
+                             VerticalAlignment="Center"/>
+                    <TextBlock x:Name="ModuleStatusTextBlock"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Opacity="0.78"/>
+                </StackPanel>
+                <TextBlock Text="Рабочая среда"
+                           Margin="0,8,0,0"
+                           FontSize="25"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <TextBlock Grid.Column="3"
+                       Text="Схема рабочего стола, Пуска, панели задач, окон и уведомлений"
+                       VerticalAlignment="Center"
+                       FontSize="13"
+                       Opacity="0.62"/>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="24,0,24,18">
+            <Viewbox Stretch="Uniform"
+                     MaxWidth="1340"
+                     MaxHeight="790"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center">
+                <Canvas x:Name="BoardCanvas" Width="1280" Height="720">
+                    <Border Canvas.Left="82"
+                            Canvas.Top="50"
+                            Width="1056"
+                            Height="606"
+                            Background="{DynamicResource ContentBackground}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="22"
+                            Opacity="0.98">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.16" Color="#05080D"/>
+                        </Border.Effect>
+                    </Border>
+
+                    <Border Canvas.Left="128"
+                            Canvas.Top="94"
+                            Width="964"
+                            Height="520"
+                            Background="{DynamicResource WindowBackground}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="18"
+                            Opacity="0.36"/>
+
+                    <Canvas x:Name="DesktopLayer" IsHitTestVisible="False">
+                        <Rectangle Canvas.Left="154" Canvas.Top="96" Width="912" Height="494" RadiusX="14" RadiusY="14" Style="{StaticResource BoardOutlineStyle}" Opacity="0.24"/>
+                        <Rectangle Canvas.Left="206" Canvas.Top="146" Width="808" Height="364" RadiusX="10" RadiusY="10" Style="{StaticResource BoardOutlineStyle}" Opacity="0.14"/>
+
+                        <Line X1="610" Y1="96" X2="610" Y2="590" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.08"/>
+                        <Line X1="154" Y1="340" X2="1066" Y2="340" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.10"/>
+                        <Line X1="386" Y1="146" X2="386" Y2="510" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.06"/>
+                        <Line X1="814" Y1="146" X2="814" Y2="510" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.06"/>
+
+                        <Rectangle Canvas.Left="220" Canvas.Top="190" Width="286" Height="146" RadiusX="12" RadiusY="12" Style="{StaticResource BoardOutlineStyle}" Opacity="0.20"/>
+                        <Rectangle Canvas.Left="684" Canvas.Top="236" Width="286" Height="146" RadiusX="12" RadiusY="12" Style="{StaticResource BoardOutlineStyle}" Opacity="0.20"/>
+                        <Rectangle Canvas.Left="252" Canvas.Top="384" Width="292" Height="132" RadiusX="12" RadiusY="12" Style="{StaticResource BoardOutlineStyle}" Opacity="0.18"/>
+                        <Rectangle Canvas.Left="248" Canvas.Top="526" Width="724" Height="42" RadiusX="12" RadiusY="12" Style="{StaticResource BoardOutlineStyle}" Opacity="0.24"/>
+
+                        <Polyline Points="610,214 610,340" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.18"/>
+                        <Polyline Points="472,254 610,254 610,340" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.24"/>
+                        <Polyline Points="714,300 610,300 610,340" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.20"/>
+                        <Polyline Points="404,398 404,340 610,340" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.22"/>
+                        <Polyline Points="610,340 610,526" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.20"/>
+                        <Polyline Points="610,546 520,546 520,526" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.16"/>
+                        <Polyline Points="610,546 872,546 872,526" Style="{StaticResource BoardTracePolylineStyle}" Opacity="0.16"/>
+                    </Canvas>
+
+                    <Canvas x:Name="RouteLayer" IsHitTestVisible="False">
+                        <Canvas.Resources>
+                            <Style x:Key="BoardRouteLineStyle" TargetType="Line">
+                                <Setter Property="Stroke" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter Property="StrokeThickness" Value="2.5"/>
+                                <Setter Property="StrokeDashArray" Value="1,8"/>
+                                <Setter Property="StrokeStartLineCap" Value="Round"/>
+                                <Setter Property="StrokeEndLineCap" Value="Round"/>
+                                <Setter Property="Opacity" Value="0"/>
+                                <Setter Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="12" ShadowDepth="0" Opacity="0.42" Color="#4AA9FF"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Canvas.Resources>
+
+                        <Line x:Name="DisplayRouteLine" X1="610" Y1="340" X2="610" Y2="146" Style="{StaticResource BoardRouteLineStyle}"/>
+                        <Line x:Name="ExplorerRouteLine" X1="610" Y1="340" X2="361" Y2="254" Style="{StaticResource BoardRouteLineStyle}"/>
+                        <Line x:Name="WindowsRouteLine" X1="610" Y1="340" X2="826" Y2="300" Style="{StaticResource BoardRouteLineStyle}"/>
+                        <Line x:Name="StartRouteLine" X1="610" Y1="340" X2="404" Y2="444" Style="{StaticResource BoardRouteLineStyle}"/>
+                        <Line x:Name="TaskbarRouteLine" X1="610" Y1="340" X2="388" Y2="546" Style="{StaticResource BoardRouteLineStyle}"/>
+                        <Line x:Name="SearchRouteLine" X1="610" Y1="340" X2="610" Y2="546" Style="{StaticResource BoardRouteLineStyle}"/>
+                        <Line x:Name="TrayRouteLine" X1="610" Y1="340" X2="890" Y2="546" Style="{StaticResource BoardRouteLineStyle}"/>
+                    </Canvas>
+
+                    <Canvas x:Name="CoreHubLayer" IsHitTestVisible="False">
+                        <Ellipse Canvas.Left="584" Canvas.Top="314" Width="52" Height="52" Fill="{DynamicResource ContentBackground}" Stroke="{DynamicResource CoreNodeBorderBrush}" StrokeThickness="1.2" Opacity="0.86"/>
+                        <Ellipse Canvas.Left="596" Canvas.Top="326" Width="28" Height="28" Fill="{DynamicResource CoreLineActiveBrush}" Opacity="0.18"/>
+                        <Ellipse Canvas.Left="604" Canvas.Top="334" Width="12" Height="12" Fill="{DynamicResource CoreLineActiveBrush}" Opacity="0.90"/>
+                        <Line X1="610" Y1="316" X2="610" Y2="364" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.22"/>
+                        <Line X1="586" Y1="340" X2="634" Y2="340" Style="{StaticResource BoardTraceLineStyle}" Opacity="0.22"/>
+                    </Canvas>
+
+                    <Border x:Name="DisplayGlow" Canvas.Left="82" Canvas.Top="50" Width="1056" Height="606" Style="{StaticResource BoardNodeGlowStyle}" CornerRadius="22"/>
+                    <Border x:Name="ExplorerGlow" Canvas.Left="236" Canvas.Top="190" Width="250" Height="128" Style="{StaticResource BoardNodeGlowStyle}"/>
+                    <Border x:Name="WindowsGlow" Canvas.Left="700" Canvas.Top="236" Width="250" Height="128" Style="{StaticResource BoardNodeGlowStyle}"/>
+                    <Border x:Name="StartGlow" Canvas.Left="276" Canvas.Top="386" Width="250" Height="112" Style="{StaticResource BoardNodeGlowStyle}"/>
+                    <Border x:Name="TaskbarGlow" Canvas.Left="248" Canvas.Top="526" Width="724" Height="42" Style="{StaticResource BoardNodeGlowStyle}"/>
+                    <Border x:Name="SearchGlow" Canvas.Left="508" Canvas.Top="532" Width="260" Height="30" Style="{StaticResource BoardNodeGlowStyle}" CornerRadius="12"/>
+                    <Border x:Name="TrayGlow" Canvas.Left="812" Canvas.Top="532" Width="148" Height="30" Style="{StaticResource BoardNodeGlowStyle}" CornerRadius="12"/>
+
+                    <Border x:Name="DisplayHitZone"
+                            Tag="Display"
+                            Canvas.Left="82"
+                            Canvas.Top="50"
+                            Width="1056"
+                            Height="606"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            MouseEnter="Component_MouseEnter"
+                            MouseLeave="Component_MouseLeave"
+                            MouseLeftButtonUp="Component_MouseLeftButtonUp"/>
+
+                    <Border x:Name="DisplayZone"
+                            Tag="Display"
+                            Canvas.Left="486"
+                            Canvas.Top="106"
+                            Width="248"
+                            Height="78"
+                            Style="{StaticResource BoardPartHitStyle}"
+                            MouseEnter="Component_MouseEnter"
+                            MouseLeave="Component_MouseLeave"
+                            MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Экран" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Тема, масштаб и визуальные эффекты рабочей среды Windows." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Border x:Name="DisplayPulseFrame" Style="{StaticResource BoardPartShellStyle}">
+                            <StackPanel Margin="18,14,18,0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                <TextBlock Text="Экран" Style="{StaticResource BoardLabelStyle}"/>
+                                <TextBlock Text="тема, масштаб, эффекты" Margin="0,5,0,0" Style="{StaticResource BoardSmallLabelStyle}"/>
+                            </StackPanel>
+                        </Border>
+                    </Border>
+
+                    <Border x:Name="ExplorerZone"
+                            Tag="Explorer"
+                            Canvas.Left="250"
+                            Canvas.Top="204"
+                            Width="222"
+                            Height="100"
+                            Style="{StaticResource BoardPartHitStyle}"
+                            MouseEnter="Component_MouseEnter"
+                            MouseLeave="Component_MouseLeave"
+                            MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Проводник" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Отображение файлов, расширений, быстрый доступ и контекстное меню." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Canvas>
+                            <Border Canvas.Left="0" Canvas.Top="0" Width="222" Height="100" Style="{StaticResource BoardPartShellStyle}"/>
+                            <TextBlock Canvas.Left="18" Canvas.Top="16" Text="Проводник" Style="{StaticResource BoardLabelStyle}"/>
+                            <TextBlock Canvas.Left="18" Canvas.Top="44" Text="файлы и расширения" Style="{StaticResource BoardSmallLabelStyle}"/>
+                            <TextBlock Canvas.Left="198" Canvas.Top="17" Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="13" Opacity="0.70"/>
+                            <Rectangle Canvas.Left="18" Canvas.Top="68" Width="186" Height="8" RadiusX="4" RadiusY="4" Fill="{DynamicResource CoreLineBrush}" Opacity="0.28"/>
+                            <Rectangle x:Name="ExplorerScanPulse" Canvas.Left="18" Canvas.Top="84" Width="64" Height="8" RadiusX="4" RadiusY="4" Fill="{DynamicResource CoreLineActiveBrush}" Opacity="0.86"/>
+                            <Rectangle Canvas.Left="96" Canvas.Top="84" Width="92" Height="8" RadiusX="4" RadiusY="4" Fill="{DynamicResource CoreLineBrush}" Opacity="0.24"/>
+                        </Canvas>
+                    </Border>
+
+                    <Border x:Name="WindowsZone"
+                            Tag="Windows"
+                            Canvas.Left="714"
+                            Canvas.Top="250"
+                            Width="222"
+                            Height="100"
+                            Style="{StaticResource BoardPartHitStyle}"
+                            MouseEnter="Component_MouseEnter"
+                            MouseLeave="Component_MouseLeave"
+                            MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Окна и задачи" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Активные окна, диспетчер задач, Snap Layouts и многозадачность." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Canvas>
+                            <Border Canvas.Left="0" Canvas.Top="0" Width="222" Height="100" Style="{StaticResource BoardPartShellStyle}"/>
+                            <TextBlock Canvas.Left="18" Canvas.Top="16" Text="Окна" Style="{StaticResource BoardLabelStyle}"/>
+                            <TextBlock Canvas.Left="18" Canvas.Top="44" Text="задачи, процессы" Style="{StaticResource BoardSmallLabelStyle}"/>
+                            <UniformGrid Canvas.Left="18" Canvas.Top="68" Width="168" Height="34" Columns="3" Rows="2">
+                                <Border Margin="3" Background="{DynamicResource CoreLineBrush}" CornerRadius="4" Opacity="0.28"/>
+                                <Border x:Name="WindowsActivityPulse" Margin="3" Background="{DynamicResource CoreLineActiveBrush}" CornerRadius="4" Opacity="0.86"/>
+                                <Border Margin="3" Background="{DynamicResource CoreLineBrush}" CornerRadius="4" Opacity="0.26"/>
+                                <Border Margin="3" Background="{DynamicResource CoreLineBrush}" CornerRadius="4" Opacity="0.22"/>
+                                <Border Margin="3" Background="{DynamicResource CoreLineBrush}" CornerRadius="4" Opacity="0.30"/>
+                                <Border Margin="3" Background="{DynamicResource CoreLineBrush}" CornerRadius="4" Opacity="0.20"/>
+                            </UniformGrid>
+                        </Canvas>
+                    </Border>
+
+                    <Border x:Name="StartZone"
+                            Tag="Start"
+                            Canvas.Left="292"
+                            Canvas.Top="398"
+                            Width="224"
+                            Height="92"
+                            Style="{StaticResource BoardPartHitStyle}"
+                            MouseEnter="Component_MouseEnter"
+                            MouseLeave="Component_MouseLeave"
+                            MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Пуск" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Закрепления, рекомендации и список приложений меню Пуск." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Canvas>
+                            <Border Canvas.Left="0" Canvas.Top="0" Width="224" Height="92" Style="{StaticResource BoardPartShellStyle}"/>
+                            <TextBlock Canvas.Left="18" Canvas.Top="14" Text="Пуск" Style="{StaticResource BoardLabelStyle}"/>
+                            <TextBlock Canvas.Left="18" Canvas.Top="42" Text="закрепления, рекомендации" Width="178" Style="{StaticResource BoardSmallLabelStyle}"/>
+                            <Rectangle x:Name="StartTilePulse" Canvas.Left="18" Canvas.Top="72" Width="24" Height="8" RadiusX="4" RadiusY="4" Fill="{DynamicResource CoreLineActiveBrush}" Opacity="0.86"/>
+                            <Rectangle Canvas.Left="52" Canvas.Top="72" Width="24" Height="8" RadiusX="4" RadiusY="4" Fill="{DynamicResource CoreLineBrush}" Opacity="0.24"/>
+                            <Rectangle Canvas.Left="86" Canvas.Top="72" Width="24" Height="8" RadiusX="4" RadiusY="4" Fill="{DynamicResource CoreLineBrush}" Opacity="0.22"/>
+                            <Rectangle Canvas.Left="120" Canvas.Top="72" Width="24" Height="8" RadiusX="4" RadiusY="4" Fill="{DynamicResource CoreLineBrush}" Opacity="0.20"/>
+                        </Canvas>
+                    </Border>
+
+                    <Border x:Name="TaskbarZone"
+                            Tag="Taskbar"
+                            Canvas.Left="248"
+                            Canvas.Top="526"
+                            Width="724"
+                            Height="42"
+                            Style="{StaticResource BoardPartHitStyle}"
+                            MouseEnter="Component_MouseEnter"
+                            MouseLeave="Component_MouseLeave"
+                            MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Панель задач" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Закрепления, системные кнопки, группировка окон и индикаторы трея." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Border Style="{StaticResource BoardPartShellStyle}" CornerRadius="12">
+                            <Grid Margin="14,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="190"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="170"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Панель задач" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <Border Width="18" Height="18" Margin="18,0,0,0" Background="{DynamicResource CoreLineBrush}" CornerRadius="5" Opacity="0.28"/>
+                                    <Border x:Name="TaskbarActivePulse" Width="18" Height="18" Margin="8,0,0,0" Background="{DynamicResource CoreLineActiveBrush}" CornerRadius="5" Opacity="0.86"/>
+                                    <Border Width="18" Height="18" Margin="8,0,0,0" Background="{DynamicResource CoreLineBrush}" CornerRadius="5" Opacity="0.24"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Border>
+
+                    <Border x:Name="SearchZone"
+                            Tag="Search"
+                            Canvas.Left="514"
+                            Canvas.Top="532"
+                            Width="248"
+                            Height="30"
+                            Style="{StaticResource BoardPartHitStyle}"
+                            MouseEnter="Component_MouseEnter"
+                            MouseLeave="Component_MouseLeave"
+                            MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Поиск" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Индексирование, локальные результаты и веб-подсказки." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Border x:Name="SearchPulseFrame" Background="{DynamicResource ContentBackground}" BorderBrush="{DynamicResource CoreNodeBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="13" Opacity="0.72" VerticalAlignment="Center"/>
+                                <TextBlock Text="Поиск Windows" Margin="10,0,0,0" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </Border>
+
+                    <Border x:Name="TrayZone"
+                            Tag="Tray"
+                            Canvas.Left="814"
+                            Canvas.Top="532"
+                            Width="146"
+                            Height="30"
+                            Style="{StaticResource BoardPartHitStyle}"
+                            MouseEnter="Component_MouseEnter"
+                            MouseLeave="Component_MouseLeave"
+                            MouseLeftButtonUp="Component_MouseLeftButtonUp">
+                        <Border.ToolTip>
+                            <ToolTip Style="{StaticResource BoardToolTipStyle}">
+                                <StackPanel Width="260">
+                                    <TextBlock Text="Уведомления" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Системные уведомления, быстрые действия и значки трея." Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.76"/>
+                                </StackPanel>
+                            </ToolTip>
+                        </Border.ToolTip>
+                        <Grid Margin="10,0">
+                            <TextBlock Text="Уведомления" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Ellipse Width="7" Height="7" Margin="0,0,7,0" Fill="{DynamicResource CoreLineBrush}" Opacity="0.32"/>
+                                <Ellipse x:Name="TrayPulseDot" Width="7" Height="7" Margin="0,0,7,0" Fill="{DynamicResource CoreLineActiveBrush}" Opacity="0.86"/>
+                                <Ellipse Width="7" Height="7" Fill="{DynamicResource CoreLineBrush}" Opacity="0.24"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Rectangle Canvas.Left="558" Canvas.Top="614" Width="104" Height="24" Fill="{DynamicResource ContentBackground}" Stroke="{DynamicResource BorderBrush}" StrokeThickness="1" Opacity="0.62"/>
+                    <Border Canvas.Left="470" Canvas.Top="638" Width="280" Height="18" Background="{DynamicResource ButtonBackground}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Opacity="0.64"/>
+
+                    <Canvas x:Name="CalloutLayer" IsHitTestVisible="True"/>
+                </Canvas>
+            </Viewbox>
+        </Grid>
+
+        <Grid x:Name="NodeDetailsLayer" Grid.RowSpan="2" Visibility="Collapsed" Opacity="0">
+            <Border x:Name="DetailsScrim"
+                    Background="{DynamicResource WindowBackground}"
+                    Opacity="0.80"
+                    MouseLeftButtonDown="DetailsScrim_MouseLeftButtonDown"/>
+
+            <Border x:Name="NodeDetailsPanel"
+                    MaxWidth="1120"
+                    Margin="28,78,28,28"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    Background="{DynamicResource CoreNodeBackgroundBrush}"
+                    BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    Padding="22"
+                    RenderTransformOrigin="0.5,0.5">
+                <Border.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform x:Name="NodeDetailsScale" ScaleX="1" ScaleY="1"/>
+                        <TranslateTransform x:Name="NodeDetailsTranslate" X="44"/>
+                    </TransformGroup>
+                </Border.RenderTransform>
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="Выбранный узел" FontSize="12" FontWeight="SemiBold" Opacity="0.62"/>
+                        <TextBlock x:Name="SelectedTitleTextBlock" Margin="0,7,0,0" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="SelectedDescriptionTextBlock" Margin="0,9,0,0" FontSize="13" LineHeight="19" Opacity="0.78" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="SelectedFindingSummaryTextBlock" Margin="0,14,0,0" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <ScrollViewer x:Name="NodeDetailsScrollViewer" Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="Проблемы и рекомендации" FontSize="15" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="SelectedFindingsEmptyText"
+                                       Text="По этому узлу сейчас нет активных проблем или рекомендаций."
+                                       Margin="0,8,0,0"
+                                       FontSize="12"
+                                       Opacity="0.70"
+                                       TextWrapping="Wrap"/>
+                            <ItemsControl x:Name="SelectedFindingsItemsControl" Margin="0,10,0,8">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource DetailsCardStyle}"
+                                                Loaded="SelectedEnvironmentFindingCard_Loaded"
+                                                Cursor="Hand"
+                                                MouseLeftButtonUp="SelectedEnvironmentFindingCard_MouseLeftButtonUp">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding KindText}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                                                <TextBlock Text="{Binding Title}" Margin="0,5,0,0" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Description}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.78" TextWrapping="Wrap"/>
+                                                <Button Content="Игнорировать"
+                                                        Tag="{Binding Id}"
+                                                        Margin="0,10,0,0"
+                                                        HorizontalAlignment="Left"
+                                                        Style="{StaticResource EnvironmentSignalActionButtonStyle}"
+                                                        Click="IgnoreSelectedFinding_Click"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="Параметры и действия" Margin="0,8,0,0" FontSize="15" FontWeight="SemiBold"/>
+                            <Grid Margin="0,10,0,0">
+                                <TextBox x:Name="EnvironmentSearchTextBox"
+                                         Style="{StaticResource EnvironmentSearchBoxStyle}"
+                                         GotKeyboardFocus="EnvironmentSearchTextBox_GotKeyboardFocus"
+                                         PreviewMouseLeftButtonDown="EnvironmentSearchTextBox_PreviewMouseLeftButtonDown"
+                                         PreviewMouseLeftButtonUp="EnvironmentSearchTextBox_PreviewMouseLeftButtonUp"
+                                         KeyDown="EnvironmentSearchTextBox_KeyDown"
+                                         TextChanged="EnvironmentSearchTextBox_TextChanged"/>
+                                <TextBlock x:Name="EnvironmentSearchPlaceholderTextBlock"
+                                           Text="Поиск по разделам и параметрам этого узла"
+                                           Margin="42,0,36,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           IsHitTestVisible="False"
+                                           Opacity="0.52"/>
+                                <TextBlock Text="&#xE721;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           Margin="14,0,0,0"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Left"
+                                           Opacity="0.58"/>
+                                <Button x:Name="EnvironmentSearchClearButton"
+                                        Content="&#xE711;"
+                                        FontFamily="Segoe MDL2 Assets"
+                                        Width="28"
+                                        Height="28"
+                                        Padding="0"
+                                        Margin="0,0,8,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource EnvironmentActionButtonStyle}"
+                                        Visibility="Collapsed"
+                                        Click="EnvironmentSearchClearButton_Click"/>
+                            </Grid>
+                            <ItemsControl x:Name="EnvironmentSearchSuggestionsItemsControl"
+                                          Margin="0,8,0,0"
+                                          MaxHeight="92"
+                                          Visibility="Collapsed">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource EnvironmentActionButtonStyle}"
+                                                Click="EnvironmentSearchSuggestion_Click">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Caption}" Margin="0,2,0,0" FontSize="10" Opacity="0.58" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock x:Name="EnvironmentSearchEmptyText"
+                                       Text="По этому запросу в текущем узле ничего не найдено."
+                                       Margin="0,8,0,0"
+                                       FontSize="12"
+                                       Opacity="0.70"
+                                       TextWrapping="Wrap"
+                                       Visibility="Collapsed"/>
+                            <WrapPanel Margin="0,8,0,0">
+                                <ToggleButton x:Name="EnvironmentFilterAllButton"
+                                              Content="Все"
+                                              Tag="All"
+                                              IsChecked="True"
+                                              Style="{StaticResource EnvironmentFilterToggleStyle}"
+                                              Click="EnvironmentSignalFilter_Click"/>
+                                <ToggleButton x:Name="EnvironmentFilterRecommendationsButton"
+                                              Content="Рекомендации"
+                                              Tag="Recommendations"
+                                              Style="{StaticResource EnvironmentFilterToggleStyle}"
+                                              Click="EnvironmentSignalFilter_Click"/>
+                                <ToggleButton x:Name="EnvironmentFilterProblemsButton"
+                                              Content="Проблемы"
+                                              Tag="Problems"
+                                              Style="{StaticResource EnvironmentFilterToggleStyle}"
+                                              Click="EnvironmentSignalFilter_Click"/>
+                                <ToggleButton x:Name="EnvironmentFilterCriticalButton"
+                                              Content="Критические"
+                                              Tag="Critical"
+                                              Style="{StaticResource EnvironmentFilterToggleStyle}"
+                                              Click="EnvironmentSignalFilter_Click"/>
+                            </WrapPanel>
+                            <TextBlock x:Name="EnvironmentSettingsEmptyText"
+                                       Text="Для этого узла пока нет доступных действий."
+                                       Margin="0,8,0,0"
+                                       FontSize="12"
+                                       Opacity="0.70"
+                                       TextWrapping="Wrap"
+                                       Visibility="Collapsed"/>
+                            <ItemsControl x:Name="SelectedSectionsItemsControl" Margin="0,12,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource EnvironmentSettingCardStyle}"
+                                                Loaded="EnvironmentSettingCard_Loaded"
+                                                Tag="{Binding Id}"
+                                                Opacity="0">
+                                            <Grid>
+                                                <Border Tag="SearchHighlightOverlay"
+                                                        Margin="-6"
+                                                        CornerRadius="10"
+                                                        Background="{StaticResource SearchHighlightGradientBrush}"
+                                                        BorderBrush="{DynamicResource CoreLineActiveBrush}"
+                                                        BorderThickness="1"
+                                                        Opacity="0"
+                                                        IsHitTestVisible="False"/>
+                                                <StackPanel>
+                                                    <WrapPanel Visibility="{Binding HasActiveSignal, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <Border>
+                                                            <Border.Style>
+                                                                <Style TargetType="Border" BasedOn="{StaticResource EnvironmentBadgeStyle}">
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource CoreNormalBrush}"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Attention}">
+                                                                            <Setter Property="BorderBrush" Value="{DynamicResource CoreAttentionBrush}"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Warning}">
+                                                                            <Setter Property="BorderBrush" Value="{DynamicResource CoreWarningBrush}"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Critical}">
+                                                                            <Setter Property="BorderBrush" Value="{DynamicResource CoreCriticalBrush}"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <TextBlock Text="{Binding SignalKindText}" FontSize="11" FontWeight="SemiBold">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource CoreNormalBrush}"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Attention}">
+                                                                                <Setter Property="Foreground" Value="{DynamicResource CoreAttentionBrush}"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Warning}">
+                                                                                <Setter Property="Foreground" Value="{DynamicResource CoreWarningBrush}"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Critical}">
+                                                                                <Setter Property="Foreground" Value="{DynamicResource CoreCriticalBrush}"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Border>
+                                                        <Button Content="{Binding SignalActionText}"
+                                                                Tag="{Binding SignalId}"
+                                                                Style="{StaticResource EnvironmentSignalActionButtonStyle}"
+                                                                Click="IgnoreEnvironmentSettingSignal_Click"/>
+                                                    </WrapPanel>
+                                                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="{Binding Description}" Margin="0,6,0,0" FontSize="12" LineHeight="18" Opacity="0.76" TextWrapping="Wrap"/>
+                                                    <WrapPanel Margin="0,10,0,-6">
+                                                        <Border Style="{StaticResource EnvironmentBadgeStyle}">
+                                                            <TextBlock Text="{Binding Source}" FontSize="11" FontWeight="SemiBold" Opacity="0.82"/>
+                                                        </Border>
+                                                        <Border Style="{StaticResource EnvironmentBadgeStyle}">
+                                                            <TextBlock Text="{Binding RiskText}" FontSize="11" FontWeight="SemiBold" Opacity="0.82"/>
+                                                        </Border>
+                                                        <Border Style="{StaticResource EnvironmentBadgeStyle}">
+                                                            <TextBlock Text="{Binding BackupState}" FontSize="11" FontWeight="SemiBold" Opacity="0.82"/>
+                                                        </Border>
+                                                    </WrapPanel>
+                                                    <Border Margin="0,10,0,0" Background="Transparent" BorderThickness="0" Visibility="{Binding HasCurrentValue, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="Текущее состояние" FontSize="11" FontWeight="SemiBold" Opacity="0.62"/>
+                                                            <TextBlock Text="{Binding CurrentValue}" Margin="0,3,0,0" FontSize="12" TextWrapping="Wrap"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Recommendation}"
+                                                               Margin="0,10,0,0"
+                                                               FontSize="12"
+                                                               LineHeight="18"
+                                                               TextWrapping="Wrap"
+                                                               Opacity="0.78"
+                                                               Visibility="{Binding HasRecommendation, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    <CheckBox Style="{StaticResource EnvironmentToggleStyle}"
+                                                              Margin="0,12,0,0"
+                                                              HorizontalAlignment="Left"
+                                                              IsChecked="{Binding ToggleValue, Mode=TwoWay}"
+                                                              IsEnabled="{Binding CanApply}"
+                                                              Visibility="{Binding IsToggle, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    <ComboBox Style="{StaticResource EnvironmentComboBoxStyle}"
+                                                              Margin="0,12,0,0"
+                                                              ItemsSource="{Binding Options}"
+                                                              SelectedItem="{Binding SelectedOption, Mode=TwoWay}"
+                                                              DisplayMemberPath="Label"
+                                                              IsEnabled="{Binding CanApply}"
+                                                              Visibility="{Binding IsCombo, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    <Border Margin="0,12,0,0"
+                                                            Padding="10,8"
+                                                            Background="{DynamicResource CoreNodeBackgroundBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="8"
+                                                            Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <TextBlock Text="{Binding StatusMessage}" FontSize="12" LineHeight="18" TextWrapping="Wrap" Opacity="0.84"/>
+                                                    </Border>
+                                                    <WrapPanel Margin="0,14,0,-8">
+                                                        <Button Content="{Binding ApplyButtonText}"
+                                                                Style="{StaticResource EnvironmentPrimaryActionButtonStyle}"
+                                                                IsEnabled="{Binding CanApply}"
+                                                                Visibility="{Binding ShowApplyAction, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                                Click="ApplyEnvironmentSetting_Click"/>
+                                                        <Button Content="Откатить"
+                                                                Style="{StaticResource EnvironmentActionButtonStyle}"
+                                                                Visibility="{Binding CanRollback, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                                Click="RollbackEnvironmentSetting_Click"/>
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <Border x:Name="EnvironmentNavigationBusyOverlay"
+                            Grid.RowSpan="2"
+                            Panel.ZIndex="20"
+                            Background="#D91D2A34"
+                            BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Visibility="Collapsed"
+                            Opacity="0"
+                            IsHitTestVisible="True">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <UniformGrid Rows="2" Columns="2" Width="60" Height="60" HorizontalAlignment="Center">
+                                <Border x:Name="EnvironmentBusySquareA" Style="{StaticResource EnvironmentLoadingSquareStyle}"/>
+                                <Border x:Name="EnvironmentBusySquareB" Style="{StaticResource EnvironmentLoadingSquareStyle}"/>
+                                <Border x:Name="EnvironmentBusySquareC" Style="{StaticResource EnvironmentLoadingSquareStyle}"/>
+                                <Border x:Name="EnvironmentBusySquareD" Style="{StaticResource EnvironmentLoadingSquareStyle}"/>
+                            </UniformGrid>
+                            <TextBlock Text="Загрузка узла, пожалуйста подождите"
+                                       Margin="0,12,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.76"/>
+                            <TextBlock Text="Считываем параметры реестра и подготавливаем доступные действия."
+                                       Margin="0,5,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="11"
+                                       Opacity="0.56"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Button x:Name="NodeDetailsOrbButton"
+                    Style="{StaticResource EnergyOrbButtonStyle}"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Margin="0"
+                    ToolTip="Свернуть узел и вернуться к карте"
+                    Visibility="Collapsed"
+                    Opacity="0"
+                    Click="NodeDetailsOrbButton_Click"
+                    RenderTransformOrigin="0.5,0.5">
+                <Button.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform x:Name="NodeDetailsOrbScale" ScaleX="1" ScaleY="1"/>
+                        <TranslateTransform x:Name="NodeDetailsOrbTranslate"/>
+                    </TransformGroup>
+                </Button.RenderTransform>
+            </Button>
+        </Grid>
+    </Grid>
+</Page>

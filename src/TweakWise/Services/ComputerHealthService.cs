@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -133,6 +133,7 @@ namespace TweakWise.Services
 
             CheckSystemDrive(moduleStatuses, findings);
             CheckRestartState(moduleStatuses, findings);
+            CheckWindowsSetupState(moduleStatuses, findings);
             CheckPerformanceState(moduleStatuses, findings);
             CheckNetworkState(moduleStatuses, findings);
 
@@ -294,6 +295,829 @@ namespace TweakWise.Services
                     Description = "Windows не сообщает о доступном сетевом подключении.",
                     ActionText = "Проверьте адаптер, Wi-Fi, кабель или состояние подключения."
                 });
+        }
+
+        private static void CheckWindowsSetupState(
+            Dictionary<CoreModuleId, ModuleHealthStatus> moduleStatuses,
+            HealthFindingAccumulator findings)
+        {
+            var target = moduleStatuses[CoreModuleId.WindowsSetup];
+            var environmentFindings = new List<ModuleHealthFinding>();
+
+            int? transparency = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+                "EnableTransparency");
+            if (transparency != 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.display.transparency",
+                    Level = HealthLevel.Normal,
+                    Title = "Прозрачность интерфейса включена",
+                    Description = "Windows использует прозрачные поверхности. Это не ошибка, но на слабых системах и при долгой работе может добавлять визуальный шум.",
+                    ActionText = "В узле «Экран» можно отключить прозрачность интерфейса."
+                });
+            }
+
+            string minAnimate = ReadRegistryStringValue(
+                Registry.CurrentUser,
+                @"Control Panel\Desktop\WindowMetrics",
+                "MinAnimate");
+            if (!string.Equals(minAnimate, "0", StringComparison.OrdinalIgnoreCase))
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.display.window-animation",
+                    Level = HealthLevel.Normal,
+                    Title = "Анимация окон включена",
+                    Description = "Сворачивание и разворачивание окон анимируется. Это штатно, но не всем подходит для быстрой рабочей среды.",
+                    ActionText = "В узле «Экран» можно отключить анимацию окон."
+                });
+            }
+
+            int? titleAccent = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\DWM",
+                "ColorPrevalence");
+            if (titleAccent.HasValue && titleAccent != 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.display.title-accent",
+                    Level = HealthLevel.Normal,
+                    Title = "Акцент на заголовках окон включён",
+                    Description = "Windows окрашивает заголовки окон акцентным цветом. Для спокойной рабочей среды этот эффект можно отключить.",
+                    ActionText = "В узле «Экран» можно вернуть нейтральные заголовки окон."
+                });
+            }
+
+            int? hideFileExt = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "HideFileExt");
+            if (hideFileExt != 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.explorer.hide-file-extensions",
+                    Level = HealthLevel.Normal,
+                    Title = "Расширения файлов скрыты",
+                    Description = "Проводник скрывает расширения известных типов файлов. Из-за этого сложнее отличить документ от исполняемого файла.",
+                    ActionText = "В узле «Проводник» включите отображение расширений файлов."
+                });
+            }
+
+            int? syncProviderNotifications = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "ShowSyncProviderNotifications");
+            if (syncProviderNotifications != 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.explorer.sync-provider-notifications",
+                    Level = HealthLevel.Normal,
+                    Title = "Предложения Проводника включены",
+                    Description = "Проводник может показывать системные предложения и информационные блоки Microsoft. Это не ошибка, но часть пользователей отключает их для более спокойной рабочей среды.",
+                    ActionText = "В узле «Проводник» проверьте, нужны ли такие предложения в ежедневной работе."
+                });
+            }
+
+            int? separateProcess = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "SeparateProcess");
+            if (separateProcess != 1)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.explorer.separate-process",
+                    Level = HealthLevel.Normal,
+                    Title = "Проводник работает в общем процессе",
+                    Description = "Окна Проводника могут использовать общий процесс оболочки. Отдельный процесс повышает устойчивость при сбоях отдельных окон.",
+                    ActionText = "В узле «Проводник» можно включить отдельный процесс для окон Проводника."
+                });
+            }
+
+            int? hiddenFilesMode = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "Hidden");
+            if (hiddenFilesMode.HasValue && hiddenFilesMode != 2)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.explorer.hidden-files",
+                    Level = HealthLevel.Normal,
+                    Title = "Скрытые файлы отображаются",
+                    Description = "Проводник показывает скрытые элементы. Это удобно для администрирования, но для обычной рабочей среды может создавать лишний визуальный шум.",
+                    ActionText = "В узле «Проводник» можно вернуть стандартное скрытие системных элементов."
+                });
+            }
+
+            int? startRecommendations = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "Start_IrisRecommendations");
+            if (startRecommendations != 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.start.recommendations",
+                    Level = HealthLevel.Normal,
+                    Title = "Рекомендации в меню Пуск включены",
+                    Description = "Windows может показывать в меню Пуск рекомендации и недавние элементы. Это не ошибка, но часть пользователей отключает этот блок для более чистого меню.",
+                    ActionText = "В узле «Пуск» проверьте, нужен ли этот блок в рабочей среде."
+                });
+            }
+
+            int? startTrackDocs = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "Start_TrackDocs");
+            if (startTrackDocs != 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.start.track-docs-enabled",
+                    Level = HealthLevel.Normal,
+                    Title = "Недавние элементы в Пуске включены",
+                    Description = "Windows может показывать недавно открытые файлы в меню Пуск, списках переходов и Проводнике. Это удобно, но не всегда подходит для аккуратной или приватной рабочей среды.",
+                    ActionText = "В узле «Пуск» проверьте отображение недавних элементов."
+                });
+            }
+
+            int? startLayout = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "Start_Layout");
+            if (startLayout != 1)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.start.more-pins",
+                    Level = HealthLevel.Normal,
+                    Title = "Пуск использует стандартную компоновку",
+                    Description = "В меню Пуск может оставаться больше места под рекомендательный блок. Для рабочей среды чаще удобнее компактная схема с большим числом закреплений.",
+                    ActionText = "В узле «Пуск» можно включить компоновку с большим числом закреплений."
+                });
+            }
+
+            int? taskbarWidgets = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "TaskbarDa");
+            if (taskbarWidgets > 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.taskbar.widgets-enabled",
+                    Level = HealthLevel.Normal,
+                    Title = "Виджеты включены на панели задач",
+                    Description = "Панель задач содержит системный блок виджетов. Если он не используется, его можно убрать, чтобы освободить место и уменьшить визуальный шум.",
+                    ActionText = "В узле «Панель задач» проверьте системные кнопки и закрепления."
+                });
+            }
+
+            int? taskbarChat = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "TaskbarMn");
+            if (taskbarChat > 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.taskbar.chat-enabled",
+                    Level = HealthLevel.Normal,
+                    Title = "Кнопка чата включена на панели задач",
+                    Description = "Windows показывает кнопку чата или Teams на панели задач. Если она не нужна, её можно скрыть.",
+                    ActionText = "В узле «Панель задач» проверьте лишние системные элементы."
+                });
+            }
+
+            int? taskbarSearchMode = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Search",
+                "SearchboxTaskbarMode");
+            if (taskbarSearchMode.HasValue && taskbarSearchMode != 1)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.taskbar.search-mode",
+                    Level = HealthLevel.Normal,
+                    Title = "Поиск занимает много места на панели задач",
+                    Description = "Панель задач может показывать широкую строку поиска вместо компактной кнопки. Это уменьшает полезное место для закреплённых приложений.",
+                    ActionText = "В узле «Панель задач» можно включить компактный вид поиска."
+                });
+            }
+
+            int? taskbarAlignment = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "TaskbarAl");
+            if (taskbarAlignment != 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.taskbar.left-align",
+                    Level = HealthLevel.Normal,
+                    Title = "Значки панели задач выровнены по центру",
+                    Description = "Центральное выравнивание выглядит современно, но для некоторых рабочих сценариев левое расположение быстрее и предсказуемее.",
+                    ActionText = "В узле «Панель задач» можно переключить значки влево."
+                });
+            }
+
+            int? bingSearch = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Search",
+                "BingSearchEnabled");
+            int? cortanaConsent = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Search",
+                "CortanaConsent");
+            int? disableSearchBoxSuggestions = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Policies\Microsoft\Windows\Explorer",
+                "DisableSearchBoxSuggestions");
+            if (disableSearchBoxSuggestions != 1)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.search.web-policy",
+                    Level = HealthLevel.Normal,
+                    Title = "Веб-подсказки поиска разрешены политикой",
+                    Description = "Windows Search может смешивать локальные результаты с веб-подсказками. Это удобно не всем и иногда делает поиск менее предсказуемым.",
+                    ActionText = "В узле «Поиск» можно отключить веб-подсказки."
+                });
+            }
+
+            if (bingSearch != 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.search.bing-search",
+                    Level = HealthLevel.Normal,
+                    Title = "Bing включён в поиске Windows",
+                    Description = "Поиск может добавлять онлайн-результаты Bing к локальным файлам и приложениям.",
+                    ActionText = "В узле «Поиск» можно оставить только локальные результаты."
+                });
+            }
+
+            if (cortanaConsent > 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.search.cortana-consent",
+                    Level = HealthLevel.Normal,
+                    Title = "Онлайн-компонент поиска разрешён",
+                    Description = "Пользовательское согласие разрешает онлайн-компоненты системного поиска.",
+                    ActionText = "В узле «Поиск» можно сбросить согласие для онлайн-компонента."
+                });
+            }
+
+            int? searchLocation = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Search",
+                "AllowSearchToUseLocation");
+            if (searchLocation != 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.search.location",
+                    Level = HealthLevel.Normal,
+                    Title = "Поиск может использовать геопозицию",
+                    Description = "Windows Search может учитывать геопозицию для подсказок. Это не ошибка, но для приватной рабочей среды параметр обычно отключают.",
+                    ActionText = "В узле «Поиск» можно отключить использование геопозиции."
+                });
+            }
+
+            string snapActive = ReadRegistryStringValue(
+                Registry.CurrentUser,
+                @"Control Panel\Desktop",
+                "WindowArrangementActive");
+            if (string.Equals(snapActive, "0", StringComparison.OrdinalIgnoreCase))
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.windows.snap",
+                    Level = HealthLevel.Warning,
+                    Title = "Привязка окон отключена",
+                    Description = "Windows не будет привязывать окна к краям экрана. Это может мешать удобной работе с несколькими окнами.",
+                    ActionText = "В узле «Окна» можно включить привязку окон."
+                });
+            }
+
+            int? snapFlyout = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "EnableSnapAssistFlyout");
+            if (snapFlyout.HasValue && snapFlyout != 1)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.windows.snap-flyout",
+                    Level = HealthLevel.Normal,
+                    Title = "Подсказки привязки окон отключены",
+                    Description = "Панель Snap Layouts не появляется при работе с окнами. Это может замедлять раскладку нескольких приложений на экране.",
+                    ActionText = "В узле «Окна» можно включить подсказки привязки."
+                });
+            }
+
+            int? altTabEdge = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "MultiTaskingAltTabFilter");
+            if (altTabEdge != 3)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.windows.alt-tab-edge",
+                    Level = HealthLevel.Normal,
+                    Title = "Alt+Tab может показывать вкладки браузера",
+                    Description = "В переключателе задач могут появляться вкладки Microsoft Edge. При большом числе вкладок список окон становится менее предсказуемым.",
+                    ActionText = "В узле «Окна» можно оставить в Alt+Tab только окна."
+                });
+            }
+
+            int? toastEnabled = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\PushNotifications",
+                "ToastEnabled");
+            if (toastEnabled == 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.notifications.toast-disabled",
+                    Level = HealthLevel.Warning,
+                    Title = "Системные уведомления отключены",
+                    Description = "Windows сообщает, что toast-уведомления отключены. Из-за этого часть важных событий может не отображаться пользователю.",
+                    ActionText = "В узле «Уведомления» проверьте, должны ли системные события показываться."
+                });
+            }
+
+            int? globalToasts = ReadRegistryDwordValue(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Notifications\Settings",
+                "NOC_GLOBAL_SETTING_TOASTS_ENABLED");
+            if (globalToasts == 0)
+            {
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = "workenv.notifications.global-toasts",
+                    Level = HealthLevel.Warning,
+                    Title = "Глобальные уведомления отключены",
+                    Description = "Общий переключатель уведомлений Windows выключен. Из-за этого часть системных и пользовательских событий может не появляться.",
+                    ActionText = "В узле «Уведомления» можно вернуть общий вывод уведомлений."
+                });
+            }
+
+            void AddDwordEnvironmentFinding(
+                RegistryKey hive,
+                string path,
+                string valueName,
+                int expectedValue,
+                string id,
+                HealthLevel level,
+                string title,
+                string description,
+                string actionText)
+            {
+                int? value = ReadRegistryDwordValue(hive, path, valueName);
+                if (value.HasValue && value.Value == expectedValue)
+                    return;
+
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = id,
+                    Level = level,
+                    Title = title,
+                    Description = description,
+                    ActionText = actionText
+                });
+            }
+
+            void AddStringEnvironmentFinding(
+                RegistryKey hive,
+                string path,
+                string valueName,
+                string expectedValue,
+                string id,
+                HealthLevel level,
+                string title,
+                string description,
+                string actionText)
+            {
+                string value = ReadRegistryStringValue(hive, path, valueName);
+                if (string.Equals(value, expectedValue, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                environmentFindings.Add(new ModuleHealthFinding
+                {
+                    Id = id,
+                    Level = level,
+                    Title = title,
+                    Description = description,
+                    ActionText = actionText
+                });
+            }
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+                "AppsUseLightTheme",
+                0,
+                "workenv.display.apps-dark-mode",
+                HealthLevel.Normal,
+                "Светлая тема приложений включена",
+                "Приложения Windows используют светлую тему. Для единой тёмной рабочей среды параметр можно переключить напрямую из TweakWise.",
+                "В узле «Экран» можно включить тёмную тему приложений.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+                "SystemUsesLightTheme",
+                0,
+                "workenv.display.system-dark-mode",
+                HealthLevel.Normal,
+                "Системная тема светлая",
+                "Оболочка Windows использует светлую тему. Если нужна единая тёмная схема, параметр можно изменить без перехода в настройки Windows.",
+                "В узле «Экран» можно включить тёмную системную тему.");
+
+            AddStringEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Control Panel\Desktop",
+                "MenuShowDelay",
+                "120",
+                "workenv.display.menu-delay",
+                HealthLevel.Normal,
+                "Меню открываются с обычной задержкой",
+                "Системная задержка открытия меню может быть выше оптимальной для быстрой рабочей среды.",
+                "В узле «Экран» можно уменьшить задержку открытия меню.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "LaunchTo",
+                1,
+                "workenv.explorer.launch-to-this-pc",
+                HealthLevel.Normal,
+                "Проводник открывает Быстрый доступ",
+                "Проводник может стартовать в Быстром доступе вместо раздела Этот компьютер. Для рабочего сценария часто удобнее сразу видеть диски.",
+                "В узле «Проводник» можно переключить стартовую страницу.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "NavPaneExpandToCurrentFolder",
+                1,
+                "workenv.explorer.expand-current-folder",
+                HealthLevel.Normal,
+                "Текущая папка не раскрывается в навигации",
+                "Область навигации Проводника не синхронизируется с текущим путём. Это может замедлять работу с вложенными папками.",
+                "В узле «Проводник» можно включить раскрытие текущей папки.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "UseCompactMode",
+                1,
+                "workenv.explorer.compact-mode",
+                HealthLevel.Normal,
+                "Проводник использует крупные отступы",
+                "Файлы и папки отображаются менее компактно, из-за чего на экран помещается меньше элементов.",
+                "В узле «Проводник» можно включить компактный режим.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "Start_TrackProgs",
+                0,
+                "workenv.start.track-programs",
+                HealthLevel.Normal,
+                "Пуск учитывает историю запуска программ",
+                "Windows может использовать историю запуска приложений для персонализации Пуска. Это не всегда подходит для приватной рабочей среды.",
+                "В узле «Пуск» можно отключить историю запуска программ.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "HideRecentlyAddedApps",
+                1,
+                "workenv.start.recent-apps",
+                HealthLevel.Normal,
+                "Недавно добавленные приложения показываются в Пуске",
+                "Меню Пуск может показывать отдельный блок новых приложений. Для чистого рабочего меню его можно скрыть.",
+                "В узле «Пуск» можно скрыть недавно добавленные приложения.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "Start_AccountNotifications",
+                0,
+                "workenv.start.account-notifications",
+                HealthLevel.Normal,
+                "Уведомления аккаунта в Пуске включены",
+                "Меню Пуск может показывать подсказки и уведомления аккаунта Microsoft. Это добавляет лишние сигналы в рабочую среду.",
+                "В узле «Пуск» можно отключить уведомления аккаунта.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "TaskbarBadges",
+                0,
+                "workenv.taskbar.badges",
+                HealthLevel.Normal,
+                "Бейджи приложений на панели задач включены",
+                "Приложения могут показывать счётчики на панели задач. Для спокойной рабочей среды бейджи можно отключить.",
+                "В узле «Панель задач» можно скрыть бейджи приложений.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "ShowTaskViewButton",
+                0,
+                "workenv.taskbar.task-view",
+                HealthLevel.Normal,
+                "Кнопка представления задач включена",
+                "Отдельная кнопка представления задач занимает место на панели, при этом Win+Tab остаётся доступным.",
+                "В узле «Панель задач» можно скрыть кнопку представления задач.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\People",
+                "PeopleBand",
+                0,
+                "workenv.taskbar.people",
+                HealthLevel.Normal,
+                "Блок Люди включён на панели задач",
+                "Устаревший блок Люди может занимать место или оставаться в параметрах оболочки.",
+                "В узле «Панель задач» можно отключить блок Люди.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Search",
+                "ConnectedSearchUseWeb",
+                0,
+                "workenv.search.connected-web",
+                HealthLevel.Normal,
+                "Подключённый веб-поиск разрешён",
+                "Windows Search может обращаться к веб-источникам при локальном поиске. Это делает результаты менее предсказуемыми.",
+                "В узле «Поиск» можно отключить подключённый веб-поиск.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Search",
+                "ConnectedSearchUseWebOverMeteredConnections",
+                0,
+                "workenv.search.web-metered",
+                HealthLevel.Normal,
+                "Веб-поиск разрешён через лимитное подключение",
+                "Системный поиск может выполнять веб-запросы даже при лимитном подключении.",
+                "В узле «Поиск» можно запретить веб-запросы через лимитные подключения.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Search",
+                "IsDeviceSearchHistoryEnabled",
+                0,
+                "workenv.search.device-history",
+                HealthLevel.Normal,
+                "История поиска на устройстве включена",
+                "Windows может хранить локальную историю поиска. Для приватной рабочей среды её можно отключить.",
+                "В узле «Поиск» можно отключить историю поиска на устройстве.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Search",
+                "IsMSACloudSearchEnabled",
+                0,
+                "workenv.search.msa-cloud",
+                HealthLevel.Normal,
+                "Облачный поиск Microsoft включён",
+                "Поиск может обращаться к данным личного Microsoft-аккаунта. Это не всегда нужно в рабочей среде.",
+                "В узле «Поиск» можно отключить облачный поиск Microsoft.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Search",
+                "IsAADCloudSearchEnabled",
+                0,
+                "workenv.search.aad-cloud",
+                HealthLevel.Normal,
+                "Облачный поиск организации включён",
+                "Поиск может обращаться к рабочей или учебной учётной записи. В личном сценарии это может быть лишним.",
+                "В узле «Поиск» можно отключить облачный поиск организации.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Notifications\Settings",
+                "NOC_GLOBAL_SETTING_ALLOW_TOASTS_ABOVE_LOCK",
+                0,
+                "workenv.notifications.lock-screen",
+                HealthLevel.Normal,
+                "Уведомления разрешены на экране блокировки",
+                "Обычные уведомления могут быть видны до входа в систему. Для приватной среды их можно скрыть.",
+                "В узле «Уведомления» можно скрыть уведомления на экране блокировки.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Policies\Microsoft\Windows\Explorer",
+                "DisableNotificationCenter",
+                0,
+                "workenv.notifications.center-policy",
+                HealthLevel.Warning,
+                "Центр уведомлений отключён политикой",
+                "Пользовательская политика может отключить центр уведомлений. Из-за этого часть системных событий сложнее увидеть.",
+                "В узле «Уведомления» можно вернуть доступ к центру уведомлений.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "SnapAssist",
+                1,
+                "workenv.windows.snap-assist",
+                HealthLevel.Normal,
+                "Snap Assist отключён",
+                "После привязки окна Windows не предлагает выбрать соседнее окно для заполнения свободной области.",
+                "В узле «Окна» можно включить Snap Assist.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "SnapFill",
+                1,
+                "workenv.windows.snap-fill",
+                HealthLevel.Normal,
+                "Автозаполнение привязки отключено",
+                "Windows может не предлагать удобное заполнение свободного пространства при работе с привязанными окнами.",
+                "В узле «Окна» можно включить автозаполнение привязки.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "JointResize",
+                1,
+                "workenv.windows.joint-resize",
+                HealthLevel.Normal,
+                "Совместное изменение размеров окон отключено",
+                "Соседние привязанные окна могут не изменять размер вместе, что делает раскладку менее удобной.",
+                "В узле «Окна» можно включить совместное изменение размеров.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "EnableSnapBar",
+                1,
+                "workenv.windows.snap-bar",
+                HealthLevel.Normal,
+                "Верхняя панель привязки отключена",
+                "Snap Bar сверху экрана может быть недоступен, если параметр выключен в оболочке Windows.",
+                "В узле «Окна» можно включить верхнюю панель привязки.");
+
+
+            AddStringEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Control Panel\Desktop",
+                "FontSmoothing",
+                "2",
+                "workenv.display.font-smoothing",
+                HealthLevel.Normal,
+                "Сглаживание шрифтов отключено",
+                "Текст в классических окнах и элементах оболочки может выглядеть грубее. Для рабочей среды лучше оставить сглаживание включённым.",
+                "В узле «Экран» можно включить сглаживание шрифтов.");
+
+            AddStringEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Control Panel\Desktop",
+                "DragFullWindows",
+                "1",
+                "workenv.display.drag-full-windows",
+                HealthLevel.Normal,
+                "Содержимое окна скрывается при перетаскивании",
+                "При перемещении окна Windows может показывать только контур. Это мешает точной раскладке рабочего пространства.",
+                "В узле «Экран» можно включить показ содержимого при перетаскивании.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "ShowStatusBar",
+                1,
+                "workenv.explorer.show-status-bar",
+                HealthLevel.Normal,
+                "Строка состояния Проводника скрыта",
+                "Без строки состояния сложнее быстро видеть количество элементов и сведения о выделении.",
+                "В узле «Проводник» можно включить строку состояния.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "ShowInfoTip",
+                1,
+                "workenv.explorer.info-tips",
+                HealthLevel.Normal,
+                "Подсказки файлов отключены",
+                "Проводник не показывает быстрые сведения о файлах и папках при наведении.",
+                "В узле «Проводник» можно включить информационные подсказки.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "AutoCheckSelect",
+                0,
+                "workenv.explorer.checkboxes",
+                HealthLevel.Normal,
+                "Флажки выбора элементов включены",
+                "Постоянные флажки могут добавлять лишний визуальный шум в Проводнике.",
+                "В узле «Проводник» можно отключить флажки выбора элементов.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Policies\Microsoft\Windows\Explorer",
+                "NoNewAppAlert",
+                1,
+                "workenv.start.app-suggestions",
+                HealthLevel.Normal,
+                "Предложения приложений в Пуске разрешены",
+                "Меню Пуск может показывать дополнительные предложения приложений. Для чистой рабочей среды их можно отключить.",
+                "В узле «Пуск» можно отключить предложения приложений.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Policies\Microsoft\Windows\CloudContent",
+                "DisableWindowsConsumerFeatures",
+                1,
+                "workenv.start.disable-spotlight",
+                HealthLevel.Normal,
+                "Потребительские подсказки Windows разрешены",
+                "Windows может показывать советы и потребительские предложения в оболочке.",
+                "В узле «Пуск» можно отключить потребительские подсказки Windows.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "TaskbarSmallIcons",
+                1,
+                "workenv.taskbar.small-icons",
+                HealthLevel.Normal,
+                "Панель задач использует обычный размер значков",
+                "Компактный размер может освободить место на панели задач, если параметр поддерживается системой.",
+                "В узле «Панель задач» можно включить маленькие значки.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "TaskbarGlomLevel",
+                0,
+                "workenv.taskbar.combine-buttons",
+                HealthLevel.Normal,
+                "Группировка кнопок панели задач изменена",
+                "Если группировка отключена, панель быстрее переполняется при большом количестве окон.",
+                "В узле «Панель задач» можно вернуть группировку кнопок.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "DisablePreviewDesktop",
+                0,
+                "workenv.windows.aero-peek",
+                HealthLevel.Normal,
+                "Aero Peek отключён",
+                "Предварительный просмотр рабочего стола и окон может быть недоступен.",
+                "В узле «Окна» можно включить Aero Peek.");
+
+            AddDwordEnvironmentFinding(
+                Registry.CurrentUser,
+                @"Software\Policies\Microsoft\Windows\Explorer",
+                "NoWindowMinimizingShortcuts",
+                0,
+                "workenv.windows.aero-shake",
+                HealthLevel.Normal,
+                "Встряхивание окна отключено политикой",
+                "Aero Shake может быть недоступен для быстрого сворачивания остальных окон.",
+                "В узле «Окна» можно вернуть встряхивание окна.");
+
+            if (environmentFindings.Count == 0)
+            {
+                SetModuleStatus(target, HealthLevel.Good);
+                return;
+            }
+
+            foreach (var finding in environmentFindings)
+            {
+                bool isProblem = IsProblemLevel(finding);
+                if (isProblem)
+                    findings.ProblemCount++;
+                else
+                    findings.RecommendationCount++;
+
+                SetModuleStatus(
+                    target,
+                    finding.Level,
+                    problems: isProblem ? 1 : 0,
+                    recommendations: isProblem ? 0 : 1,
+                    finding: finding);
+            }
         }
 
         private static void CheckPerformanceState(
@@ -707,6 +1531,41 @@ namespace TweakWise.Services
             }
 
             return values;
+        }
+
+        private static int? ReadRegistryDwordValue(RegistryKey hive, string path, string valueName)
+        {
+            try
+            {
+                using var key = hive.OpenSubKey(path, writable: false);
+                var value = key?.GetValue(valueName);
+
+                return value switch
+                {
+                    int intValue => intValue,
+                    uint uintValue when uintValue <= int.MaxValue => (int)uintValue,
+                    long longValue when longValue >= int.MinValue && longValue <= int.MaxValue => (int)longValue,
+                    string text when int.TryParse(text, out int parsed) => parsed,
+                    _ => null
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string ReadRegistryStringValue(RegistryKey hive, string path, string valueName)
+        {
+            try
+            {
+                using var key = hive.OpenSubKey(path, writable: false);
+                return Convert.ToString(key?.GetValue(valueName)) ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         private static IReadOnlyList<string> ClassifyPendingFileOperationSources(IReadOnlyList<string> pendingFileOperations)

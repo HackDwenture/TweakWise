@@ -10,34 +10,35 @@ namespace TweakWise.Services
 {
     public sealed class HardwareTemperatureService : IDisposable
     {
-        private readonly Computer _computer;
+        private Computer _computer;
         private readonly HashSet<string> _faultedHardwareKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly bool _suppressHardwareBackend;
         private readonly bool _skipUnsafeHardwareUpdates;
+        private readonly bool _forceLocalBackend;
         private bool _disposed;
         private bool _isOpen;
 
         public HardwareTemperatureService()
+            : this(forceLocalBackend: false)
         {
-            _suppressHardwareBackend = ShouldSuppressLibreHardwareMonitor();
-            _skipUnsafeHardwareUpdates = ShouldSkipUnsafeHardwareUpdates();
-            _computer = new Computer
-            {
-                IsCpuEnabled = true,
-                IsGpuEnabled = true,
-                IsMotherboardEnabled = false,
-                IsStorageEnabled = false,
-                IsMemoryEnabled = false,
-                IsControllerEnabled = false,
-                IsNetworkEnabled = false,
-                IsPsuEnabled = false,
-                IsBatteryEnabled = false
-            };
+        }
+
+        internal HardwareTemperatureService(bool forceLocalBackend)
+        {
+            _forceLocalBackend = forceLocalBackend;
+            _suppressHardwareBackend = forceLocalBackend ? false : ShouldSuppressLibreHardwareMonitor();
+            _skipUnsafeHardwareUpdates = forceLocalBackend ? false : ShouldSkipUnsafeHardwareUpdates();
         }
 
         public IReadOnlyList<TemperatureSensorReading> GetTemperatures()
         {
-            if (_disposed || _suppressHardwareBackend || !EnsureComputerOpened())
+            if (_disposed)
+                return Array.Empty<TemperatureSensorReading>();
+
+            if (!_forceLocalBackend && HardwareMonitorSafety.ShouldUseIsolatedTemperatureProbe())
+                return TemperatureProbeRunner.ReadTemperaturesFromIsolatedProcess();
+
+            if (_suppressHardwareBackend || !EnsureComputerOpened())
                 return Array.Empty<TemperatureSensorReading>();
 
             try
@@ -77,6 +78,7 @@ namespace TweakWise.Services
 
             try
             {
+                _computer ??= CreateComputer();
                 _computer.Open();
                 _isOpen = true;
                 return true;
@@ -91,6 +93,22 @@ namespace TweakWise.Services
         private static bool ShouldSuppressLibreHardwareMonitor() => HardwareMonitorSafety.IsHardwareBackendSuppressed();
 
         private static bool ShouldSkipUnsafeHardwareUpdates() => HardwareMonitorSafety.ShouldSkipUnsafeHardwareUpdates();
+
+        private static Computer CreateComputer()
+        {
+            return new Computer
+            {
+                IsCpuEnabled = true,
+                IsGpuEnabled = true,
+                IsMotherboardEnabled = false,
+                IsStorageEnabled = false,
+                IsMemoryEnabled = false,
+                IsControllerEnabled = false,
+                IsNetworkEnabled = false,
+                IsPsuEnabled = false,
+                IsBatteryEnabled = false
+            };
+        }
 
         private IReadOnlyList<IHardware> GetRootHardware()
         {
@@ -416,7 +434,7 @@ namespace TweakWise.Services
             try
             {
                 if (_isOpen)
-                    _computer.Close();
+                    _computer?.Close();
             }
             catch
             {

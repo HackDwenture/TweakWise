@@ -551,7 +551,7 @@
                                                      Cursor="Hand"
                                                      PreviewMouseLeftButtonUp="ExpandedCore_MouseLeftButtonUp"/>
 
-                        <Border x:Name="DetailsHeaderCard" Canvas.Left="358" Canvas.Top="8" Width="384" Style="{StaticResource GlassCardStyle}" Opacity="0">
+                        <Border x:Name="DetailsHeaderCard" Canvas.Left="358" Canvas.Top="0" Width="384" Style="{StaticResource GlassCardStyle}" Opacity="0">
                             <Border.RenderTransform>
                                 <TranslateTransform x:Name="HeaderCardTranslate"/>
                             </Border.RenderTransform>
@@ -715,18 +715,27 @@
                                     </ScrollViewer>
                                 </StackPanel>
 
-                                <StackPanel x:Name="CoreCleanupPanel" Visibility="Collapsed">
-                                    <TextBlock Text="Очистка" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource WindowForeground}"/>
-                                    <TextBlock x:Name="CleanupHintTextBlock" Margin="0,8,0,0" FontSize="12" LineHeight="17" TextWrapping="Wrap" Opacity="0.76" Foreground="{DynamicResource WindowForeground}"/>
-                                    <TextBlock x:Name="LastCleanupStatusTextBlock" Margin="0,7,0,0" FontSize="11.5" Opacity="0.72" Foreground="{DynamicResource WindowForeground}"/>
-                                    <WrapPanel Margin="0,12,0,0">
-                                        <primitives:ToggleButton x:Name="SafeCleanupProfileButton" Content="Безопасно" Tag="&#xE73E;" Style="{StaticResource CleanupProfileToggleStyle}" Click="CleanupProfileToggleButton_Click"/>
-                                        <primitives:ToggleButton x:Name="AdvancedCleanupProfileButton" Content="Расширенно" Tag="&#xE713;" Style="{StaticResource CleanupProfileToggleStyle}" Click="CleanupProfileToggleButton_Click"/>
-                                        <primitives:ToggleButton x:Name="MaximumCleanupProfileButton" Content="Максимум" Tag="&#xE74D;" Style="{StaticResource CleanupProfileToggleStyle}" Click="CleanupProfileToggleButton_Click"/>
-                                        <primitives:ToggleButton x:Name="DisableCleanupProfileButton" Content="Выкл." Tag="&#xE711;" Style="{StaticResource CleanupProfileToggleStyle}" Click="CleanupProfileToggleButton_Click"/>
-                                    </WrapPanel>
-                                    <TextBlock x:Name="CleanupSummaryTextBlock" Margin="0,6,0,0" FontSize="12" LineHeight="17" TextWrapping="Wrap" Opacity="0.82" Foreground="{DynamicResource WindowForeground}"/>
-                                    <ScrollViewer MaxHeight="100" Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
+                                <Grid x:Name="CoreCleanupPanel" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Grid.Row="0">
+                                        <TextBlock Text="Очистка" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource WindowForeground}"/>
+                                        <TextBlock x:Name="CleanupHintTextBlock" Margin="0,8,0,0" FontSize="12" LineHeight="17" TextWrapping="Wrap" Opacity="0.76" Foreground="{DynamicResource WindowForeground}"/>
+                                        <TextBlock x:Name="LastCleanupStatusTextBlock" Margin="0,7,0,0" FontSize="11.5" Opacity="0.72" Foreground="{DynamicResource WindowForeground}"/>
+                                        <WrapPanel Margin="0,12,0,0">
+                                            <primitives:ToggleButton x:Name="SafeCleanupProfileButton" Content="Безопасно" Tag="&#xE73E;" Style="{StaticResource CleanupProfileToggleStyle}" Click="CleanupProfileToggleButton_Click"/>
+                                            <primitives:ToggleButton x:Name="AdvancedCleanupProfileButton" Content="Расширенно" Tag="&#xE713;" Style="{StaticResource CleanupProfileToggleStyle}" Click="CleanupProfileToggleButton_Click"/>
+                                            <primitives:ToggleButton x:Name="MaximumCleanupProfileButton" Content="Максимум" Tag="&#xE74D;" Style="{StaticResource CleanupProfileToggleStyle}" Click="CleanupProfileToggleButton_Click"/>
+                                            <primitives:ToggleButton x:Name="DisableCleanupProfileButton" Content="Выкл." Tag="&#xE711;" Style="{StaticResource CleanupProfileToggleStyle}" Click="CleanupProfileToggleButton_Click"/>
+                                        </WrapPanel>
+                                        <TextBlock x:Name="CleanupSummaryTextBlock" Margin="0,6,0,0" FontSize="12" LineHeight="17" TextWrapping="Wrap" Opacity="0.82" Foreground="{DynamicResource WindowForeground}"/>
+                                    </StackPanel>
+
+                                    <ScrollViewer Grid.Row="1" MinHeight="92" Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
                                         <ItemsControl x:Name="CleanupTargetsItemsControl">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
@@ -746,25 +755,39 @@
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                     </ScrollViewer>
-                                    <Grid Margin="0,12,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Button x:Name="RunCleanupButton" Style="{StaticResource DockActionButtonStyle}" Padding="12,8" Click="RunCleanupButton_Click">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xE75C;" FontFamily="Segoe MDL2 Assets" Margin="0,0,8,0"/>
-                                                <TextBlock Text="Запустить"/>
-                                            </StackPanel>
-                                        </Button>
-                                        <Button x:Name="AnalyzeCleanupButton" Grid.Column="1" Margin="10,0,0,0" Style="{StaticResource DockSecondaryButtonStyle}" Padding="12,8" Click="AnalyzeCleanupButton_Click">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" Margin="0,0,8,0"/>
-                                                <TextBlock Text="Оценить"/>
-                                            </StackPanel>
-                                        </Button>
-                                    </Grid>
-                                </StackPanel>
+
+                                    <Border Grid.Row="2" Margin="0,10,0,0" Background="Transparent">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Button x:Name="RunCleanupButton"
+                                                    MinHeight="38"
+                                                    Style="{StaticResource DockActionButtonStyle}"
+                                                    Padding="12,8"
+                                                    HorizontalContentAlignment="Center"
+                                                    Click="RunCleanupButton_Click">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <TextBlock Text="&#xE75C;" FontFamily="Segoe MDL2 Assets" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="Запустить очистку"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button x:Name="AnalyzeCleanupButton"
+                                                    Grid.Column="1"
+                                                    MinHeight="38"
+                                                    Margin="10,0,0,0"
+                                                    Style="{StaticResource DockSecondaryButtonStyle}"
+                                                    Padding="12,8"
+                                                    Click="AnalyzeCleanupButton_Click">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="Оценить"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
                             </Grid>
                         </Border>
 

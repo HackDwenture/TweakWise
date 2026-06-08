@@ -42,6 +42,12 @@ namespace TweakWise
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            if (TemperatureProbeRunner.IsProbeRequest(e.Args))
+            {
+                Shutdown(TemperatureProbeRunner.RunProbeAndWriteResult());
+                return;
+            }
+
             DispatcherUnhandledException += App_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
@@ -72,6 +78,13 @@ namespace TweakWise
 
         private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
+            if (e.Exception is AccessViolationException)
+            {
+                e.Handled = true;
+                ReportApplicationError(e.Exception, "Небезопасный системный вызов был остановлен. Приложение продолжит работу без аварийного закрытия.", showDialog: false);
+                return;
+            }
+
             if (IsRecoverableWpfAnimationException(e.Exception))
             {
                 e.Handled = true;
@@ -85,6 +98,12 @@ namespace TweakWise
 
         private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
+            if (e.ExceptionObject is AccessViolationException accessViolation)
+            {
+                ReportApplicationError(accessViolation, "Зафиксирован сбой небезопасного системного вызова.", showDialog: false);
+                return;
+            }
+
             if (e.ExceptionObject is Exception exception)
                 ReportApplicationError(exception, "Произошла критическая ошибка фонового потока.", showDialog: true);
         }
