@@ -4,6 +4,7 @@
         xmlns:controls="clr-namespace:TweakWise.Controls"
         xmlns:local="clr-namespace:TweakWise"
         Title="TweakWise"
+        Icon="Assets/AppIcon.ico"
         Width="1120"
         Height="720"
         MinWidth="860"
