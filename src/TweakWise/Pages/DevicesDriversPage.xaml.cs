@@ -71,7 +71,7 @@ namespace TweakWise.Pages
             SetActiveMode(DeviceDriverDashboardMode.Drivers, animate: false, direction: 1);
             ApplyModuleStatus();
             AnimateOpacity(RootContent, 1, 220);
-            await RefreshDiagnosticsAsync();
+            await RefreshDiagnosticsAsync(forceRefresh: false);
         }
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)
@@ -140,7 +140,7 @@ namespace TweakWise.Pages
 
         private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            await RefreshDiagnosticsAsync();
+            await RefreshDiagnosticsAsync(forceRefresh: true);
         }
 
         private void PreviousModeButton_Click(object sender, RoutedEventArgs e)
@@ -247,7 +247,7 @@ namespace TweakWise.Pages
             OrbitStage.ReleaseMouseCapture();
         }
 
-        private async Task RefreshDiagnosticsAsync()
+        private async Task RefreshDiagnosticsAsync(bool forceRefresh = true)
         {
             var previousScanCts = _scanCts;
             var currentScanCts = new CancellationTokenSource();
@@ -261,7 +261,9 @@ namespace TweakWise.Pages
 
             try
             {
-                var result = await _diagnosticsService.ScanAsync(token);
+                var result = forceRefresh
+                    ? await _diagnosticsService.ScanAsync(token, forceRefresh: true)
+                    : await _diagnosticsService.GetOrScanAsync(token, TimeSpan.FromMinutes(8));
                 if (!_isPageActive || token.IsCancellationRequested)
                     return;
 
@@ -269,6 +271,9 @@ namespace TweakWise.Pages
                 UpdateActiveModeContent();
                 ApplyModuleStatus();
                 RefreshWorkspaceIfOpen();
+
+                if (forceRefresh && _healthService != null)
+                    _ = _healthService.RefreshStatusAsync(new[] { CoreModuleId.Devices });
             }
             catch (OperationCanceledException)
             {
@@ -1429,7 +1434,8 @@ namespace TweakWise.Pages
                 Window.GetWindow(this),
                 new[] { reason.Id },
                 reason.Title,
-                IsProblemLevel(reason.Level));
+                IsProblemLevel(reason.Level),
+                new[] { CoreModuleId.Devices });
 
             if (!applied)
                 return;
@@ -1555,7 +1561,7 @@ namespace TweakWise.Pages
                 ShowOperationResult(action, result);
 
             if (result.Success && ShouldRefreshAfterAction(action.Kind))
-                await RefreshDiagnosticsAsync();
+                await RefreshDiagnosticsAsync(forceRefresh: true);
         }
 
         private DeviceDriverOperationResult ExecuteInventoryAction(DeviceDriverActionViewModel action)

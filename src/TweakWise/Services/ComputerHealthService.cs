@@ -21,6 +21,7 @@ namespace TweakWise.Services
     {
         private readonly SettingsManager _settingsManager;
         private readonly List<CoreModuleDefinition> _modules;
+        private readonly SemaphoreSlim _refreshGate = new SemaphoreSlim(1, 1);
         private HashSet<string> _lastProblemFindingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private ComputerHealthStatus _overallStatus;
 
@@ -75,6 +76,34 @@ namespace TweakWise.Services
             _settingsManager.DismissHealthSignals(findingIds);
         }
 
+        public bool HasFreshStatus(IEnumerable<CoreModuleId> modulesToScan, TimeSpan maxAge)
+        {
+            return HasFreshStatus(NormalizeRequestedModules(modulesToScan), maxAge);
+        }
+
+        public async Task EnsureStatusAsync(IEnumerable<CoreModuleId> modulesToScan, TimeSpan maxAge)
+        {
+            var requestedModules = NormalizeRequestedModules(modulesToScan);
+            if (requestedModules != null && requestedModules.Count == 0)
+                return;
+
+            if (HasFreshStatus(requestedModules, maxAge))
+                return;
+
+            await _refreshGate.WaitAsync();
+            try
+            {
+                if (HasFreshStatus(requestedModules, maxAge))
+                    return;
+
+                await RefreshStatusCoreAsync(requestedModules);
+            }
+            finally
+            {
+                _refreshGate.Release();
+            }
+        }
+
         public Task RefreshStatusAsync()
         {
             return RefreshStatusAsync(null);
@@ -83,6 +112,22 @@ namespace TweakWise.Services
         public async Task RefreshStatusAsync(IEnumerable<CoreModuleId> modulesToScan)
         {
             var requestedModules = NormalizeRequestedModules(modulesToScan);
+            if (requestedModules != null && requestedModules.Count == 0)
+                return;
+
+            await _refreshGate.WaitAsync();
+            try
+            {
+                await RefreshStatusCoreAsync(requestedModules);
+            }
+            finally
+            {
+                _refreshGate.Release();
+            }
+        }
+
+        private async Task RefreshStatusCoreAsync(ISet<CoreModuleId> requestedModules)
+        {
             SetCheckingState(requestedModules);
 
             var result = await Task.Run(() => RunSafeHealthChecks(requestedModules));
@@ -100,6 +145,30 @@ namespace TweakWise.Services
             OnHealthStatusChanged();
         }
 
+        private bool HasFreshStatus(ISet<CoreModuleId> modulesToScan, TimeSpan maxAge)
+        {
+            DateTime now = DateTime.Now;
+            foreach (var module in _modules)
+            {
+                if (!ShouldScanModule(modulesToScan, module.Id) || IsUnavailableModule(module.Id))
+                    continue;
+
+                var status = module.Status;
+                if (status == null ||
+                    status.Status == HealthLevel.Unknown ||
+                    status.Status == HealthLevel.Checking ||
+                    !status.LastCheckedAt.HasValue)
+                {
+                    return false;
+                }
+
+                if (maxAge > TimeSpan.Zero && now - status.LastCheckedAt.Value > maxAge)
+                    return false;
+            }
+
+            return true;
+        }
+
         private void SetCheckingState(ISet<CoreModuleId> modulesToScan)
         {
             var now = DateTime.Now;
@@ -111,7 +180,7 @@ namespace TweakWise.Services
 
             foreach (var module in _modules)
             {
-                if (!ShouldScanModule(modulesToScan, module.Id))
+                if (!ShouldScanModule(modulesToScan, module.Id) || IsUnavailableModule(module.Id))
                     continue;
 
                 module.Status = new ModuleHealthStatus
@@ -143,25 +212,17 @@ namespace TweakWise.Services
 
             var findings = new HealthFindingAccumulator();
 
-            if (ShouldScanModule(modulesToScan, CoreModuleId.Maintenance))
-                CheckSystemDrive(moduleStatuses, findings);
-            if (ShouldScanModule(modulesToScan, CoreModuleId.SystemParameters))
-                CheckRestartState(moduleStatuses, findings);
             if (ShouldScanModule(modulesToScan, CoreModuleId.WindowsSetup))
                 CheckWindowsSetupState(moduleStatuses, findings);
             if (ShouldScanModule(modulesToScan, CoreModuleId.Resources))
                 CheckPerformanceState(moduleStatuses, findings);
             if (ShouldScanModule(modulesToScan, CoreModuleId.Devices))
                 CheckDevicesDriversState(moduleStatuses, findings);
-            if (ShouldScanModule(modulesToScan, CoreModuleId.Network))
-                CheckNetworkState(moduleStatuses, findings);
 
             MarkUntouchedModulesAsGood(moduleStatuses, modulesToScan);
-            bool pendingRestart = ShouldScanModule(modulesToScan, CoreModuleId.SystemParameters)
-                ? findings.PendingRestart
-                : _overallStatus.PendingRestart;
+            MarkUnavailableModulesAsNotChecked(moduleStatuses);
 
-            var overall = ApplySuppressionsAndRecalculate(moduleStatuses, pendingRestart, now);
+            var overall = ApplySuppressionsAndRecalculate(moduleStatuses, pendingRestart: false, now, modulesToScan);
 
             return new HealthCheckSnapshot(overall, moduleStatuses.Values.ToList());
         }
@@ -354,7 +415,7 @@ namespace TweakWise.Services
             try
             {
                 var snapshot = new DeviceDriverDiagnosticsService()
-                    .ScanAsync(CancellationToken.None)
+                    .GetOrScanAsync(CancellationToken.None, TimeSpan.FromSeconds(30))
                     .GetAwaiter()
                     .GetResult() ?? new DeviceDriverDiagnosticsSnapshot();
 
@@ -1499,7 +1560,7 @@ namespace TweakWise.Services
         {
             foreach (var pair in moduleStatuses)
             {
-                if (!ShouldScanModule(modulesToScan, pair.Key))
+                if (!ShouldScanModule(modulesToScan, pair.Key) || IsUnavailableModule(pair.Key))
                     continue;
 
                 if (pair.Value.Status == HealthLevel.Unknown)
@@ -1507,10 +1568,34 @@ namespace TweakWise.Services
             }
         }
 
+        private static void MarkUnavailableModulesAsNotChecked(Dictionary<CoreModuleId, ModuleHealthStatus> moduleStatuses)
+        {
+            foreach (var moduleId in new[] { CoreModuleId.SystemParameters, CoreModuleId.Maintenance, CoreModuleId.Network })
+            {
+                if (!moduleStatuses.TryGetValue(moduleId, out var status))
+                    continue;
+
+                status.Status = HealthLevel.Unknown;
+                status.ProblemCount = 0;
+                status.RecommendationCount = 0;
+                status.CriticalCount = 0;
+                status.Findings = new List<ModuleHealthFinding>();
+                status.LastCheckedAt = null;
+            }
+        }
+
+        private static bool IsUnavailableModule(CoreModuleId moduleId)
+        {
+            return moduleId == CoreModuleId.SystemParameters ||
+                   moduleId == CoreModuleId.Maintenance ||
+                   moduleId == CoreModuleId.Network;
+        }
+
         private ComputerHealthStatus ApplySuppressionsAndRecalculate(
             Dictionary<CoreModuleId, ModuleHealthStatus> moduleStatuses,
             bool pendingRestart,
-            DateTime checkedAt)
+            DateTime checkedAt,
+            ISet<CoreModuleId> modulesToScan)
         {
             int problemCount = 0;
             int recommendationCount = 0;
@@ -1518,6 +1603,17 @@ namespace TweakWise.Services
 
             foreach (var status in moduleStatuses.Values)
             {
+                if (IsUnavailableModule(status.ModuleId))
+                {
+                    status.Findings = new List<ModuleHealthFinding>();
+                    status.ProblemCount = 0;
+                    status.RecommendationCount = 0;
+                    status.CriticalCount = 0;
+                    status.Status = HealthLevel.Unknown;
+                    status.LastCheckedAt = null;
+                    continue;
+                }
+
                 status.Findings = status.Findings
                     .Where(finding => finding != null &&
                                       !string.IsNullOrWhiteSpace(finding.Id) &&
@@ -1530,7 +1626,8 @@ namespace TweakWise.Services
                 status.Status = status.Findings.Count == 0
                     ? HealthLevel.Good
                     : status.Findings.OrderByDescending(finding => GetSeverity(finding.Level)).First().Level;
-                status.LastCheckedAt = checkedAt;
+                if (ShouldScanModule(modulesToScan, status.ModuleId))
+                    status.LastCheckedAt = checkedAt;
 
                 problemCount += status.ProblemCount;
                 recommendationCount += status.RecommendationCount;
@@ -1563,7 +1660,7 @@ namespace TweakWise.Services
                 ProblemCount = settings.LastHealthProblemCount,
                 RecommendationCount = settings.LastHealthRecommendationCount,
                 CriticalCount = settings.LastHealthCriticalCount,
-                PendingRestart = settings.PendingRestart,
+                PendingRestart = false,
                 LastCheckedAt = settings.LastHealthCheckedAt
             };
         }
@@ -1575,7 +1672,7 @@ namespace TweakWise.Services
             settings.LastHealthProblemCount = _overallStatus.ProblemCount;
             settings.LastHealthRecommendationCount = _overallStatus.RecommendationCount;
             settings.LastHealthCriticalCount = _overallStatus.CriticalCount;
-            settings.PendingRestart = _overallStatus.PendingRestart;
+            settings.PendingRestart = false;
             settings.LastHealthCheckedAt = _overallStatus.LastCheckedAt;
             _settingsManager.SaveSettings();
         }
@@ -1593,15 +1690,6 @@ namespace TweakWise.Services
                 };
             }
 
-            if (_overallStatus.PendingRestart)
-            {
-                var systemModule = _modules.FirstOrDefault(item => item.Id == CoreModuleId.SystemParameters);
-                SetModuleStatus(
-                    systemModule?.Status,
-                    HealthLevel.Normal,
-                    recommendations: 1,
-                    finding: CreatePendingRestartFinding());
-            }
         }
 
         private static SystemDriveCheck CheckSystemDrive()
@@ -2161,8 +2249,8 @@ namespace TweakWise.Services
                 {
                     Id = CoreModuleId.SystemParameters,
                     Title = "Системная конфигурация",
-                    ShortHint = "Службы, обновления, приватность, питание",
-                    Description = "Параметры ОС, которые влияют на стабильность, фоновые процессы, обновления, приватность и схемы питания.",
+                    ShortHint = "Будет добавлено в следующих обновлениях",
+                    Description = "Раздел временно отключён и будет добавлен в следующих обновлениях TweakWise.",
                     Sections = new List<string>
                     {
                         "Обновления и перезапуск",
@@ -2194,8 +2282,8 @@ namespace TweakWise.Services
                 {
                     Id = CoreModuleId.Maintenance,
                     Title = "Накопители и память",
-                    ShortHint = "Диски, место, кэш, файл подкачки",
-                    Description = "Системный диск, дополнительные накопители, временные файлы, кэш, файл подкачки и безопасная очистка.",
+                    ShortHint = "Будет добавлено в следующих обновлениях",
+                    Description = "Раздел временно отключён и будет добавлен в следующих обновлениях TweakWise.",
                     Sections = new List<string>
                     {
                         "Системный диск",
@@ -2228,8 +2316,8 @@ namespace TweakWise.Services
                 {
                     Id = CoreModuleId.Network,
                     Title = "Сеть и подключение",
-                    ShortHint = "Адаптеры, DNS, ping, диагностика",
-                    Description = "Сетевой контур компьютера: адаптеры, DNS, доступ в интернет, задержка и быстрые исправления подключения.",
+                    ShortHint = "Будет добавлено в следующих обновлениях",
+                    Description = "Раздел временно отключён и будет добавлен в следующих обновлениях TweakWise.",
                     Sections = new List<string>
                     {
                         "Сетевые адаптеры",

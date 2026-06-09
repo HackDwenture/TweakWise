@@ -258,16 +258,10 @@ namespace TweakWise.Managers
 
             if (CurrentSettings.ScanWorkEnvironmentAtStartup)
                 modules.Add(CoreModuleId.WindowsSetup);
-            if (CurrentSettings.ScanSystemConfigurationAtStartup)
-                modules.Add(CoreModuleId.SystemParameters);
             if (CurrentSettings.ScanPerformanceAtStartup)
                 modules.Add(CoreModuleId.Resources);
-            if (CurrentSettings.ScanStorageAtStartup)
-                modules.Add(CoreModuleId.Maintenance);
             if (CurrentSettings.ScanDevicesAtStartup)
                 modules.Add(CoreModuleId.Devices);
-            if (CurrentSettings.ScanNetworkAtStartup)
-                modules.Add(CoreModuleId.Network);
 
             return modules;
         }

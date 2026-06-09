@@ -4317,6 +4317,7 @@ if ($null -eq $sum) { $sum = 0 }
         public bool HasCurrentValue => !string.IsNullOrWhiteSpace(CurrentValue);
         public bool HasRecommendation => !string.IsNullOrWhiteSpace(Recommendation);
         public bool HasRisk => !string.IsNullOrWhiteSpace(RiskLabel);
+        public string RiskBadgeLabel => FormatRiskBadgeLabel(RiskLabel);
         public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
         public bool HasActiveSignal =>
             SignalLevel == HealthLevel.Normal ||
@@ -4326,6 +4327,18 @@ if ($null -eq $sum) { $sum = 0 }
             IsPriority ||
             (StatusIsWarning && HasStatusMessage);
         public string SignalActionText => "Игнорировать";
+        private static string FormatRiskBadgeLabel(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            string trimmed = value.Trim();
+            return trimmed.StartsWith("Риск:", StringComparison.CurrentCultureIgnoreCase) ||
+                   trimmed.StartsWith("Risk:", StringComparison.OrdinalIgnoreCase)
+                ? trimmed
+                : $"Риск: {trimmed}";
+        }
+
         public string SignalKindText
         {
             get

@@ -133,6 +133,7 @@
             <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Padding" Value="14"/>
             <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
         </Style>
 
         <Style x:Key="BoardToolTipStyle" TargetType="ToolTip">
@@ -345,10 +346,9 @@
             <Setter Property="MinHeight" Value="24"/>
             <Setter Property="Padding" Value="10,3"/>
             <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="Opacity" Value="0.92"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
         </Style>
 
         <Style x:Key="PerformanceFilterToggleStyle" TargetType="ToggleButton">
@@ -545,7 +545,7 @@
                     </Grid>
 
                     <WrapPanel Margin="0,12,0,0">
-                        <Border Visibility="{Binding HasActiveSignal, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Border x:Name="SettingSignalStatusBadge" Visibility="{Binding HasActiveSignal, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Border.Style>
                                 <Style TargetType="Border" BasedOn="{StaticResource PerformanceBadgeStyle}">
                                     <Setter Property="BorderBrush" Value="{DynamicResource CoreNormalBrush}"/>
@@ -562,7 +562,7 @@
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
-                            <TextBlock Text="{Binding SignalKindText}" FontSize="11" FontWeight="SemiBold">
+                            <TextBlock x:Name="SettingSignalStatusLabel" Text="{Binding SignalKindText}" FontSize="11" FontWeight="SemiBold">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Foreground" Value="{DynamicResource CoreNormalBrush}"/>
@@ -581,8 +581,8 @@
                                 </TextBlock.Style>
                             </TextBlock>
                         </Border>
-                        <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding HasRisk, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <TextBlock Text="{Binding RiskLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                        <Border x:Name="SettingRiskBadge" Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding HasRisk, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock x:Name="SettingRiskLabel" Text="{Binding RiskBadgeLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
                         </Border>
                         <Border Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding RequiresElevationWarning, Converter={StaticResource BoolToVisibilityConverter}}">
                             <TextBlock Text="нужны права администратора" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource CoreAttentionBrush}"/>
@@ -1087,7 +1087,14 @@
                                                 ToolTip="Перейти к связанному блоку"
                                                 MouseLeftButtonUp="SelectedFindingCard_MouseLeftButtonUp">
                                             <StackPanel>
-                                                <TextBlock Text="{Binding KindText}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                                                <WrapPanel>
+                                                    <Border x:Name="SignalStatusBadge" Style="{StaticResource PerformanceBadgeStyle}">
+                                                        <TextBlock x:Name="SignalStatusLabel" Text="{Binding KindText}" FontSize="11" FontWeight="SemiBold"/>
+                                                    </Border>
+                                                    <Border x:Name="SignalRiskBadge" Style="{StaticResource PerformanceBadgeStyle}" Visibility="{Binding RiskVisibility}">
+                                                        <TextBlock x:Name="SignalRiskLabel" Text="{Binding RiskLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                                                    </Border>
+                                                </WrapPanel>
                                                 <TextBlock Text="{Binding Title}" Margin="0,5,0,0" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                                 <TextBlock Text="{Binding Description}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.78" TextWrapping="Wrap"/>
                                                 <Button Content="Игнорировать"

@@ -20,4 +20,10 @@
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="Pages\ModuleWorkspacePage.xaml.cs" />
+    <Page Remove="Pages\ModuleWorkspacePage.xaml" />
+    <Compile Remove="Services\ModuleDiagnosticsService.cs" />
+  </ItemGroup>
+
 </Project>

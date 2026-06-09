@@ -130,6 +130,7 @@
             <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Padding" Value="14"/>
             <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
         </Style>
 
         <Style x:Key="EnvironmentSearchBoxStyle" TargetType="TextBox">
@@ -244,10 +245,9 @@
             <Setter Property="MinHeight" Value="24"/>
             <Setter Property="Padding" Value="10,3"/>
             <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="Opacity" Value="0.92"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
         </Style>
 
         <Style x:Key="EnvironmentSettingCardStyle" TargetType="Border">
@@ -927,7 +927,14 @@
                                                 Cursor="Hand"
                                                 MouseLeftButtonUp="SelectedEnvironmentFindingCard_MouseLeftButtonUp">
                                             <StackPanel>
-                                                <TextBlock Text="{Binding KindText}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                                                <WrapPanel>
+                                                    <Border x:Name="SignalStatusBadge" Style="{StaticResource EnvironmentBadgeStyle}">
+                                                        <TextBlock x:Name="SignalStatusLabel" Text="{Binding KindText}" FontSize="11" FontWeight="SemiBold"/>
+                                                    </Border>
+                                                    <Border x:Name="SignalRiskBadge" Style="{StaticResource EnvironmentBadgeStyle}" Visibility="{Binding RiskVisibility}">
+                                                        <TextBlock x:Name="SignalRiskLabel" Text="{Binding RiskLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                                                    </Border>
+                                                </WrapPanel>
                                                 <TextBlock Text="{Binding Title}" Margin="0,5,0,0" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                                 <TextBlock Text="{Binding Description}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.78" TextWrapping="Wrap"/>
                                                 <Button Content="Игнорировать"
@@ -1052,61 +1059,22 @@
                                                         Opacity="0"
                                                         IsHitTestVisible="False"/>
                                                 <StackPanel>
-                                                    <WrapPanel Visibility="{Binding HasActiveSignal, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                        <Border>
-                                                            <Border.Style>
-                                                                <Style TargetType="Border" BasedOn="{StaticResource EnvironmentBadgeStyle}">
-                                                                    <Setter Property="BorderBrush" Value="{DynamicResource CoreNormalBrush}"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Attention}">
-                                                                            <Setter Property="BorderBrush" Value="{DynamicResource CoreAttentionBrush}"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Warning}">
-                                                                            <Setter Property="BorderBrush" Value="{DynamicResource CoreWarningBrush}"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Critical}">
-                                                                            <Setter Property="BorderBrush" Value="{DynamicResource CoreCriticalBrush}"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Border.Style>
-                                                            <TextBlock Text="{Binding SignalKindText}" FontSize="11" FontWeight="SemiBold">
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Foreground" Value="{DynamicResource CoreNormalBrush}"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Attention}">
-                                                                                <Setter Property="Foreground" Value="{DynamicResource CoreAttentionBrush}"/>
-                                                                            </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Warning}">
-                                                                                <Setter Property="Foreground" Value="{DynamicResource CoreWarningBrush}"/>
-                                                                            </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding SignalLevel}" Value="{x:Static models:HealthLevel.Critical}">
-                                                                                <Setter Property="Foreground" Value="{DynamicResource CoreCriticalBrush}"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                        </Border>
-                                                        <Button Content="{Binding SignalActionText}"
-                                                                Tag="{Binding SignalId}"
-                                                                Style="{StaticResource EnvironmentSignalActionButtonStyle}"
-                                                                Click="IgnoreEnvironmentSettingSignal_Click"/>
-                                                    </WrapPanel>
-                                                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                    <TextBlock Text="{Binding Description}" Margin="0,6,0,0" FontSize="12" LineHeight="18" Opacity="0.76" TextWrapping="Wrap"/>
-                                                    <WrapPanel Margin="0,10,0,-6">
+                                                    <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                    <WrapPanel Margin="0,10,0,0">
                                                         <Border Style="{StaticResource EnvironmentBadgeStyle}">
                                                             <TextBlock Text="{Binding Source}" FontSize="11" FontWeight="SemiBold" Opacity="0.82"/>
                                                         </Border>
-                                                        <Border Style="{StaticResource EnvironmentBadgeStyle}">
-                                                            <TextBlock Text="{Binding RiskText}" FontSize="11" FontWeight="SemiBold" Opacity="0.82"/>
+                                                        <Border x:Name="SettingSignalStatusBadge" Style="{StaticResource EnvironmentBadgeStyle}" Visibility="{Binding HasActiveSignal, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                            <TextBlock x:Name="SettingSignalStatusLabel" Text="{Binding SignalKindText}" FontSize="11" FontWeight="SemiBold"/>
+                                                        </Border>
+                                                        <Border x:Name="SettingRiskBadge" Style="{StaticResource EnvironmentBadgeStyle}" Visibility="{Binding RiskVisibility}">
+                                                            <TextBlock x:Name="SettingRiskLabel" Text="{Binding RiskLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.82"/>
                                                         </Border>
                                                         <Border Style="{StaticResource EnvironmentBadgeStyle}">
                                                             <TextBlock Text="{Binding BackupState}" FontSize="11" FontWeight="SemiBold" Opacity="0.82"/>
                                                         </Border>
                                                     </WrapPanel>
+                                                    <TextBlock Text="{Binding Description}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.76" TextWrapping="Wrap"/>
                                                     <Border Margin="0,10,0,0" Background="Transparent" BorderThickness="0" Visibility="{Binding HasCurrentValue, Converter={StaticResource BoolToVisibilityConverter}}">
                                                         <StackPanel>
                                                             <TextBlock Text="Текущее состояние" FontSize="11" FontWeight="SemiBold" Opacity="0.62"/>
@@ -1152,6 +1120,11 @@
                                                                 Style="{StaticResource EnvironmentActionButtonStyle}"
                                                                 Visibility="{Binding CanRollback, Converter={StaticResource BoolToVisibilityConverter}}"
                                                                 Click="RollbackEnvironmentSetting_Click"/>
+                                                        <Button Content="{Binding SignalActionText}"
+                                                                Tag="{Binding SignalId}"
+                                                                Style="{StaticResource EnvironmentSignalActionButtonStyle}"
+                                                                Visibility="{Binding HasActiveSignal, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                                Click="IgnoreEnvironmentSettingSignal_Click"/>
                                                     </WrapPanel>
                                                 </StackPanel>
                                             </Grid>

@@ -702,21 +702,18 @@
 
                                 <Border x:Name="SettingsStartupScanSection"
                                         Style="{StaticResource SettingsSectionCardStyle}"
-                                        Tag="сканировать при старте проверка запуск диагностика разделы рабочая среда системная конфигурация производительность охлаждение накопители память устройства драйверы сеть подключение">
+                                        Tag="сканировать при старте проверка запуск диагностика готовые разделы рабочая среда производительность охлаждение устройства драйверы">
                                     <StackPanel>
                                         <TextBlock Text="Сканировать при старте" FontSize="13" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Выберите разделы, которые проверяются при запуске программы. Отключённые разделы проверяются при ручном обновлении или входе в раздел."
+                                        <TextBlock Text="Выберите готовые разделы, которые проверяются при запуске программы. Временно недоступные разделы не сканируются."
                                                    Margin="0,4,0,8"
                                                    FontSize="12"
                                                    Opacity="0.68"
                                                    TextWrapping="Wrap"/>
                                         <UniformGrid Columns="2">
                                             <CheckBox x:Name="ScanWorkEnvironmentAtStartupCheckBox" Content="Рабочая среда" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
-                                            <CheckBox x:Name="ScanSystemConfigurationAtStartupCheckBox" Content="Системная конфигурация" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
                                             <CheckBox x:Name="ScanPerformanceAtStartupCheckBox" Content="Производительность и охлаждение" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
-                                            <CheckBox x:Name="ScanStorageAtStartupCheckBox" Content="Накопители и память" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
                                             <CheckBox x:Name="ScanDevicesAtStartupCheckBox" Content="Устройства и драйверы" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
-                                            <CheckBox x:Name="ScanNetworkAtStartupCheckBox" Content="Сеть и подключение" Checked="SettingsCheckBox_Changed" Unchecked="SettingsCheckBox_Changed"/>
                                         </UniformGrid>
                                     </StackPanel>
                                 </Border>

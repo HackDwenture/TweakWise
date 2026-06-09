@@ -13,7 +13,8 @@ namespace TweakWise.Managers
             Window owner,
             IEnumerable<string> signalIds,
             string targetTitle,
-            bool hasProblem)
+            bool hasProblem,
+            IEnumerable<CoreModuleId> modulesToRefresh = null)
         {
             var ids = signalIds?
                 .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -52,7 +53,7 @@ namespace TweakWise.Managers
                 return false;
             }
 
-            await App.ComputerHealthService.RefreshStatusAsync();
+            await App.ComputerHealthService.RefreshStatusAsync(modulesToRefresh);
             return true;
         }
 

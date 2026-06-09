@@ -171,10 +171,73 @@ namespace TweakWise.Services
     public sealed class DeviceDriverDiagnosticsService
     {
         private const int CommandTimeoutMs = 9000;
+        private static readonly TimeSpan DefaultSnapshotCacheAge = TimeSpan.FromMinutes(8);
+        private static readonly object SnapshotCacheSync = new object();
+        private static DeviceDriverDiagnosticsSnapshot _cachedSnapshot;
+        private static DateTime _cachedSnapshotAtUtc = DateTime.MinValue;
+        private static Task<DeviceDriverDiagnosticsSnapshot> _activeScanTask;
 
         public Task<DeviceDriverDiagnosticsSnapshot> ScanAsync(CancellationToken cancellationToken)
         {
-            return Task.Run(() => Scan(cancellationToken), cancellationToken);
+            return ScanAsync(cancellationToken, forceRefresh: true);
+        }
+
+        public Task<DeviceDriverDiagnosticsSnapshot> GetOrScanAsync(CancellationToken cancellationToken, TimeSpan maxAge)
+        {
+            return ScanAsync(cancellationToken, forceRefresh: false, maxAge);
+        }
+
+        public async Task<DeviceDriverDiagnosticsSnapshot> ScanAsync(
+            CancellationToken cancellationToken,
+            bool forceRefresh,
+            TimeSpan? maxAge = null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var scanTask = GetOrStartScanTask(forceRefresh, maxAge ?? DefaultSnapshotCacheAge);
+            return await scanTask.WaitAsync(cancellationToken);
+        }
+
+        private static Task<DeviceDriverDiagnosticsSnapshot> GetOrStartScanTask(bool forceRefresh, TimeSpan maxAge)
+        {
+            lock (SnapshotCacheSync)
+            {
+                if (!forceRefresh && TryGetCachedSnapshotLocked(maxAge, out var cachedSnapshot))
+                    return Task.FromResult(cachedSnapshot);
+
+                if (_activeScanTask != null && !_activeScanTask.IsCompleted)
+                    return _activeScanTask;
+
+                _activeScanTask = Task.Run(() =>
+                {
+                    var snapshot = Scan(CancellationToken.None) ?? new DeviceDriverDiagnosticsSnapshot();
+                    StoreCachedSnapshot(snapshot);
+                    return snapshot;
+                });
+
+                return _activeScanTask;
+            }
+        }
+
+        private static bool TryGetCachedSnapshotLocked(TimeSpan maxAge, out DeviceDriverDiagnosticsSnapshot snapshot)
+        {
+            snapshot = null;
+            if (_cachedSnapshot == null)
+                return false;
+
+            if (maxAge > TimeSpan.Zero && DateTime.UtcNow - _cachedSnapshotAtUtc > maxAge)
+                return false;
+
+            snapshot = _cachedSnapshot;
+            return true;
+        }
+
+        private static void StoreCachedSnapshot(DeviceDriverDiagnosticsSnapshot snapshot)
+        {
+            lock (SnapshotCacheSync)
+            {
+                _cachedSnapshot = snapshot;
+                _cachedSnapshotAtUtc = DateTime.UtcNow;
+            }
         }
 
         private static DeviceDriverDiagnosticsSnapshot Scan(CancellationToken cancellationToken)

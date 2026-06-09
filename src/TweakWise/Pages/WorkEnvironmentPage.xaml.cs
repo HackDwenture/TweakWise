@@ -115,7 +115,7 @@ namespace TweakWise.Pages
             ApplyModuleStatus();
             AnimateOpacity(RootContent, 1, 220);
 
-            await RefreshHealthStatusQuietlyAsync();
+            await EnsureHealthStatusQuietlyAsync();
             TryOpenPendingExternalFindingTarget();
         }
 
@@ -138,7 +138,19 @@ namespace TweakWise.Pages
             try
             {
                 if (_healthService != null)
-                    await _healthService.RefreshStatusAsync();
+                    await _healthService.RefreshStatusAsync(new[] { CoreModuleId.WindowsSetup });
+            }
+            catch
+            {
+            }
+        }
+
+        private async Task EnsureHealthStatusQuietlyAsync()
+        {
+            try
+            {
+                if (_healthService != null)
+                    await _healthService.EnsureStatusAsync(new[] { CoreModuleId.WindowsSetup }, TimeSpan.FromMinutes(8));
             }
             catch
             {
@@ -224,7 +236,8 @@ namespace TweakWise.Pages
                 Window.GetWindow(this),
                 new[] { id },
                 finding.Title,
-                IsProblemLevel(finding.Level));
+                IsProblemLevel(finding.Level),
+                new[] { CoreModuleId.WindowsSetup });
 
             if (applied)
                 ApplyModuleStatus();
@@ -243,7 +256,8 @@ namespace TweakWise.Pages
                 Window.GetWindow(this),
                 new[] { id },
                 finding.Title,
-                IsProblemLevel(finding.Level));
+                IsProblemLevel(finding.Level),
+                new[] { CoreModuleId.WindowsSetup });
 
             if (applied)
                 ApplyModuleStatus();
@@ -256,9 +270,8 @@ namespace TweakWise.Pages
 
             string brushKey = GetStatusBrushKey(finding.Level);
             border.SetResourceReference(Border.BorderBrushProperty, brushKey);
-
-            if (border.Child is StackPanel panel && panel.Children.Count > 0 && panel.Children[0] is TextBlock kindText)
-                kindText.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+            SetBadgeBrush(border, "SignalStatusBadge", "SignalStatusLabel", finding.Level);
+            SetBadgeBrush(border, "SignalRiskBadge", "SignalRiskLabel", finding.RiskLevel);
         }
 
         private void SelectedEnvironmentFindingCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -411,7 +424,12 @@ namespace TweakWise.Pages
             {
                 var level = statusItem.SignalLevel;
                 if (level == HealthLevel.Normal || level == HealthLevel.Attention || level == HealthLevel.Warning || level == HealthLevel.Critical)
+                {
                     border.SetResourceReference(Border.BorderBrushProperty, GetStatusBrushKey(level));
+                    SetBadgeBrush(border, "SettingSignalStatusBadge", "SettingSignalStatusLabel", level);
+                }
+
+                SetBadgeBrush(border, "SettingRiskBadge", "SettingRiskLabel", statusItem.RiskLevel);
             }
 
             if (element.DataContext is not EnvironmentSection section)
@@ -879,15 +897,43 @@ namespace TweakWise.Pages
             };
 
             var panel = new StackPanel();
-            var kind = new TextBlock
+            var header = new WrapPanel();
+            var statusBadge = new Border
+            {
+                Style = FindResource("EnvironmentBadgeStyle") as Style
+            };
+            statusBadge.SetResourceReference(Border.BorderBrushProperty, brushKey);
+            var statusLabel = new TextBlock
             {
                 Text = layout.Finding.KindText,
                 FontSize = 11,
-                FontWeight = FontWeights.SemiBold,
-                Opacity = 0.76
+                FontWeight = FontWeights.SemiBold
             };
-            kind.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
-            panel.Children.Add(kind);
+            statusLabel.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+            statusBadge.Child = statusLabel;
+            header.Children.Add(statusBadge);
+
+            if (!string.IsNullOrWhiteSpace(layout.Finding.RiskLabel))
+            {
+                string riskBrushKey = GetStatusBrushKey(layout.Finding.RiskLevel);
+                var riskBadge = new Border
+                {
+                    Style = FindResource("EnvironmentBadgeStyle") as Style
+                };
+                riskBadge.SetResourceReference(Border.BorderBrushProperty, riskBrushKey);
+                var riskLabel = new TextBlock
+                {
+                    Text = layout.Finding.RiskLabel,
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold,
+                    Opacity = 0.78
+                };
+                riskLabel.SetResourceReference(TextBlock.ForegroundProperty, riskBrushKey);
+                riskBadge.Child = riskLabel;
+                header.Children.Add(riskBadge);
+            }
+
+            panel.Children.Add(header);
             panel.Children.Add(new TextBlock
             {
                 Text = layout.Finding.Title,
@@ -1809,6 +1855,37 @@ namespace TweakWise.Pages
             return null;
         }
 
+        private static T FindVisualChild<T>(DependencyObject root, string name)
+            where T : FrameworkElement
+        {
+            if (root == null)
+                return null;
+
+            int count = VisualTreeHelper.GetChildrenCount(root);
+            for (int index = 0; index < count; index++)
+            {
+                var child = VisualTreeHelper.GetChild(root, index);
+                if (child is T element && string.Equals(element.Name, name, StringComparison.Ordinal))
+                    return element;
+
+                var nested = FindVisualChild<T>(child, name);
+                if (nested != null)
+                    return nested;
+            }
+
+            return null;
+        }
+
+        private void SetBadgeBrush(DependencyObject root, string badgeName, string labelName, HealthLevel level)
+        {
+            string brushKey = GetStatusBrushKey(level);
+            var badge = FindVisualChild<Border>(root, badgeName);
+            var label = FindVisualChild<TextBlock>(root, labelName);
+
+            badge?.SetResourceReference(Border.BorderBrushProperty, brushKey);
+            label?.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+        }
+
         private static T FindVisualParent<T>(DependencyObject source)
             where T : DependencyObject
         {
@@ -2516,7 +2593,9 @@ namespace TweakWise.Pages
                         Level = NormalizeFindingLevel(finding.Level),
                         KindText = GetFindingKindText(finding.Level),
                         Title = finding.Title,
-                        Description = description
+                        Description = description,
+                        RiskLabel = GetRiskLabel(finding.Level),
+                        RiskLevel = GetRiskLevel(finding.Level)
                     };
                 })
                 .GroupBy(finding => $"{finding.NodeKey}|{NormalizeIdPart(finding.Id)}", StringComparer.OrdinalIgnoreCase)
@@ -2853,12 +2932,70 @@ namespace TweakWise.Pages
         {
             return level switch
             {
-                HealthLevel.Critical => "Критическая проблема",
-                HealthLevel.Warning or HealthLevel.Attention => "Проблема",
-                HealthLevel.Normal => "Рекомендация",
-                HealthLevel.Good => "В норме",
-                _ => "Сигнал"
+                HealthLevel.Critical => "КРИТИЧЕСКАЯ ПРОБЛЕМА",
+                HealthLevel.Warning or HealthLevel.Attention => "ПРОБЛЕМА",
+                HealthLevel.Normal => "РЕКОМЕНДАЦИЯ",
+                HealthLevel.Good => "В НОРМЕ",
+                _ => "СИГНАЛ"
             };
+        }
+
+        private static string GetRiskLabel(HealthLevel level)
+        {
+            return level switch
+            {
+                HealthLevel.Critical => "Риск: высокий",
+                HealthLevel.Warning or HealthLevel.Attention => "Риск: средний",
+                HealthLevel.Normal => "Риск: низкий",
+                _ => string.Empty
+            };
+        }
+
+        private static string GetRiskLabel(string riskText, HealthLevel level)
+        {
+            string normalized = riskText ?? string.Empty;
+            if (normalized.IndexOf("высок", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("high", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Риск: высокий";
+
+            if (normalized.IndexOf("сред", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("medium", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Риск: средний";
+
+            if (normalized.IndexOf("низ", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("low", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Риск: низкий";
+
+            return GetRiskLabel(level);
+        }
+
+        private static HealthLevel GetRiskLevel(HealthLevel level)
+        {
+            return level switch
+            {
+                HealthLevel.Critical => HealthLevel.Critical,
+                HealthLevel.Warning or HealthLevel.Attention => HealthLevel.Warning,
+                HealthLevel.Normal => HealthLevel.Normal,
+                _ => HealthLevel.Good
+            };
+        }
+
+        private static HealthLevel GetRiskLevel(string riskText, HealthLevel level)
+        {
+            string normalized = riskText ?? string.Empty;
+            if (normalized.IndexOf("высок", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("high", StringComparison.OrdinalIgnoreCase) >= 0)
+                return HealthLevel.Critical;
+
+            if (normalized.IndexOf("сред", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("medium", StringComparison.OrdinalIgnoreCase) >= 0)
+                return HealthLevel.Warning;
+
+            if (normalized.IndexOf("низ", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("low", StringComparison.OrdinalIgnoreCase) >= 0)
+                return HealthLevel.Normal;
+
+            return GetRiskLevel(level);
         }
 
         private static string FormatFindingSummary(IReadOnlyList<EnvironmentFindingViewModel> findings)
@@ -3024,6 +3161,9 @@ namespace TweakWise.Pages
             public string CurrentValue { get; }
             public string Recommendation { get; }
             public string RiskText { get; }
+            public string RiskLabel => GetRiskLabel(RiskText, SignalLevel == HealthLevel.Good ? HealthLevel.Normal : SignalLevel);
+            public HealthLevel RiskLevel => GetRiskLevel(RiskText, SignalLevel == HealthLevel.Good ? HealthLevel.Normal : SignalLevel);
+            public Visibility RiskVisibility => string.IsNullOrWhiteSpace(RiskLabel) ? Visibility.Collapsed : Visibility.Visible;
             public string BackupState { get; }
             public bool CanRollback { get; }
             public IReadOnlyList<EnvironmentSettingOptionViewModel> Options { get; }
@@ -3048,10 +3188,10 @@ namespace TweakWise.Pages
                 {
                     return SignalLevel switch
                     {
-                        HealthLevel.Critical => "критично",
-                        HealthLevel.Warning => "проблема",
-                        HealthLevel.Attention => "внимание",
-                        HealthLevel.Normal => "рекомендация",
+                        HealthLevel.Critical => "КРИТИЧНО",
+                        HealthLevel.Warning => "ПРОБЛЕМА",
+                        HealthLevel.Attention => "ВНИМАНИЕ",
+                        HealthLevel.Normal => "РЕКОМЕНДАЦИЯ",
                         _ => string.Empty
                     };
                 }
@@ -3168,6 +3308,19 @@ namespace TweakWise.Pages
             public string KindText { get; set; } = string.Empty;
             public string Title { get; set; } = string.Empty;
             public string Description { get; set; } = string.Empty;
+            private string _riskLabel = string.Empty;
+            public string RiskLabel
+            {
+                get => string.IsNullOrWhiteSpace(_riskLabel) ? GetRiskLabel(Level) : _riskLabel;
+                set => _riskLabel = value ?? string.Empty;
+            }
+            private HealthLevel _riskLevel = HealthLevel.Unknown;
+            public HealthLevel RiskLevel
+            {
+                get => _riskLevel == HealthLevel.Unknown ? GetRiskLevel(Level) : _riskLevel;
+                set => _riskLevel = value;
+            }
+            public Visibility RiskVisibility => string.IsNullOrWhiteSpace(RiskLabel) ? Visibility.Collapsed : Visibility.Visible;
         }
     }
 }

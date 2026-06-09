@@ -75,6 +75,12 @@ namespace TweakWise
 
         public void OpenModuleWorkspace(CoreModuleId moduleId, string targetFindingId)
         {
+            if (IsUnavailableModule(moduleId))
+            {
+                ShowUnavailableModuleDialog(moduleId);
+                return;
+            }
+
             NavigateFresh(CreateModulePage(moduleId, targetFindingId));
         }
 
@@ -103,8 +109,34 @@ namespace TweakWise
                 CoreModuleId.Resources => new MonitoringPerformancePage(targetFindingId),
                 CoreModuleId.WindowsSetup => new WorkEnvironmentPage(targetFindingId),
                 CoreModuleId.Devices => new DevicesDriversPage(),
-                _ => new ModuleWorkspacePage(moduleId)
+                _ => new CoreHomePage()
             };
+        }
+
+        private static bool IsUnavailableModule(CoreModuleId moduleId)
+        {
+            return moduleId == CoreModuleId.SystemParameters ||
+                   moduleId == CoreModuleId.Maintenance ||
+                   moduleId == CoreModuleId.Network;
+        }
+
+        private void ShowUnavailableModuleDialog(CoreModuleId moduleId)
+        {
+            string title = moduleId switch
+            {
+                CoreModuleId.SystemParameters => "Системная конфигурация",
+                CoreModuleId.Maintenance => "Накопители и память",
+                CoreModuleId.Network => "Сеть и подключение",
+                _ => "Раздел"
+            };
+
+            _dialogManager.Show(
+                this,
+                title,
+                "Раздел временно недоступен",
+                "Раздел находится в разработке и станет доступен в одном из следующих обновлений.",
+                AppDialogKind.Info,
+                AppDialogButtons.Ok);
         }
 
         private void NavigateFresh(Page page)
@@ -137,6 +169,8 @@ namespace TweakWise
                 "Devices" => CoreModuleId.Devices,
                 "Drivers" => CoreModuleId.Devices,
                 "DevicesDrivers" => CoreModuleId.Devices,
+                "Network" => CoreModuleId.Network,
+                "NetworkConnection" => CoreModuleId.Network,
                 _ => CoreModuleId.WindowsSetup
             };
 
@@ -186,11 +220,8 @@ namespace TweakWise
             MinimizeToTrayOnCloseCheckBox.IsChecked = _settingsManager.CurrentSettings.MinimizeToTrayOnClose;
             StartMinimizedToTrayCheckBox.IsChecked = _settingsManager.CurrentSettings.StartMinimizedToTray;
             ScanWorkEnvironmentAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanWorkEnvironmentAtStartup;
-            ScanSystemConfigurationAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanSystemConfigurationAtStartup;
             ScanPerformanceAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanPerformanceAtStartup;
-            ScanStorageAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanStorageAtStartup;
             ScanDevicesAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanDevicesAtStartup;
-            ScanNetworkAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanNetworkAtStartup;
             BackupRetentionComboBox.SelectedItem = Math.Clamp(_settingsManager.CurrentSettings.PerformanceBackupRetentionDays, 1, 30);
             _settingsLoaded = true;
         }
@@ -406,11 +437,11 @@ namespace TweakWise
 
             _settingsManager.UpdateStartupScanPreferences(
                 ScanWorkEnvironmentAtStartupCheckBox.IsChecked == true,
-                ScanSystemConfigurationAtStartupCheckBox.IsChecked == true,
+                false,
                 ScanPerformanceAtStartupCheckBox.IsChecked == true,
-                ScanStorageAtStartupCheckBox.IsChecked == true,
+                false,
                 ScanDevicesAtStartupCheckBox.IsChecked == true,
-                ScanNetworkAtStartupCheckBox.IsChecked == true);
+                false);
 
             ApplyTrayPreferences();
         }

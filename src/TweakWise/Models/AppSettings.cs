@@ -17,11 +17,11 @@ namespace TweakWise.Models
         public bool MinimizeToTrayOnClose { get; set; } = false;
         public bool StartMinimizedToTray { get; set; } = false;
         public bool ScanWorkEnvironmentAtStartup { get; set; } = true;
-        public bool ScanSystemConfigurationAtStartup { get; set; } = true;
+        public bool ScanSystemConfigurationAtStartup { get; set; } = false;
         public bool ScanPerformanceAtStartup { get; set; } = true;
-        public bool ScanStorageAtStartup { get; set; } = true;
+        public bool ScanStorageAtStartup { get; set; } = false;
         public bool ScanDevicesAtStartup { get; set; } = true;
-        public bool ScanNetworkAtStartup { get; set; } = true;
+        public bool ScanNetworkAtStartup { get; set; } = false;
         public bool FirstRunCompleted { get; set; } = false;
         public bool PendingRestart { get; set; } = false;
         public int PerformanceBackupRetentionDays { get; set; } = 30;

@@ -27,6 +27,11 @@ namespace TweakWise.Pages
     public partial class MonitoringPerformancePage : Page
     {
         private const int MaxVisibleCallouts = 5;
+        private static readonly TimeSpan DiagnosticFindingsCacheAge = TimeSpan.FromMinutes(4);
+        private static readonly object DiagnosticFindingsCacheSync = new object();
+        private static IReadOnlyList<BoardFinding> _cachedDiagnosticFindings = Array.Empty<BoardFinding>();
+        private static DateTime _cachedDiagnosticFindingsAtUtc = DateTime.MinValue;
+        private static bool _hasCachedDiagnosticFindings;
         private HardwareTemperatureService _temperatureService;
         private PerformanceTuningService _performanceTuningService;
         private readonly DispatcherTimer _diagnosticsTimer = new DispatcherTimer();
@@ -185,7 +190,6 @@ namespace TweakWise.Pages
                     return;
 
                 UpdateHighlights();
-                _diagnosticsTimer.Start();
                 RefreshDiagnostics();
             }), DispatcherPriority.ContextIdle);
         }
@@ -344,10 +348,11 @@ namespace TweakWise.Pages
                 Window.GetWindow(this),
                 new[] { finding.Id },
                 finding.Title,
-                finding.Level == HealthLevel.Attention || finding.Level == HealthLevel.Warning || finding.Level == HealthLevel.Critical);
+                finding.Level == HealthLevel.Attention || finding.Level == HealthLevel.Warning || finding.Level == HealthLevel.Critical,
+                new[] { CoreModuleId.Resources });
 
             if (applied)
-                RefreshDiagnostics();
+                RefreshDiagnostics(forceRefresh: true);
         }
 
         private async void IgnorePerformanceSettingSignal_Click(object sender, RoutedEventArgs e)
@@ -366,7 +371,8 @@ namespace TweakWise.Pages
                 Window.GetWindow(this),
                 new[] { item.SignalId },
                 item.Title,
-                hasProblem);
+                hasProblem,
+                new[] { CoreModuleId.Resources });
 
             if (!applied)
                 return;
@@ -450,7 +456,7 @@ namespace TweakWise.Pages
                 ReloadPerformanceSettingsAfterOperation();
 
             if (result.RequiresRestart && App.ComputerHealthService != null)
-                _ = App.ComputerHealthService.RefreshStatusAsync();
+                _ = App.ComputerHealthService.RefreshStatusAsync(new[] { CoreModuleId.Resources });
         }
 
         private async void ApplyPowerSliderShortcut_Click(object sender, RoutedEventArgs e)
@@ -480,7 +486,7 @@ namespace TweakWise.Pages
                 ReloadPerformanceSettingsAfterOperation();
 
             if (result.RequiresRestart && App.ComputerHealthService != null)
-                _ = App.ComputerHealthService.RefreshStatusAsync();
+                _ = App.ComputerHealthService.RefreshStatusAsync(new[] { CoreModuleId.Resources });
         }
 
         private async void RollbackPerformanceSetting_Click(object sender, RoutedEventArgs e)
@@ -500,7 +506,7 @@ namespace TweakWise.Pages
                 ReloadPerformanceSettingsAfterOperation();
 
             if (result.RequiresRestart && App.ComputerHealthService != null)
-                _ = App.ComputerHealthService.RefreshStatusAsync();
+                _ = App.ComputerHealthService.RefreshStatusAsync(new[] { CoreModuleId.Resources });
         }
 
         private async void ClearPerformanceBackup_Click(object sender, RoutedEventArgs e)
@@ -545,7 +551,13 @@ namespace TweakWise.Pages
             {
                 var level = GetPerformanceSignalLevel(statusItem);
                 if (level == HealthLevel.Normal || level == HealthLevel.Attention || level == HealthLevel.Warning || level == HealthLevel.Critical)
+                {
                     border.SetResourceReference(Border.BorderBrushProperty, GetStatusBrushKey(level));
+                    SetBadgeBrush(border, "SettingSignalStatusBadge", "SettingSignalStatusLabel", level);
+                }
+
+                if (statusItem.HasRisk)
+                    SetBadgeBrush(border, "SettingRiskBadge", "SettingRiskLabel", GetRiskLevel(statusItem.RiskLabel, level));
             }
 
             if (element.DataContext is PerformanceTuningItem item &&
@@ -568,9 +580,8 @@ namespace TweakWise.Pages
 
             string brushKey = GetStatusBrushKey(finding.Level);
             border.SetResourceReference(Border.BorderBrushProperty, brushKey);
-
-            if (border.Child is StackPanel panel && panel.Children.Count > 0 && panel.Children[0] is TextBlock kindText)
-                kindText.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+            SetBadgeBrush(border, "SignalStatusBadge", "SignalStatusLabel", finding.Level);
+            SetBadgeBrush(border, "SignalRiskBadge", "SignalRiskLabel", finding.RiskLevel);
         }
 
         private void SelectedFindingCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -616,6 +627,37 @@ namespace TweakWise.Pages
             }
 
             return null;
+        }
+
+        private static T FindVisualChild<T>(DependencyObject root, string name)
+            where T : FrameworkElement
+        {
+            if (root == null)
+                return null;
+
+            int count = VisualTreeHelper.GetChildrenCount(root);
+            for (int index = 0; index < count; index++)
+            {
+                var child = VisualTreeHelper.GetChild(root, index);
+                if (child is T element && string.Equals(element.Name, name, StringComparison.Ordinal))
+                    return element;
+
+                var nested = FindVisualChild<T>(child, name);
+                if (nested != null)
+                    return nested;
+            }
+
+            return null;
+        }
+
+        private void SetBadgeBrush(DependencyObject root, string badgeName, string labelName, HealthLevel level)
+        {
+            string brushKey = GetStatusBrushKey(level);
+            var badge = FindVisualChild<Border>(root, badgeName);
+            var label = FindVisualChild<TextBlock>(root, labelName);
+
+            badge?.SetResourceReference(Border.BorderBrushProperty, brushKey);
+            label?.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
         }
 
         private void NavigateToFindingTarget(BoardFinding finding, bool openNode)
@@ -1189,9 +1231,12 @@ namespace TweakWise.Pages
             ModuleStatusIndicator.SetResourceReference(Shape.FillProperty, GetStatusBrushKey(module.Status.Status));
         }
 
-        private async void RefreshDiagnostics()
+        private async void RefreshDiagnostics(bool forceRefresh = false)
         {
             if (!_isInitialized || !_isPageActive || _diagnosticsRefreshRunning)
+                return;
+
+            if (!forceRefresh && TryApplyCachedDiagnosticFindings())
                 return;
 
             _diagnosticsRefreshRunning = true;
@@ -1203,6 +1248,7 @@ namespace TweakWise.Pages
                     return;
 
                 _findings = findings;
+                CacheDiagnosticFindings(findings);
                 ApplyCallouts();
                 UpdateSelectedFindings();
                 UpdateHighlights();
@@ -1222,6 +1268,62 @@ namespace TweakWise.Pages
             {
                 _diagnosticsRefreshRunning = false;
             }
+        }
+
+        private bool TryApplyCachedDiagnosticFindings()
+        {
+            List<BoardFinding> cached;
+            lock (DiagnosticFindingsCacheSync)
+            {
+                if (!_hasCachedDiagnosticFindings ||
+                    DateTime.UtcNow - _cachedDiagnosticFindingsAtUtc > DiagnosticFindingsCacheAge)
+                {
+                    return false;
+                }
+
+                cached = _cachedDiagnosticFindings.Select(CloneBoardFinding).ToList();
+            }
+
+            _findings = cached;
+            ApplyCallouts();
+            UpdateSelectedFindings();
+            UpdateHighlights();
+            TryOpenPendingExternalFindingTarget();
+            return true;
+        }
+
+        private static void CacheDiagnosticFindings(IReadOnlyList<BoardFinding> findings)
+        {
+            lock (DiagnosticFindingsCacheSync)
+            {
+                _cachedDiagnosticFindings = (findings ?? Array.Empty<BoardFinding>())
+                    .Select(CloneBoardFinding)
+                    .ToList();
+                _cachedDiagnosticFindingsAtUtc = DateTime.UtcNow;
+                _hasCachedDiagnosticFindings = true;
+            }
+        }
+
+        private static BoardFinding CloneBoardFinding(BoardFinding source)
+        {
+            if (source == null)
+                return null;
+
+            return new BoardFinding
+            {
+                Id = source.Id,
+                NodeKey = source.NodeKey,
+                Level = source.Level,
+                Title = source.Title,
+                Description = source.Description,
+                TargetSettingId = source.TargetSettingId,
+                TargetSectionTitle = source.TargetSectionTitle,
+                RiskLabel = source.RiskLabel,
+                RiskLevel = source.RiskLevel,
+                IsSummary = source.IsSummary,
+                ExtraSignalCount = source.ExtraSignalCount,
+                ExtraSignalSummary = source.ExtraSignalSummary
+            };
         }
 
         private void TryOpenPendingExternalFindingTarget()
@@ -1694,14 +1796,41 @@ namespace TweakWise.Pages
             card.MouseLeftButtonUp += DiagnosticCallout_MouseLeftButtonUp;
 
             var panel = new StackPanel();
-            var header = new TextBlock
+            var header = new WrapPanel();
+            var statusBadge = new Border
+            {
+                Style = FindResource("PerformanceBadgeStyle") as Style
+            };
+            statusBadge.SetResourceReference(Border.BorderBrushProperty, brushKey);
+            var statusLabel = new TextBlock
             {
                 Text = GetFindingKindText(finding.Level),
                 FontSize = 11,
-                FontWeight = FontWeights.SemiBold,
-                Opacity = 0.72
+                FontWeight = FontWeights.SemiBold
             };
-            header.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+            statusLabel.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+            statusBadge.Child = statusLabel;
+            header.Children.Add(statusBadge);
+
+            if (!string.IsNullOrWhiteSpace(finding.RiskLabel))
+            {
+                string riskBrushKey = GetStatusBrushKey(finding.RiskLevel);
+                var riskBadge = new Border
+                {
+                    Style = FindResource("PerformanceBadgeStyle") as Style
+                };
+                riskBadge.SetResourceReference(Border.BorderBrushProperty, riskBrushKey);
+                var riskLabel = new TextBlock
+                {
+                    Text = finding.RiskLabel,
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold,
+                    Opacity = 0.78
+                };
+                riskLabel.SetResourceReference(TextBlock.ForegroundProperty, riskBrushKey);
+                riskBadge.Child = riskLabel;
+                header.Children.Add(riskBadge);
+            }
 
             var title = new TextBlock
             {
@@ -1956,10 +2085,10 @@ namespace TweakWise.Pages
             _currentPerformanceItems = preparedItems;
             UpdateSettingSignalFindings(_selectedNodeKey, preparedItems);
             if (preparedItems.Any(item => item.HasActiveSignal))
-                _ = App.ComputerHealthService?.RefreshStatusAsync();
+                _ = App.ComputerHealthService?.RefreshStatusAsync(new[] { CoreModuleId.Resources });
 
             ApplyPerformanceSearchFilter();
-            RefreshDiagnostics();
+            RefreshDiagnostics(forceRefresh: true);
         }
 
         private static void ApplyPerformanceSettingSignalSuppression(PerformanceTuningItem item)
@@ -2482,7 +2611,9 @@ namespace TweakWise.Pages
                 Title = item.Title,
                 Description = description,
                 TargetSettingId = item.SettingId,
-                TargetSectionTitle = string.IsNullOrWhiteSpace(item.SectionTitle) ? string.Empty : item.SectionTitle
+                TargetSectionTitle = string.IsNullOrWhiteSpace(item.SectionTitle) ? string.Empty : item.SectionTitle,
+                RiskLabel = item.RiskBadgeLabel,
+                RiskLevel = GetRiskLevel(item.RiskLabel, level)
             };
         }
 
@@ -3225,6 +3356,64 @@ namespace TweakWise.Pages
             };
         }
 
+        private static string GetRiskLabel(HealthLevel level)
+        {
+            return level switch
+            {
+                HealthLevel.Critical => "Риск: высокий",
+                HealthLevel.Warning or HealthLevel.Attention => "Риск: средний",
+                HealthLevel.Normal => "Риск: низкий",
+                _ => string.Empty
+            };
+        }
+
+        private static string GetRiskLabel(string riskText, HealthLevel level)
+        {
+            string normalized = riskText ?? string.Empty;
+            if (normalized.IndexOf("высок", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("high", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Риск: высокий";
+
+            if (normalized.IndexOf("сред", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("medium", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Риск: средний";
+
+            if (normalized.IndexOf("низ", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("low", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Риск: низкий";
+
+            return GetRiskLabel(level);
+        }
+
+        private static HealthLevel GetRiskLevel(HealthLevel level)
+        {
+            return level switch
+            {
+                HealthLevel.Critical => HealthLevel.Critical,
+                HealthLevel.Warning or HealthLevel.Attention => HealthLevel.Warning,
+                HealthLevel.Normal => HealthLevel.Normal,
+                _ => HealthLevel.Good
+            };
+        }
+
+        private static HealthLevel GetRiskLevel(string riskText, HealthLevel level)
+        {
+            string normalized = riskText ?? string.Empty;
+            if (normalized.IndexOf("высок", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("high", StringComparison.OrdinalIgnoreCase) >= 0)
+                return HealthLevel.Critical;
+
+            if (normalized.IndexOf("сред", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("medium", StringComparison.OrdinalIgnoreCase) >= 0)
+                return HealthLevel.Warning;
+
+            if (normalized.IndexOf("низ", StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                normalized.IndexOf("low", StringComparison.OrdinalIgnoreCase) >= 0)
+                return HealthLevel.Normal;
+
+            return GetRiskLevel(level);
+        }
+
         private static string GetStatusBrushKey(HealthLevel status)
         {
             return status switch
@@ -3343,6 +3532,19 @@ namespace TweakWise.Pages
             public string Description { get; set; } = string.Empty;
             public string TargetSettingId { get; set; } = string.Empty;
             public string TargetSectionTitle { get; set; } = string.Empty;
+            private string _riskLabel = string.Empty;
+            public string RiskLabel
+            {
+                get => string.IsNullOrWhiteSpace(_riskLabel) ? GetRiskLabel(Level) : _riskLabel;
+                set => _riskLabel = value ?? string.Empty;
+            }
+            private HealthLevel _riskLevel = HealthLevel.Unknown;
+            public HealthLevel RiskLevel
+            {
+                get => _riskLevel == HealthLevel.Unknown ? GetRiskLevel(Level) : _riskLevel;
+                set => _riskLevel = value;
+            }
+            public Visibility RiskVisibility => string.IsNullOrWhiteSpace(RiskLabel) ? Visibility.Collapsed : Visibility.Visible;
             public bool IsSummary { get; set; }
             public int ExtraSignalCount { get; set; }
             public string ExtraSignalSummary { get; set; } = string.Empty;
