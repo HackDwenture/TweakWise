@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -232,6 +233,66 @@ namespace TweakWise.Managers
             CurrentSettings.ShowCoreMotherboardTemperature = showMotherboard;
             CurrentSettings.ShowCoreOtherTemperature = showOther;
             SaveSettings();
+        }
+
+        public void UpdateStartupScanPreferences(
+            bool scanWorkEnvironment,
+            bool scanSystemConfiguration,
+            bool scanPerformance,
+            bool scanStorage,
+            bool scanDevices,
+            bool scanNetwork)
+        {
+            CurrentSettings.ScanWorkEnvironmentAtStartup = scanWorkEnvironment;
+            CurrentSettings.ScanSystemConfigurationAtStartup = scanSystemConfiguration;
+            CurrentSettings.ScanPerformanceAtStartup = scanPerformance;
+            CurrentSettings.ScanStorageAtStartup = scanStorage;
+            CurrentSettings.ScanDevicesAtStartup = scanDevices;
+            CurrentSettings.ScanNetworkAtStartup = scanNetwork;
+            SaveSettings();
+        }
+
+        public ISet<CoreModuleId> GetStartupHealthScanModules()
+        {
+            var modules = new HashSet<CoreModuleId>();
+
+            if (CurrentSettings.ScanWorkEnvironmentAtStartup)
+                modules.Add(CoreModuleId.WindowsSetup);
+            if (CurrentSettings.ScanSystemConfigurationAtStartup)
+                modules.Add(CoreModuleId.SystemParameters);
+            if (CurrentSettings.ScanPerformanceAtStartup)
+                modules.Add(CoreModuleId.Resources);
+            if (CurrentSettings.ScanStorageAtStartup)
+                modules.Add(CoreModuleId.Maintenance);
+            if (CurrentSettings.ScanDevicesAtStartup)
+                modules.Add(CoreModuleId.Devices);
+            if (CurrentSettings.ScanNetworkAtStartup)
+                modules.Add(CoreModuleId.Network);
+
+            return modules;
+        }
+
+        public void ResetApplicationState()
+        {
+            try
+            {
+                ApplyRunOnStartup(false);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                if (File.Exists(_settingsPath))
+                    File.Delete(_settingsPath);
+            }
+            catch
+            {
+            }
+
+            CurrentSettings = new AppSettings();
+            SettingsChanged?.Invoke();
         }
 
         public void MarkPendingRestart(string reason)

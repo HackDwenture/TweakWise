@@ -102,6 +102,7 @@ namespace TweakWise
             {
                 CoreModuleId.Resources => new MonitoringPerformancePage(targetFindingId),
                 CoreModuleId.WindowsSetup => new WorkEnvironmentPage(targetFindingId),
+                CoreModuleId.Devices => new DevicesDriversPage(),
                 _ => new ModuleWorkspacePage(moduleId)
             };
         }
@@ -133,6 +134,9 @@ namespace TweakWise
                 "System" => CoreModuleId.SystemParameters,
                 "Maintenance" => CoreModuleId.Maintenance,
                 "MonitoringPerformance" => CoreModuleId.Performance,
+                "Devices" => CoreModuleId.Devices,
+                "Drivers" => CoreModuleId.Devices,
+                "DevicesDrivers" => CoreModuleId.Devices,
                 _ => CoreModuleId.WindowsSetup
             };
 
@@ -181,6 +185,12 @@ namespace TweakWise
             ShowCoreOtherTemperatureCheckBox.IsChecked = _settingsManager.CurrentSettings.ShowCoreOtherTemperature;
             MinimizeToTrayOnCloseCheckBox.IsChecked = _settingsManager.CurrentSettings.MinimizeToTrayOnClose;
             StartMinimizedToTrayCheckBox.IsChecked = _settingsManager.CurrentSettings.StartMinimizedToTray;
+            ScanWorkEnvironmentAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanWorkEnvironmentAtStartup;
+            ScanSystemConfigurationAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanSystemConfigurationAtStartup;
+            ScanPerformanceAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanPerformanceAtStartup;
+            ScanStorageAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanStorageAtStartup;
+            ScanDevicesAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanDevicesAtStartup;
+            ScanNetworkAtStartupCheckBox.IsChecked = _settingsManager.CurrentSettings.ScanNetworkAtStartup;
             BackupRetentionComboBox.SelectedItem = Math.Clamp(_settingsManager.CurrentSettings.PerformanceBackupRetentionDays, 1, 30);
             _settingsLoaded = true;
         }
@@ -313,10 +323,12 @@ namespace TweakWise
             {
                 SettingsAppearanceSection,
                 SettingsBehaviorSection,
+                SettingsStartupScanSection,
                 SettingsTemperatureSection,
                 SettingsNotificationsSection,
                 SettingsUpdatesSection,
-                SettingsBackupsSection
+                SettingsBackupsSection,
+                SettingsResetSection
             };
 
             int visibleCount = 0;
@@ -392,6 +404,14 @@ namespace TweakWise
                 ShowCoreMotherboardTemperatureCheckBox.IsChecked == true,
                 ShowCoreOtherTemperatureCheckBox.IsChecked == true);
 
+            _settingsManager.UpdateStartupScanPreferences(
+                ScanWorkEnvironmentAtStartupCheckBox.IsChecked == true,
+                ScanSystemConfigurationAtStartupCheckBox.IsChecked == true,
+                ScanPerformanceAtStartupCheckBox.IsChecked == true,
+                ScanStorageAtStartupCheckBox.IsChecked == true,
+                ScanDevicesAtStartupCheckBox.IsChecked == true,
+                ScanNetworkAtStartupCheckBox.IsChecked == true);
+
             ApplyTrayPreferences();
         }
 
@@ -425,7 +445,7 @@ namespace TweakWise
                 HideToTray();
 
             if (App.ComputerHealthService != null)
-                await App.ComputerHealthService.RefreshStatusAsync();
+                await App.ComputerHealthService.RefreshStatusAsync(_settingsManager.GetStartupHealthScanModules());
 
             if (_settingsManager.CurrentSettings.AutoCheckUpdates)
                 await CheckForUpdatesAsync(false);
@@ -590,6 +610,30 @@ namespace TweakWise
             };
 
             updateWindow.ShowDialog();
+        }
+
+        private void ResetApplicationButton_Click(object sender, RoutedEventArgs e)
+        {
+            var result = _dialogManager.Show(
+                this,
+                "Сброс программы",
+                "Сбросить TweakWise?",
+                "Будут удалены настройки программы, отключён автозапуск и TweakWise закроется. При следующем запуске снова появится окно лицензии. Продолжить?",
+                AppDialogKind.Warning,
+                AppDialogButtons.YesNo);
+
+            if (result != AppDialogResult.Primary)
+                return;
+
+            try
+            {
+                _settingsManager.ResetApplicationState();
+            }
+            finally
+            {
+                _allowClose = true;
+                Application.Current.Shutdown();
+            }
         }
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

@@ -15,5 +15,6 @@ namespace TweakWise.Services
         void SnoozeFindings(IEnumerable<string> findingIds, TimeSpan duration);
         void DismissFindings(IEnumerable<string> findingIds);
         Task RefreshStatusAsync();
+        Task RefreshStatusAsync(IEnumerable<CoreModuleId> modulesToScan);
     }
 }

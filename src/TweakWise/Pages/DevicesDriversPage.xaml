@@ -1,0 +1,1090 @@
+<Page x:Class="TweakWise.Pages.DevicesDriversPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Loaded="Page_Loaded"
+      Unloaded="Page_Unloaded"
+      PreviewKeyDown="Page_PreviewKeyDown"
+      Title="Устройства и драйверы"
+      Focusable="True"
+      Background="{DynamicResource WindowBackground}">
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
+        <SolidColorBrush x:Key="DevicesBoardSurfaceBrush" Color="#1A1A1A"/>
+        <SolidColorBrush x:Key="DevicesPanelBrush" Color="#1F1F1F"/>
+        <SolidColorBrush x:Key="DevicesComponentBrush" Color="#232323"/>
+        <SolidColorBrush x:Key="DevicesComponentHoverBrush" Color="#2C2C2C"/>
+        <SolidColorBrush x:Key="DevicesCalloutBrush" Color="#202020"/>
+        <SolidColorBrush x:Key="DevicesBorderBrush" Color="#363636"/>
+        <SolidColorBrush x:Key="DevicesTraceBrush" Color="#464646"/>
+        <SolidColorBrush x:Key="DevicesLineBrush" Color="#6A6A6A"/>
+        <Style x:Key="IconButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="38"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="9">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource DevicesComponentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.78"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="OrbitArrowStyle" TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+            <Setter Property="Width" Value="54"/>
+            <Setter Property="Height" Value="54"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="30"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+        </Style>
+
+        <Style x:Key="WorkspaceReturnOrbButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource CoreOrbForegroundBrush}"/>
+            <Setter Property="Background">
+                <Setter.Value>
+                    <RadialGradientBrush Center="0.44,0.38" GradientOrigin="0.36,0.30" RadiusX="0.78" RadiusY="0.78">
+                        <GradientStop Color="#F14FE8D8" Offset="0"/>
+                        <GradientStop Color="#C531B9D0" Offset="0.44"/>
+                        <GradientStop Color="#702D6EA7" Offset="0.78"/>
+                        <GradientStop Color="#25203B54" Offset="1"/>
+                    </RadialGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse Margin="-7,24,-7,-9"
+                                     Opacity="0.22">
+                                <Ellipse.Fill>
+                                    <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.66" RadiusY="0.42">
+                                        <GradientStop Color="#7A4FE8D8" Offset="0"/>
+                                        <GradientStop Color="#243CC7B7" Offset="0.55"/>
+                                        <GradientStop Color="#00000000" Offset="1"/>
+                                    </RadialGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <Ellipse x:Name="OuterRing"
+                                     Stroke="{TemplateBinding BorderBrush}"
+                                     StrokeThickness="1"
+                                     Opacity="0.34"/>
+                            <Ellipse Margin="4"
+                                     Fill="{TemplateBinding Background}">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect BlurRadius="14" ShadowDepth="0" Opacity="0.34" Color="#3CC7B7"/>
+                                </Ellipse.Effect>
+                            </Ellipse>
+                            <Ellipse Margin="9" Opacity="0.24">
+                                <Ellipse.Fill>
+                                    <RadialGradientBrush Center="0.36,0.30" GradientOrigin="0.22,0.18" RadiusX="0.92" RadiusY="0.92">
+                                        <GradientStop Color="#D8FFFFFF" Offset="0"/>
+                                        <GradientStop Color="#7A5DEBE2" Offset="0.30"/>
+                                        <GradientStop Color="#2835A7C8" Offset="0.72"/>
+                                        <GradientStop Color="#00000000" Offset="1"/>
+                                    </RadialGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <Ellipse Margin="14,10,19,23" Fill="#DFFFFFFF" Opacity="0.32"/>
+                            <Ellipse Margin="20,20,15,15" Fill="#7EE9FFF7" Opacity="0.18"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="OuterRing" Property="Opacity" Value="0.92"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.78"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="OrbButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="300"/>
+            <Setter Property="Height" Value="300"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter x:Name="ContentPresenter"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ContentPresenter" Property="Opacity" Value="0.94"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ContentPresenter" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RailSignalStyle" TargetType="Border">
+            <Setter Property="MinHeight" Value="50"/>
+            <Setter Property="Padding" Value="13,8"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="DeviceSignalActionButtonStyle" TargetType="Button">
+            <Setter Property="MinHeight" Value="24"/>
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+
+
+        <Style x:Key="DeviceWorkspaceFilterToggleStyle" TargetType="ToggleButton">
+            <Setter Property="MinHeight" Value="26"/>
+            <Setter Property="Padding" Value="12,4"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Root" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource CoreLineActiveBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource ButtonHoverBackground}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DeviceWorkspaceFilterButtonStyle" TargetType="Button" BasedOn="{StaticResource DeviceSignalActionButtonStyle}">
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+        </Style>
+
+        <Style x:Key="SearchBoxStyle" TargetType="TextBox">
+            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="TextAlignment" Value="Left"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowForeground}"/>
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10"
+                                Padding="0">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="40,0,40,0"
+                                          HorizontalAlignment="Stretch"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource CoreLineActiveBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DetailGroupStyle" TargetType="Border">
+            <Setter Property="Padding" Value="0,0,0,16"/>
+            <Setter Property="Margin" Value="0,0,0,20"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="CornerRadius" Value="0"/>
+        </Style>
+
+        <Style x:Key="WorkspaceSignalCardStyle" TargetType="Border">
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="WorkspaceInventoryCardStyle" TargetType="Border">
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="Background" Value="{DynamicResource ContentBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <Style x:Key="DeviceBadgeStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CoreNodeBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNodeBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="7,3"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+        </Style>
+
+        <LinearGradientBrush x:Key="SearchHighlightGradientBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#254EA8FF" Offset="0"/>
+            <GradientStop Color="#343CC7B7" Offset="0.46"/>
+            <GradientStop Color="#1BFFFFFF" Offset="1"/>
+        </LinearGradientBrush>
+
+        <Style x:Key="DeviceLoadingSquareStyle" TargetType="Border">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Background" Value="{DynamicResource CoreLineActiveBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CoreNormalBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="14" ShadowDepth="0" Opacity="0.42" Color="#3CC7B7"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <Grid x:Name="RootContent" Background="{DynamicResource WindowBackground}" ClipToBounds="True" Opacity="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="28,18,28,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="22"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0"
+                    Content="&#xE72B;"
+                    Style="{StaticResource IconButtonStyle}"
+                    ToolTip="Назад"
+                    Click="BackButton_Click"/>
+
+            <StackPanel Grid.Column="2">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse x:Name="ModuleStatusIndicator" Width="9" Height="9" Margin="0,1,10,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="ModuleStatusTextBlock" FontSize="13" FontWeight="SemiBold" Opacity="0.78"/>
+                </StackPanel>
+                <TextBlock Text="Устройства и драйверы" Margin="0,8,0,0" FontSize="25" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Content="&#xE72C;"
+                        Style="{StaticResource IconButtonStyle}"
+                        ToolTip="Обновить диагностику"
+                        Click="RefreshButton_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="24,8,24,18" MaxWidth="1580" HorizontalAlignment="Center">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="372"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid x:Name="OrbitStage"
+                  Grid.Row="0"
+                  ClipToBounds="True"
+                  MinHeight="320"
+                  MaxHeight="350"
+                  VerticalAlignment="Top"
+                  PreviewMouseLeftButtonDown="OrbitStage_MouseLeftButtonDown"
+                  PreviewMouseMove="OrbitStage_MouseMove"
+                  PreviewMouseLeftButtonUp="OrbitStage_MouseLeftButtonUp">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="88"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="88"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="PreviousModeButton"
+                        Grid.Column="0"
+                        Content="&#x2039;"
+                        Style="{StaticResource OrbitArrowStyle}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Click="PreviousModeButton_Click"/>
+
+                <Grid Grid.Column="1" ClipToBounds="True">
+                    <Grid x:Name="OrbitScene">
+                        <Border Width="900"
+                                Height="330"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource DevicesBoardSurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="30"
+                                Opacity="0.38"/>
+
+                        <Canvas Width="900" Height="340" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                            <Line X1="116" Y1="170" X2="784" Y2="170" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="1" Opacity="0.18"/>
+                            <Ellipse Canvas.Left="335" Canvas.Top="55" Width="230" Height="230" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="1" StrokeDashArray="8,9" Opacity="0.16"/>
+                            <Ellipse Canvas.Left="300" Canvas.Top="25" Width="300" Height="300" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="1" Opacity="0.08"/>
+                        </Canvas>
+
+                        <Grid x:Name="OrbitTextureLayer" RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="OrbitSceneScale" ScaleX="1" ScaleY="1"/>
+                                    <TranslateTransform x:Name="OrbitSceneTranslate" X="0"/>
+                                </TransformGroup>
+                            </Grid.RenderTransform>
+
+                        <StackPanel x:Name="LeftGhost"
+                                    Width="170"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Margin="-390,0,0,0"
+                                    Opacity="0.25"
+                                    RenderTransformOrigin="0.5,0.5"
+                                    IsHitTestVisible="False">
+                            <StackPanel.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="LeftGhostScale" ScaleX="1" ScaleY="1"/>
+                                    <TranslateTransform x:Name="LeftGhostTranslate" X="0" Y="0"/>
+                                </TransformGroup>
+                            </StackPanel.RenderTransform>
+                            <Viewbox Width="122" Height="98" Stretch="Uniform" HorizontalAlignment="Center">
+                                <Grid Width="180" Height="150">
+                                    <Canvas x:Name="LeftGhostDriverGlyph" Width="180" Height="150">
+                                        <Rectangle Canvas.Left="34" Canvas.Top="26" Width="112" Height="92" RadiusX="14" RadiusY="14" Fill="{DynamicResource DevicesBoardSurfaceBrush}" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="3"/>
+                                        <Rectangle Canvas.Left="58" Canvas.Top="50" Width="64" Height="44" RadiusX="8" RadiusY="8" Fill="{DynamicResource DevicesComponentBrush}" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="2"/>
+                                        <Line X1="68" Y1="62" X2="112" Y2="62" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        <Line X1="68" Y1="78" X2="100" Y2="78" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        <Rectangle Canvas.Left="18" Canvas.Top="42" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                        <Rectangle Canvas.Left="18" Canvas.Top="65" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                        <Rectangle Canvas.Left="18" Canvas.Top="88" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                        <Rectangle Canvas.Left="144" Canvas.Top="42" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                        <Rectangle Canvas.Left="144" Canvas.Top="65" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                        <Rectangle Canvas.Left="144" Canvas.Top="88" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                    </Canvas>
+                                    <Canvas x:Name="LeftGhostDeviceGlyph" Width="180" Height="150" Visibility="Collapsed">
+                                        <Rectangle Canvas.Left="48" Canvas.Top="20" Width="84" Height="50" RadiusX="8" RadiusY="8" Fill="{DynamicResource DevicesBoardSurfaceBrush}" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="3"/>
+                                        <Rectangle Canvas.Left="31" Canvas.Top="61" Width="118" Height="56" RadiusX="13" RadiusY="13" Fill="{DynamicResource DevicesBoardSurfaceBrush}" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="3"/>
+                                        <Rectangle Canvas.Left="55" Canvas.Top="99" Width="70" Height="34" RadiusX="7" RadiusY="7" Fill="{DynamicResource DevicesComponentBrush}" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="2"/>
+                                        <Ellipse Canvas.Left="118" Canvas.Top="76" Width="10" Height="10" Fill="{DynamicResource DevicesLineBrush}"/>
+                                        <Line X1="67" Y1="111" X2="113" Y2="111" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="3" StrokeStartLineCap="Round"/>
+                                        <Line X1="67" Y1="123" X2="104" Y2="123" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="3" StrokeStartLineCap="Round"/>
+                                    </Canvas>
+                                </Grid>
+                            </Viewbox>
+                            <TextBlock x:Name="LeftGhostTitle"
+                                       Margin="0,10,0,0"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       TextAlignment="Center"
+                                       Foreground="{DynamicResource WindowForeground}"/>
+                        </StackPanel>
+
+                        <StackPanel x:Name="RightGhost"
+                                    Width="170"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Margin="390,0,0,0"
+                                    Opacity="0.25"
+                                    RenderTransformOrigin="0.5,0.5"
+                                    IsHitTestVisible="False">
+                            <StackPanel.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="RightGhostScale" ScaleX="1" ScaleY="1"/>
+                                    <TranslateTransform x:Name="RightGhostTranslate" X="0" Y="0"/>
+                                </TransformGroup>
+                            </StackPanel.RenderTransform>
+                            <Viewbox Width="122" Height="98" Stretch="Uniform" HorizontalAlignment="Center">
+                                <Grid Width="180" Height="150">
+                                    <Canvas x:Name="RightGhostDriverGlyph" Width="180" Height="150">
+                                        <Rectangle Canvas.Left="34" Canvas.Top="26" Width="112" Height="92" RadiusX="14" RadiusY="14" Fill="{DynamicResource DevicesBoardSurfaceBrush}" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="3"/>
+                                        <Rectangle Canvas.Left="58" Canvas.Top="50" Width="64" Height="44" RadiusX="8" RadiusY="8" Fill="{DynamicResource DevicesComponentBrush}" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="2"/>
+                                        <Line X1="68" Y1="62" X2="112" Y2="62" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        <Line X1="68" Y1="78" X2="100" Y2="78" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        <Rectangle Canvas.Left="18" Canvas.Top="42" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                        <Rectangle Canvas.Left="18" Canvas.Top="65" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                        <Rectangle Canvas.Left="18" Canvas.Top="88" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                        <Rectangle Canvas.Left="144" Canvas.Top="42" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                        <Rectangle Canvas.Left="144" Canvas.Top="65" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                        <Rectangle Canvas.Left="144" Canvas.Top="88" Width="18" Height="7" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}"/>
+                                    </Canvas>
+                                    <Canvas x:Name="RightGhostDeviceGlyph" Width="180" Height="150" Visibility="Collapsed">
+                                        <Rectangle Canvas.Left="48" Canvas.Top="20" Width="84" Height="50" RadiusX="8" RadiusY="8" Fill="{DynamicResource DevicesBoardSurfaceBrush}" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="3"/>
+                                        <Rectangle Canvas.Left="31" Canvas.Top="61" Width="118" Height="56" RadiusX="13" RadiusY="13" Fill="{DynamicResource DevicesBoardSurfaceBrush}" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="3"/>
+                                        <Rectangle Canvas.Left="55" Canvas.Top="99" Width="70" Height="34" RadiusX="7" RadiusY="7" Fill="{DynamicResource DevicesComponentBrush}" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="2"/>
+                                        <Ellipse Canvas.Left="118" Canvas.Top="76" Width="10" Height="10" Fill="{DynamicResource DevicesLineBrush}"/>
+                                        <Line X1="67" Y1="111" X2="113" Y2="111" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="3" StrokeStartLineCap="Round"/>
+                                        <Line X1="67" Y1="123" X2="104" Y2="123" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="3" StrokeStartLineCap="Round"/>
+                                    </Canvas>
+                                </Grid>
+                            </Viewbox>
+                            <TextBlock x:Name="RightGhostTitle"
+                                       Margin="0,10,0,0"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       TextAlignment="Center"
+                                       Foreground="{DynamicResource WindowForeground}"/>
+                        </StackPanel>
+
+                        <Button x:Name="CenterOrbButton"
+                                Style="{StaticResource OrbButtonStyle}"
+                                Width="268"
+                                Height="268"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                RenderTransformOrigin="0.5,0.5"
+                                MouseEnter="CenterOrbButton_MouseEnter"
+                                MouseLeave="CenterOrbButton_MouseLeave"
+                                Click="CenterOrbButton_Click">
+                            <Button.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="CenterOrbButtonScale" ScaleX="1" ScaleY="1"/>
+                                    <TranslateTransform x:Name="CenterOrbButtonTranslate" X="0" Y="0"/>
+                                </TransformGroup>
+                            </Button.RenderTransform>
+                            <Grid Width="268" Height="268">
+                                <Ellipse Width="250" Height="250" Fill="{DynamicResource DevicesBoardSurfaceBrush}" Opacity="0.74"/>
+                                <Ellipse x:Name="OrbGlow" Width="230" Height="230" Opacity="0.16"/>
+                                <Ellipse Width="210" Height="210" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="1.35" Opacity="0.72"/>
+                                <Ellipse Width="174" Height="174" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="1" StrokeDashArray="5,8" Opacity="0.28"/>
+
+                                <Canvas x:Name="DriverGlyph" Width="160" Height="150" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="-16,-12,0,0">
+                                    <Rectangle Canvas.Left="34" Canvas.Top="28" Width="108" Height="98" RadiusX="15" RadiusY="15" Fill="{DynamicResource DevicesBoardSurfaceBrush}" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="2.4"/>
+                                    <Rectangle Canvas.Left="60" Canvas.Top="54" Width="56" Height="46" RadiusX="8" RadiusY="8" Fill="{DynamicResource DevicesComponentBrush}" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="1.8"/>
+                                    <Line X1="70" Y1="67" X2="106" Y2="67" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                    <Line X1="70" Y1="84" X2="96" Y2="84" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                    <Rectangle Canvas.Left="18" Canvas.Top="43" Width="18" Height="6" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}" Opacity="0.8"/>
+                                    <Rectangle Canvas.Left="18" Canvas.Top="66" Width="18" Height="6" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}" Opacity="0.8"/>
+                                    <Rectangle Canvas.Left="18" Canvas.Top="89" Width="18" Height="6" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}" Opacity="0.8"/>
+                                    <Rectangle Canvas.Left="140" Canvas.Top="43" Width="18" Height="6" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}" Opacity="0.8"/>
+                                    <Rectangle Canvas.Left="140" Canvas.Top="66" Width="18" Height="6" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}" Opacity="0.8"/>
+                                    <Rectangle Canvas.Left="140" Canvas.Top="89" Width="18" Height="6" RadiusX="3" RadiusY="3" Fill="{DynamicResource DevicesTraceBrush}" Opacity="0.8"/>
+                                    <Path Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="3" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Data="M46,134 C70,146 109,146 132,134"/>
+                                </Canvas>
+
+                                <Canvas x:Name="DeviceGlyph" Width="160" Height="150" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="-16,-8,0,0" Visibility="Collapsed">
+                                    <Rectangle Canvas.Left="48" Canvas.Top="24" Width="80" Height="52" RadiusX="8" RadiusY="8" Fill="{DynamicResource DevicesBoardSurfaceBrush}" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="2.4"/>
+                                    <Rectangle Canvas.Left="28" Canvas.Top="65" Width="120" Height="58" RadiusX="14" RadiusY="14" Fill="{DynamicResource DevicesBoardSurfaceBrush}" Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="2.4"/>
+                                    <Rectangle Canvas.Left="54" Canvas.Top="103" Width="68" Height="36" RadiusX="7" RadiusY="7" Fill="{DynamicResource DevicesComponentBrush}" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="1.8"/>
+                                    <Ellipse Canvas.Left="118" Canvas.Top="80" Width="10" Height="10" Fill="{DynamicResource DevicesLineBrush}"/>
+                                    <Line X1="66" Y1="115" X2="110" Y2="115" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="3" StrokeStartLineCap="Round"/>
+                                    <Line X1="66" Y1="127" X2="100" Y2="127" Stroke="{DynamicResource DevicesTraceBrush}" StrokeThickness="3" StrokeStartLineCap="Round"/>
+                                    <Path Stroke="{DynamicResource DevicesLineBrush}" StrokeThickness="3" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Data="M46,148 C70,158 108,158 132,148"/>
+                                </Canvas>
+
+                                <StackPanel VerticalAlignment="Bottom" Margin="20,0,20,-5">
+                                    <TextBlock x:Name="OrbTitleTextBlock" FontSize="20" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="OrbSummaryTextBlock" Margin="0,10,0,0" FontSize="12" LineHeight="17" Opacity="0.72" TextAlignment="Center" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        </Grid>
+
+                        <Grid x:Name="LoadingOverlay" Background="#D91B1B1B" Visibility="Collapsed" Opacity="0">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <UniformGrid Rows="2" Columns="2" Width="74" Height="74">
+                                    <Border x:Name="LoadingSquareA" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                    <Border x:Name="LoadingSquareB" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                    <Border x:Name="LoadingSquareC" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                    <Border x:Name="LoadingSquareD" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                </UniformGrid>
+                                <TextBlock Text="Диагностика устройств и драйверов"
+                                           Margin="0,14,0,0"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Grid>
+
+                <Button x:Name="NextModeButton"
+                        Grid.Column="2"
+                        Content="&#x203A;"
+                        Style="{StaticResource OrbitArrowStyle}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Click="NextModeButton_Click"/>
+            </Grid>
+
+            <Border Grid.Row="1"
+                    Margin="54,6,54,0"
+                    MinHeight="300"
+                    VerticalAlignment="Stretch"
+                    Padding="16,14"
+                    Background="{DynamicResource ContentBackground}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="14">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock x:Name="RailTitleTextBlock" Text="Проблемы и рекомендации по драйверам" FontSize="16" FontWeight="SemiBold"/>
+                    <ScrollViewer Grid.Row="1" Margin="0,12,0,0" VerticalScrollBarVisibility="Visible">
+                        <ItemsControl x:Name="SignalRailItemsControl">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource RailSignalStyle}"
+                                            Loaded="SignalRailItem_Loaded"
+                                            MouseLeftButtonUp="SignalRailItem_MouseLeftButtonUp">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border x:Name="RailAccent" Width="4" CornerRadius="2"/>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Description}" Margin="0,4,0,0" FontSize="11.5" Opacity="0.72" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding ActionText}" Margin="0,5,0,0" FontSize="11.2" FontWeight="SemiBold" Opacity="0.74" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="3" Margin="14,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding LevelText}" FontSize="11" FontWeight="SemiBold" Opacity="0.75" HorizontalAlignment="Right"/>
+                                                <Button Content="Игнорировать"
+                                                        Tag="{Binding}"
+                                                        Margin="0,7,0,0"
+                                                        HorizontalAlignment="Right"
+                                                        Style="{StaticResource DeviceSignalActionButtonStyle}"
+                                                        Visibility="{Binding IgnoreVisibility}"
+                                                        Click="IgnoreSignal_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Grid x:Name="WorkspaceLayer" Grid.RowSpan="2" Visibility="Collapsed" Opacity="0">
+            <Border Background="{DynamicResource WindowBackground}" Opacity="0.86" MouseLeftButtonDown="WorkspaceScrim_MouseLeftButtonDown"/>
+
+            <Border x:Name="WorkspacePanel"
+                    MaxWidth="1120"
+                    Margin="28,78,28,28"
+                    Padding="22"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    Background="{DynamicResource CoreNodeBackgroundBrush}"
+                    BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    RenderTransformOrigin="0.5,0.5">
+                <Border.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform x:Name="WorkspacePanelScale" ScaleX="1" ScaleY="1"/>
+                        <TranslateTransform x:Name="WorkspacePanelTranslate" Y="0"/>
+                    </TransformGroup>
+                </Border.RenderTransform>
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock x:Name="WorkspaceEyebrowTextBlock"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Opacity="0.62"/>
+                        <TextBlock x:Name="WorkspaceTitleTextBlock"
+                                   Margin="0,7,0,0"
+                                   FontSize="24"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"/>
+                        <TextBlock x:Name="WorkspaceSummaryTextBlock"
+                                   Margin="0,9,0,0"
+                                   FontSize="13"
+                                   LineHeight="19"
+                                   Opacity="0.78"
+                                   TextWrapping="Wrap"/>
+                        <TextBlock x:Name="WorkspaceFindingSummaryTextBlock"
+                                   Margin="0,14,0,0"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <ScrollViewer x:Name="WorkspaceScrollViewer"
+                                  Grid.Row="1"
+                                  Margin="0,18,0,0"
+                                  VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="Проблемы и рекомендации" FontSize="15" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="WorkspaceFindingsEmptyText"
+                                       Text="По этому узлу сейчас нет активных проблем или рекомендаций."
+                                       Margin="0,8,0,0"
+                                       FontSize="12"
+                                       Opacity="0.70"
+                                       TextWrapping="Wrap"
+                                       Visibility="Collapsed"/>
+                            <ItemsControl x:Name="WorkspaceFindingsItemsControl" Margin="0,10,0,8">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource WorkspaceSignalCardStyle}"
+                                                Loaded="SignalRailItem_Loaded"
+                                                MouseEnter="WorkspaceCard_MouseEnter"
+                                                MouseLeave="WorkspaceCard_MouseLeave"
+                                                MouseLeftButtonUp="SignalRailItem_MouseLeftButtonUp">
+                                            <Grid>
+                                                <Border Tag="SearchHighlightOverlay"
+                                                        Margin="-6"
+                                                        CornerRadius="10"
+                                                        Background="{StaticResource SearchHighlightGradientBrush}"
+                                                        BorderBrush="{DynamicResource CoreLineActiveBrush}"
+                                                        BorderThickness="1"
+                                                        Opacity="0"
+                                                        IsHitTestVisible="False"/>
+                                                <StackPanel>
+                                                    <WrapPanel>
+                                                        <Border x:Name="SignalStatusBadge" Style="{StaticResource DeviceBadgeStyle}">
+                                                            <TextBlock x:Name="SignalStatusLabel" Text="{Binding KindText}" FontSize="11" FontWeight="SemiBold"/>
+                                                        </Border>
+                                                        <Border x:Name="SignalRiskBadge" Style="{StaticResource DeviceBadgeStyle}" Visibility="{Binding RiskVisibility}">
+                                                            <TextBlock x:Name="SignalRiskLabel" Text="{Binding RiskLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                                                        </Border>
+                                                    </WrapPanel>
+                                                <TextBlock Text="{Binding Title}" Margin="0,5,0,0" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Description}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.78" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding ActionText}" Margin="0,7,0,0" FontSize="12" FontWeight="SemiBold" Opacity="0.80" TextWrapping="Wrap"/>
+                                                <Button Content="Игнорировать"
+                                                        Tag="{Binding}"
+                                                        Margin="0,10,0,0"
+                                                        HorizontalAlignment="Left"
+                                                        Style="{StaticResource DeviceWorkspaceFilterButtonStyle}"
+                                                        Visibility="{Binding IgnoreVisibility}"
+                                                        Click="IgnoreSignal_Click"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="Параметры и действия" Margin="0,8,0,0" FontSize="15" FontWeight="SemiBold"/>
+                            <Grid Margin="0,10,0,0">
+                                <TextBox x:Name="WorkspaceSearchTextBox"
+                                         Style="{StaticResource SearchBoxStyle}"
+                                         GotKeyboardFocus="WorkspaceSearchTextBox_GotKeyboardFocus"
+                                         PreviewMouseLeftButtonDown="WorkspaceSearchTextBox_PreviewMouseLeftButtonDown"
+                                         PreviewMouseLeftButtonUp="WorkspaceSearchTextBox_PreviewMouseLeftButtonUp"
+                                         KeyDown="WorkspaceSearchTextBox_KeyDown"
+                                         TextChanged="WorkspaceSearchTextBox_TextChanged"/>
+                                <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="14,0,0,0" VerticalAlignment="Center" Opacity="0.58" IsHitTestVisible="False"/>
+                                <TextBlock x:Name="WorkspaceSearchPlaceholderTextBlock" Margin="40,0,36,0" VerticalAlignment="Center" FontSize="13" Opacity="0.52" IsHitTestVisible="False"/>
+                                <Button x:Name="WorkspaceSearchClearButton"
+                                        Content="&#xE711;"
+                                        Width="28"
+                                        Height="28"
+                                        Margin="0,0,8,0"
+                                        Padding="0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        FontFamily="Segoe MDL2 Assets"
+                                        Style="{StaticResource IconButtonStyle}"
+                                        Visibility="Collapsed"
+                                        Click="WorkspaceSearchClearButton_Click"/>
+                            </Grid>
+                            <ItemsControl x:Name="WorkspaceSearchSuggestionsItemsControl"
+                                          Margin="0,8,0,0"
+                                          MaxHeight="92"
+                                          Visibility="Collapsed">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource DeviceWorkspaceFilterButtonStyle}"
+                                                Click="WorkspaceSearchSuggestion_Click">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Caption}" Margin="0,2,0,0" FontSize="10" Opacity="0.58" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <WrapPanel Margin="0,8,0,0">
+                                <ToggleButton x:Name="WorkspaceFilterAllButton"
+                                              Content="Все"
+                                              Tag="All"
+                                              IsChecked="True"
+                                              Style="{StaticResource DeviceWorkspaceFilterToggleStyle}"
+                                              Click="WorkspaceFilterButton_Click"/>
+                                <ToggleButton x:Name="WorkspaceFilterRecommendationsButton"
+                                              Content="Рекомендации"
+                                              Tag="Recommendations"
+                                              Style="{StaticResource DeviceWorkspaceFilterToggleStyle}"
+                                              Click="WorkspaceFilterButton_Click"/>
+                                <ToggleButton x:Name="WorkspaceFilterProblemsButton"
+                                              Content="Проблемы"
+                                              Tag="Problems"
+                                              Style="{StaticResource DeviceWorkspaceFilterToggleStyle}"
+                                              Click="WorkspaceFilterButton_Click"/>
+                                <ToggleButton x:Name="WorkspaceFilterCriticalButton"
+                                              Content="Критические"
+                                              Tag="Critical"
+                                              Style="{StaticResource DeviceWorkspaceFilterToggleStyle}"
+                                              Click="WorkspaceFilterButton_Click"/>
+                            </WrapPanel>
+
+                            <WrapPanel Margin="0,2,0,0">
+                                <Button Content="Установить INF"
+                                        Style="{StaticResource DeviceWorkspaceFilterButtonStyle}"
+                                        Click="InstallDriverInfButton_Click"/>
+                                <Button Content="Откат из бэкапа"
+                                        Style="{StaticResource DeviceWorkspaceFilterButtonStyle}"
+                                        Click="RollbackDriverFromBackupButton_Click"/>
+                                <Button Content="Бэкап драйверов"
+                                        Style="{StaticResource DeviceWorkspaceFilterButtonStyle}"
+                                        Click="BackupDriversButton_Click"/>
+                                <Button Content="Сканировать устройства"
+                                        Style="{StaticResource DeviceWorkspaceFilterButtonStyle}"
+                                        Click="ScanDevicesButton_Click"/>
+                                <Button Content="Диспетчер устройств"
+                                        Style="{StaticResource DeviceWorkspaceFilterButtonStyle}"
+                                        Click="OpenDeviceManagerButton_Click"/>
+                                <Button Content="Safe Mode"
+                                        Style="{StaticResource DeviceWorkspaceFilterButtonStyle}"
+                                        Click="EnableSafeModeButton_Click"/>
+                                <Button Content="Отключить Safe Mode"
+                                        Style="{StaticResource DeviceWorkspaceFilterButtonStyle}"
+                                        Click="DisableSafeModeButton_Click"/>
+                            </WrapPanel>
+
+                            <TextBlock x:Name="WorkspaceEmptyTextBlock"
+                                       Text="По этому запросу ничего не найдено."
+                                       Margin="0,8,0,0"
+                                       FontSize="12"
+                                       Opacity="0.70"
+                                       TextWrapping="Wrap"
+                                       Visibility="Collapsed"/>
+                            <Border x:Name="WorkspaceContentLoadingPanel"
+                                    Margin="0,12,0,0"
+                                    Padding="18,20"
+                                    Background="{DynamicResource ContentBackground}"
+                                    BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Visibility="Collapsed">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <UniformGrid Rows="2" Columns="2" Width="60" Height="60" HorizontalAlignment="Center">
+                                        <Border x:Name="WorkspaceContentLoadingSquareA" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                        <Border x:Name="WorkspaceContentLoadingSquareB" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                        <Border x:Name="WorkspaceContentLoadingSquareC" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                        <Border x:Name="WorkspaceContentLoadingSquareD" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                    </UniformGrid>
+                                    <TextBlock Text="Загрузка узла, пожалуйста подождите"
+                                               Margin="0,12,0,0"
+                                               HorizontalAlignment="Center"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Opacity="0.76"/>
+                                    <TextBlock Text="Считываем драйверы, PnP-устройства, принтеры и доступные действия Windows."
+                                               Margin="0,5,0,0"
+                                               HorizontalAlignment="Center"
+                                               FontSize="11"
+                                               Opacity="0.56"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="Секции диагностики" Margin="0,10,0,0" FontSize="15" FontWeight="SemiBold"/>
+                            <ItemsControl x:Name="WorkspaceGroupsItemsControl" Margin="0,12,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource DetailGroupStyle}"
+                                                Loaded="WorkspaceGroup_Loaded"
+                                                MouseEnter="WorkspaceCard_MouseEnter"
+                                                MouseLeave="WorkspaceCard_MouseLeave">
+                                            <Grid>
+                                                <Border Tag="SearchHighlightOverlay"
+                                                        Margin="-8"
+                                                        CornerRadius="12"
+                                                        Background="{StaticResource SearchHighlightGradientBrush}"
+                                                        BorderBrush="{DynamicResource CoreLineActiveBrush}"
+                                                        BorderThickness="1"
+                                                        Opacity="0"
+                                                        IsHitTestVisible="False"/>
+                                                <StackPanel>
+                                                <Border Padding="0,0,0,8"
+                                                        BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                                                        BorderThickness="0,0,0,1">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                        <TextBlock Text="{Binding Description}" Margin="0,4,0,0" FontSize="12" LineHeight="18" Opacity="0.68" TextWrapping="Wrap"/>
+                                                        <TextBlock Text="{Binding Summary}" Margin="0,4,0,0" FontSize="12" FontWeight="SemiBold" Opacity="0.74" TextWrapping="Wrap"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                <ItemsControl ItemsSource="{Binding Items}" Margin="0,12,0,0">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Style="{StaticResource WorkspaceInventoryCardStyle}"
+                                                                    Loaded="WorkspaceInventoryCard_Loaded">
+                                                                <Grid>
+                                                                    <Border Tag="SearchHighlightOverlay"
+                                                                            Margin="-6"
+                                                                            CornerRadius="10"
+                                                                            Background="{StaticResource SearchHighlightGradientBrush}"
+                                                                            BorderBrush="{DynamicResource CoreLineActiveBrush}"
+                                                                            BorderThickness="1"
+                                                                            Opacity="0"
+                                                                            IsHitTestVisible="False"/>
+                                                                    <StackPanel>
+                                                                    <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                                    <WrapPanel Margin="0,10,0,0">
+                                                                        <Border Style="{StaticResource DeviceBadgeStyle}">
+                                                                            <TextBlock Text="{Binding KindLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                                                                        </Border>
+                                                                        <Border x:Name="ItemStatusBadge" Style="{StaticResource DeviceBadgeStyle}">
+                                                                            <TextBlock x:Name="ItemStatusLabel" Text="{Binding StatusLabel}" FontSize="11" FontWeight="SemiBold"/>
+                                                                        </Border>
+                                                                        <Border x:Name="ItemRiskBadge" Style="{StaticResource DeviceBadgeStyle}" Visibility="{Binding RiskVisibility}">
+                                                                            <TextBlock x:Name="ItemRiskLabel" Text="{Binding RiskLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.78"/>
+                                                                        </Border>
+                                                                        <Border Style="{StaticResource DeviceBadgeStyle}" Visibility="{Binding InfVisibility}">
+                                                                            <TextBlock Text="{Binding InfLabel}" FontSize="11" FontWeight="SemiBold" Opacity="0.72"/>
+                                                                        </Border>
+                                                                    </WrapPanel>
+                                                                    <TextBlock Text="{Binding Description}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.76" TextWrapping="Wrap"/>
+                                                                    <TextBlock Text="{Binding MetaText}" Margin="0,7,0,0" FontSize="12" LineHeight="18" Opacity="0.68" TextWrapping="Wrap"/>
+                                                                    <TextBlock Text="{Binding RiskText}" Margin="0,8,0,0" FontSize="12" LineHeight="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                                    <TextBlock Text="{Binding ActionText}" Margin="0,6,0,0" FontSize="12" LineHeight="18" FontWeight="SemiBold" Opacity="0.80" TextWrapping="Wrap"/>
+                                                                    <ItemsControl ItemsSource="{Binding Actions}" Margin="0,10,0,-8">
+                                                                        <ItemsControl.ItemsPanel>
+                                                                            <ItemsPanelTemplate>
+                                                                                <WrapPanel/>
+                                                                            </ItemsPanelTemplate>
+                                                                        </ItemsControl.ItemsPanel>
+                                                                        <ItemsControl.ItemTemplate>
+                                                                            <DataTemplate>
+                                                                                <Button Content="{Binding Label}"
+                                                                                        Tag="{Binding}"
+                                                                                        Style="{StaticResource DeviceWorkspaceFilterButtonStyle}"
+                                                                                        Click="InventoryActionButton_Click"/>
+                                                                            </DataTemplate>
+                                                                        </ItemsControl.ItemTemplate>
+                                                                    </ItemsControl>
+                                                    <TextBlock Text="{Binding HiddenItemsText}"
+                                                               Margin="0,4,0,0"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold"
+                                                               Opacity="0.66"
+                                                               Visibility="{Binding HiddenItemsVisibility}"
+                                                               TextWrapping="Wrap"/>
+                                                                    </StackPanel>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+
+
+                    <Border x:Name="WorkspaceNodeLoadingOverlay"
+                            Grid.RowSpan="2"
+                            Panel.ZIndex="18"
+                            Background="#F21B1B1B"
+                            BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Visibility="Collapsed"
+                            Opacity="0"
+                            IsHitTestVisible="True">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <UniformGrid Rows="2" Columns="2" Width="66" Height="66" HorizontalAlignment="Center">
+                                <Border x:Name="WorkspaceNodeLoadingSquareA" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                <Border x:Name="WorkspaceNodeLoadingSquareB" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                <Border x:Name="WorkspaceNodeLoadingSquareC" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                <Border x:Name="WorkspaceNodeLoadingSquareD" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                            </UniformGrid>
+                            <TextBlock Text="Загрузка узла, пожалуйста подождите"
+                                       Margin="0,16,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.78"/>
+                            <TextBlock Text="Считываем параметры системы и подготавливаем доступные действия."
+                                       Margin="0,7,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="12"
+                                       Opacity="0.60"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="WorkspaceNavigationBusyOverlay"
+                            Grid.RowSpan="2"
+                            Panel.ZIndex="20"
+                            Background="#D91D2A34"
+                            BorderBrush="{DynamicResource CoreNodeBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Visibility="Collapsed"
+                            Opacity="0"
+                            IsHitTestVisible="True">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <UniformGrid Rows="2" Columns="2" Width="60" Height="60" HorizontalAlignment="Center">
+                                <Border x:Name="WorkspaceBusySquareA" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                <Border x:Name="WorkspaceBusySquareB" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                <Border x:Name="WorkspaceBusySquareC" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                                <Border x:Name="WorkspaceBusySquareD" Style="{StaticResource DeviceLoadingSquareStyle}"/>
+                            </UniformGrid>
+                            <TextBlock Text="Загрузка перехода, пожалуйста подождите"
+                                       Margin="0,12,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Opacity="0.80"/>
+                            <TextBlock Text="Открываем нужный блок и готовим подсветку."
+                                       Margin="0,5,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="11"
+                                       Opacity="0.58"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Button x:Name="WorkspaceReturnOrbButton"
+                    Style="{StaticResource WorkspaceReturnOrbButtonStyle}"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Margin="0"
+                    ToolTip="Свернуть узел и вернуться к схеме"
+                    Visibility="Collapsed"
+                    Opacity="0"
+                    Click="WorkspaceReturnOrbButton_Click"
+                    RenderTransformOrigin="0.5,0.5">
+                <Button.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform x:Name="WorkspaceReturnOrbScale" ScaleX="1" ScaleY="1"/>
+                        <TranslateTransform x:Name="WorkspaceReturnOrbTranslate" X="0" Y="0"/>
+                    </TransformGroup>
+                </Button.RenderTransform>
+            </Button>
+        </Grid>
+    </Grid>
+</Page>

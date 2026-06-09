@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Win32;
@@ -74,11 +75,17 @@ namespace TweakWise.Services
             _settingsManager.DismissHealthSignals(findingIds);
         }
 
-        public async Task RefreshStatusAsync()
+        public Task RefreshStatusAsync()
         {
-            SetCheckingState();
+            return RefreshStatusAsync(null);
+        }
 
-            var result = await Task.Run(RunSafeHealthChecks);
+        public async Task RefreshStatusAsync(IEnumerable<CoreModuleId> modulesToScan)
+        {
+            var requestedModules = NormalizeRequestedModules(modulesToScan);
+            SetCheckingState(requestedModules);
+
+            var result = await Task.Run(() => RunSafeHealthChecks(requestedModules));
             _overallStatus = result.OverallStatus;
 
             foreach (var moduleStatus in result.ModuleStatuses)
@@ -93,7 +100,7 @@ namespace TweakWise.Services
             OnHealthStatusChanged();
         }
 
-        private void SetCheckingState()
+        private void SetCheckingState(ISet<CoreModuleId> modulesToScan)
         {
             var now = DateTime.Now;
             _overallStatus = new ComputerHealthStatus
@@ -104,6 +111,9 @@ namespace TweakWise.Services
 
             foreach (var module in _modules)
             {
+                if (!ShouldScanModule(modulesToScan, module.Id))
+                    continue;
+
                 module.Status = new ModuleHealthStatus
                 {
                     ModuleId = module.Id,
@@ -116,31 +126,102 @@ namespace TweakWise.Services
             OnHealthStatusChanged();
         }
 
-        private HealthCheckSnapshot RunSafeHealthChecks()
+        private HealthCheckSnapshot RunSafeHealthChecks(ISet<CoreModuleId> modulesToScan)
         {
             var now = DateTime.Now;
             var moduleStatuses = _modules.ToDictionary(
                 module => module.Id,
-                module => new ModuleHealthStatus
-                {
-                    ModuleId = module.Id,
-                    Title = module.Title,
-                    Status = HealthLevel.Unknown,
-                    LastCheckedAt = now
-                });
+                module => ShouldScanModule(modulesToScan, module.Id)
+                    ? new ModuleHealthStatus
+                    {
+                        ModuleId = module.Id,
+                        Title = module.Title,
+                        Status = HealthLevel.Unknown,
+                        LastCheckedAt = now
+                    }
+                    : CloneModuleStatus(module.Status, module));
 
             var findings = new HealthFindingAccumulator();
 
-            CheckSystemDrive(moduleStatuses, findings);
-            CheckRestartState(moduleStatuses, findings);
-            CheckWindowsSetupState(moduleStatuses, findings);
-            CheckPerformanceState(moduleStatuses, findings);
-            CheckNetworkState(moduleStatuses, findings);
+            if (ShouldScanModule(modulesToScan, CoreModuleId.Maintenance))
+                CheckSystemDrive(moduleStatuses, findings);
+            if (ShouldScanModule(modulesToScan, CoreModuleId.SystemParameters))
+                CheckRestartState(moduleStatuses, findings);
+            if (ShouldScanModule(modulesToScan, CoreModuleId.WindowsSetup))
+                CheckWindowsSetupState(moduleStatuses, findings);
+            if (ShouldScanModule(modulesToScan, CoreModuleId.Resources))
+                CheckPerformanceState(moduleStatuses, findings);
+            if (ShouldScanModule(modulesToScan, CoreModuleId.Devices))
+                CheckDevicesDriversState(moduleStatuses, findings);
+            if (ShouldScanModule(modulesToScan, CoreModuleId.Network))
+                CheckNetworkState(moduleStatuses, findings);
 
-            MarkUntouchedModulesAsGood(moduleStatuses);
-            var overall = ApplySuppressionsAndRecalculate(moduleStatuses, findings.PendingRestart, now);
+            MarkUntouchedModulesAsGood(moduleStatuses, modulesToScan);
+            bool pendingRestart = ShouldScanModule(modulesToScan, CoreModuleId.SystemParameters)
+                ? findings.PendingRestart
+                : _overallStatus.PendingRestart;
+
+            var overall = ApplySuppressionsAndRecalculate(moduleStatuses, pendingRestart, now);
 
             return new HealthCheckSnapshot(overall, moduleStatuses.Values.ToList());
+        }
+
+        private static ISet<CoreModuleId> NormalizeRequestedModules(IEnumerable<CoreModuleId> modulesToScan)
+        {
+            if (modulesToScan == null)
+                return null;
+
+            var normalized = new HashSet<CoreModuleId>();
+            foreach (var moduleId in modulesToScan)
+            {
+                if (moduleId == CoreModuleId.PowerThermal)
+                    normalized.Add(CoreModuleId.Resources);
+                else
+                    normalized.Add(moduleId);
+            }
+
+            return normalized.Count == 0 ? new HashSet<CoreModuleId>() : normalized;
+        }
+
+        private static bool ShouldScanModule(ISet<CoreModuleId> modulesToScan, CoreModuleId moduleId)
+        {
+            return modulesToScan == null || modulesToScan.Contains(moduleId);
+        }
+
+        private static ModuleHealthStatus CloneModuleStatus(ModuleHealthStatus source, CoreModuleDefinition module)
+        {
+            if (source == null)
+            {
+                return new ModuleHealthStatus
+                {
+                    ModuleId = module.Id,
+                    Title = module.Title,
+                    Status = HealthLevel.Unknown
+                };
+            }
+
+            return new ModuleHealthStatus
+            {
+                ModuleId = module.Id,
+                Title = string.IsNullOrWhiteSpace(source.Title) ? module.Title : source.Title,
+                Status = source.Status,
+                ProblemCount = source.ProblemCount,
+                RecommendationCount = source.RecommendationCount,
+                CriticalCount = source.CriticalCount,
+                Findings = source.Findings?
+                    .Where(finding => finding != null)
+                    .Select(finding => new ModuleHealthFinding
+                    {
+                        Id = finding.Id,
+                        ModuleId = finding.ModuleId,
+                        Level = finding.Level,
+                        Title = finding.Title,
+                        Description = finding.Description,
+                        ActionText = finding.ActionText
+                    })
+                    .ToList() ?? new List<ModuleHealthFinding>(),
+                LastCheckedAt = source.LastCheckedAt
+            };
         }
 
         private static void CheckSystemDrive(
@@ -261,6 +342,74 @@ namespace TweakWise.Services
             AddDistinct(
                 restartCheck.AppSources,
                 string.IsNullOrWhiteSpace(reason) ? "изменения TweakWise" : reason);
+        }
+
+        private static void CheckDevicesDriversState(
+            Dictionary<CoreModuleId, ModuleHealthStatus> moduleStatuses,
+            HealthFindingAccumulator findings)
+        {
+            if (!moduleStatuses.TryGetValue(CoreModuleId.Devices, out var target))
+                return;
+
+            try
+            {
+                var snapshot = new DeviceDriverDiagnosticsService()
+                    .ScanAsync(CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult() ?? new DeviceDriverDiagnosticsSnapshot();
+
+                var visibleFindings = (snapshot.Findings ?? new List<DeviceDriverFinding>())
+                    .Where(item => item != null && item.Level != HealthLevel.Good)
+                    .OrderByDescending(item => GetSeverity(item.Level))
+                    .ThenBy(item => item.Title ?? string.Empty)
+                    .Take(6)
+                    .ToList();
+
+                if (visibleFindings.Count == 0)
+                {
+                    SetModuleStatus(target, HealthLevel.Good);
+                    return;
+                }
+
+                foreach (var deviceFinding in visibleFindings)
+                {
+                    bool isProblem = deviceFinding.Level == HealthLevel.Attention || deviceFinding.Level == HealthLevel.Warning || deviceFinding.Level == HealthLevel.Critical;
+                    if (isProblem)
+                        findings.ProblemCount++;
+                    else
+                        findings.RecommendationCount++;
+
+                    SetModuleStatus(
+                        target,
+                        deviceFinding.Level,
+                        problems: isProblem ? 1 : 0,
+                        recommendations: isProblem ? 0 : 1,
+                        finding: new ModuleHealthFinding
+                        {
+                            Id = string.IsNullOrWhiteSpace(deviceFinding.Id) ? $"devices.{deviceFinding.Title}" : deviceFinding.Id,
+                            Level = deviceFinding.Level,
+                            Title = deviceFinding.Title,
+                            Description = deviceFinding.Description,
+                            ActionText = deviceFinding.ActionText
+                        });
+                }
+            }
+            catch
+            {
+                findings.RecommendationCount++;
+                SetModuleStatus(
+                    target,
+                    HealthLevel.Normal,
+                    recommendations: 1,
+                    finding: new ModuleHealthFinding
+                    {
+                        Id = "devices.diagnostics-unavailable",
+                        Level = HealthLevel.Normal,
+                        Title = "Диагностика устройств недоступна",
+                        Description = "Проверка устройств и драйверов не смогла получить данные WMI/CIM в фоновом режиме.",
+                        ActionText = "Откройте раздел устройств и драйверов и повторите диагностику вручную."
+                    });
+            }
         }
 
         private static void CheckNetworkState(
@@ -1344,12 +1493,17 @@ namespace TweakWise.Services
             }
         }
 
-        private static void MarkUntouchedModulesAsGood(Dictionary<CoreModuleId, ModuleHealthStatus> moduleStatuses)
+        private static void MarkUntouchedModulesAsGood(
+            Dictionary<CoreModuleId, ModuleHealthStatus> moduleStatuses,
+            ISet<CoreModuleId> modulesToScan)
         {
-            foreach (var status in moduleStatuses.Values)
+            foreach (var pair in moduleStatuses)
             {
-                if (status.Status == HealthLevel.Unknown)
-                    status.Status = HealthLevel.Good;
+                if (!ShouldScanModule(modulesToScan, pair.Key))
+                    continue;
+
+                if (pair.Value.Status == HealthLevel.Unknown)
+                    pair.Value.Status = HealthLevel.Good;
             }
         }
 
