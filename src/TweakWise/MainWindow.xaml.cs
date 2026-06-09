@@ -156,6 +156,14 @@ namespace TweakWise
 
         private void NavigateToModuleFromPageKey(string pageName)
         {
+            if (string.Equals(pageName, "Dashboard", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(pageName, "Home", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(pageName, "CoreHome", StringComparison.OrdinalIgnoreCase))
+            {
+                NavigateToCoreHome();
+                return;
+            }
+
             CoreModuleId moduleId = pageName switch
             {
                 "Explorer" => CoreModuleId.WindowsSetup,

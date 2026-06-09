@@ -408,7 +408,7 @@ namespace TweakWise.Services
                 return;
             }
 
-            ApplySection(item, "Скрытые параметры питания", "Автоматически найденные powercfg-параметры текущей схемы без CPU, GPU и дисковых твиков.");
+            ApplySection(item, "Скрытые параметры питания", "Автоматически найденные powercfg-параметры текущей схемы без CPU, GPU и дисковых настроек.");
         }
 
         private static bool IsSubgroup(PerformanceTuningItem item, string guid, string alias)

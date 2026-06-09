@@ -1,54 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using TweakWise.Catalog;
-using TweakWise.Models;
-using TweakWise.Providers;
 
 namespace TweakWise.Search
 {
     public sealed class GlobalSearchService
     {
-        private readonly ITweakCatalogProvider _catalogProvider;
-        private List<GlobalSearchIndexEntry> _index = new List<GlobalSearchIndexEntry>();
+        private readonly List<GlobalSearchIndexEntry> _index;
 
-        public GlobalSearchService(ITweakCatalogProvider catalogProvider)
+        public GlobalSearchService()
         {
-            _catalogProvider = catalogProvider;
-            RebuildIndex();
-        }
-
-        public void RebuildIndex()
-        {
-            var categories = _catalogProvider.GetCategories();
-            var tweaks = _catalogProvider.GetTweaks();
-            var templates = _catalogProvider.GetTemplates();
-            var tweakMap = tweaks.ToDictionary(tweak => tweak.Id, tweak => tweak);
-
-            var index = new List<GlobalSearchIndexEntry>
-            {
-                new()
-                {
-                    Title = "Главная",
-                    ResultTypeText = "Раздел",
-                    PathText = "Раздел приложения",
-                    SearchBlob = BuildSearchBlob("Главная", "Раздел приложения", "dashboard home"),
-                    DefaultRank = 0,
-                    IsDefaultSuggestion = true,
-                    NavigationTarget = new GlobalSearchNavigationTarget
-                    {
-                        PageKey = "Dashboard",
-                        ResultKind = GlobalSearchResultKind.Section
-                    }
-                }
-            };
-
-            index.AddRange(BuildCategoryEntries(categories));
-            index.AddRange(BuildSubsectionEntries(categories));
-            index.AddRange(BuildTweakEntries(tweaks));
-            index.AddRange(BuildTemplateEntries(templates, tweakMap));
-
-            _index = index;
+            _index = BuildIndex();
         }
 
         public IReadOnlyList<GlobalSearchResultViewModel> Search(string query, int maxResults = 8)
@@ -81,139 +43,157 @@ namespace TweakWise.Search
                 .ToList();
         }
 
-        private static IEnumerable<GlobalSearchIndexEntry> BuildCategoryEntries(IEnumerable<TweakCategoryDefinition> categories)
+        private static List<GlobalSearchIndexEntry> BuildIndex()
         {
-            int rank = 10;
+            var entries = new List<GlobalSearchIndexEntry>();
 
-            foreach (var category in categories)
+            AddSection(
+                entries,
+                0,
+                "Главная",
+                "Раздел приложения",
+                "Карта состояния, быстрые показатели и запуск проверки",
+                "Dashboard",
+                "dashboard home карта ядро проверка");
+
+            AddSection(
+                entries,
+                10,
+                "Рабочая среда",
+                "Раздел",
+                "Проводник, меню Пуск, панель задач, рабочий стол, поиск и уведомления",
+                "WorkEnvironment",
+                "windows interface explorer start taskbar desktop notifications");
+
+            AddSection(
+                entries,
+                11,
+                "Производительность и охлаждение",
+                "Раздел",
+                "Питание, CPU, GPU, RAM, охлаждение, датчики и безопасный тюнинг",
+                "MonitoringPerformance",
+                "performance cooling thermal power cpu gpu ram");
+
+            AddSection(
+                entries,
+                12,
+                "Устройства и драйверы",
+                "Раздел",
+                "Реальные устройства, драйверы, подписи, резервные копии и откаты",
+                "DevicesDrivers",
+                "devices drivers pnp inf rollback backup safe mode");
+
+            AddSubsections(entries, "Рабочая среда", "WorkEnvironment", 100, new[]
             {
-                yield return new GlobalSearchIndexEntry
-                {
-                    Title = category.Title,
-                    ResultTypeText = "Раздел",
-                    PathText = "Раздел приложения",
-                    SearchBlob = BuildSearchBlob(category.Title, category.Description, string.Join(" ", category.Subcategories)),
-                    DefaultRank = rank++,
-                    IsDefaultSuggestion = true,
-                    NavigationTarget = new GlobalSearchNavigationTarget
-                    {
-                        PageKey = GetPageKey(category.Id),
-                        CategoryId = category.Id,
-                        ResultKind = GlobalSearchResultKind.Section
-                    }
-                };
-            }
+                "Проводник",
+                "Меню Пуск",
+                "Панель задач",
+                "Контекстное меню",
+                "Поиск Windows",
+                "Рабочий стол",
+                "Уведомления"
+            });
+
+            AddSubsections(entries, "Производительность и охлаждение", "MonitoringPerformance", 130, new[]
+            {
+                "Питание",
+                "CPU и планировщик",
+                "GPU и графический стек",
+                "Оперативная память",
+                "Охлаждение и датчики",
+                "Безопасный тюнинг",
+                "Расширенные параметры"
+            });
+
+            AddSubsections(entries, "Устройства и драйверы", "DevicesDrivers", 160, new[]
+            {
+                "Драйверы",
+                "Устройства",
+                "Резервные копии драйверов",
+                "Откат драйверов",
+                "Безопасный режим",
+                "Оценка рисков"
+            });
+
+            AddAction(entries, 250, "Открыть настройки", "OpenSettings", "settings параметры тема запуск автопроверка");
+            AddAction(entries, 251, "Открыть уведомления", "OpenNotifications", "notifications сообщения проблемы рекомендации");
+            AddAction(entries, 252, "Проверить обновления", "CheckUpdates", "update release версия github");
+
+            return entries;
         }
 
-        private static IEnumerable<GlobalSearchIndexEntry> BuildSubsectionEntries(IEnumerable<TweakCategoryDefinition> categories)
+        private static void AddSection(
+            List<GlobalSearchIndexEntry> entries,
+            int rank,
+            string title,
+            string resultType,
+            string description,
+            string pageKey,
+            string aliases)
         {
-            int rank = 100;
-
-            foreach (var category in categories)
+            entries.Add(new GlobalSearchIndexEntry
             {
-                string pageKey = GetPageKey(category.Id);
-
-                foreach (var subsection in category.Subcategories)
+                Title = title,
+                ResultTypeText = resultType,
+                PathText = "Раздел приложения",
+                SearchBlob = BuildSearchBlob(title, resultType, description, pageKey, aliases),
+                DefaultRank = rank,
+                IsDefaultSuggestion = true,
+                NavigationTarget = new GlobalSearchNavigationTarget
                 {
-                    yield return new GlobalSearchIndexEntry
-                    {
-                        Title = subsection,
-                        ResultTypeText = "Секция",
-                        PathText = $"{category.Title} → {subsection}",
-                        SearchBlob = BuildSearchBlob(subsection, category.Title),
-                        DefaultRank = rank++,
-                        NavigationTarget = new GlobalSearchNavigationTarget
-                        {
-                            PageKey = pageKey,
-                            CategoryId = category.Id,
-                            Subcategory = subsection,
-                            ResultKind = GlobalSearchResultKind.Subsection
-                        }
-                    };
+                    PageKey = pageKey,
+                    ResultKind = GlobalSearchResultKind.Section
                 }
-            }
+            });
         }
 
-        private static IEnumerable<GlobalSearchIndexEntry> BuildTweakEntries(IEnumerable<TweakDefinition> tweaks)
+        private static void AddSubsections(
+            List<GlobalSearchIndexEntry> entries,
+            string sectionTitle,
+            string pageKey,
+            int startRank,
+            IReadOnlyList<string> subsectionTitles)
         {
-            int rank = 200;
-
-            foreach (var tweak in tweaks)
+            for (int index = 0; index < subsectionTitles.Count; index++)
             {
-                string categoryTitle = CatalogPresentationBuilder.GetCategoryTitle(tweak.Category);
-                string resultTypeText = HasActionTag(tweak) ? "Действие" : "Настройка";
-
-                yield return new GlobalSearchIndexEntry
+                string title = subsectionTitles[index];
+                entries.Add(new GlobalSearchIndexEntry
                 {
-                    Title = tweak.Title,
-                    ResultTypeText = resultTypeText,
-                    PathText = $"{categoryTitle} → {tweak.Subcategory}",
-                    SourceBadgeText = $"Источник: {CatalogPresentationBuilder.GetSourceText(tweak.SourceType)}",
-                    RiskBadgeText = $"Риск: {CatalogPresentationBuilder.GetRiskText(tweak.RiskLevel)}",
-                    RiskTone = GetRiskTone(tweak.RiskLevel),
-                    SearchBlob = BuildSearchBlob(
-                        tweak.Title,
-                        resultTypeText,
-                        tweak.ShortDescription,
-                        tweak.LongDescription,
-                        tweak.Subcategory,
-                        categoryTitle,
-                        string.Join(" ", tweak.Tags),
-                        tweak.SourceType.ToString()),
-                    DefaultRank = rank++,
-                    NavigationTarget = new GlobalSearchNavigationTarget
-                    {
-                        PageKey = GetPageKey(tweak.Category),
-                        CategoryId = tweak.Category,
-                        Subcategory = tweak.Subcategory,
-                        ItemId = tweak.Id,
-                        ResultKind = GlobalSearchResultKind.Setting
-                    }
-                };
-            }
-        }
-
-        private static bool HasActionTag(TweakDefinition tweak)
-        {
-            return tweak.Tags.Any(tag =>
-                string.Equals(tag, "action", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(tag, "repair", StringComparison.OrdinalIgnoreCase));
-        }
-
-        private static IEnumerable<GlobalSearchIndexEntry> BuildTemplateEntries(
-            IEnumerable<TweakTemplateDefinition> templates,
-            IReadOnlyDictionary<string, TweakDefinition> tweakMap)
-        {
-            int rank = 300;
-
-            foreach (var template in templates)
-            {
-                string pathText = BuildTemplatePath(template);
-                string pageKey = GetTemplatePageKey(template, tweakMap);
-
-                yield return new GlobalSearchIndexEntry
-                {
-                    Title = template.Title,
-                    ResultTypeText = "Шаблон",
-                    PathText = pathText,
-                    RiskBadgeText = $"Риск: {CatalogPresentationBuilder.GetRiskText(template.RiskLevel)}",
-                    RiskTone = GetRiskTone(template.RiskLevel),
-                    SearchBlob = BuildSearchBlob(
-                        template.Title,
-                        template.Description,
-                        pathText,
-                        template.Audience,
-                        string.Join(" ", template.TweakIds)),
-                    DefaultRank = rank++,
+                    Title = title,
+                    ResultTypeText = "Секция",
+                    PathText = $"{sectionTitle} > {title}",
+                    SearchBlob = BuildSearchBlob(title, sectionTitle, pageKey),
+                    DefaultRank = startRank + index,
                     NavigationTarget = new GlobalSearchNavigationTarget
                     {
                         PageKey = pageKey,
-                        CategoryId = GetTemplateCategoryId(template, tweakMap),
-                        ItemId = template.Id,
-                        ResultKind = GlobalSearchResultKind.Template
+                        ResultKind = GlobalSearchResultKind.Subsection
                     }
-                };
+                });
             }
+        }
+
+        private static void AddAction(
+            List<GlobalSearchIndexEntry> entries,
+            int rank,
+            string title,
+            string actionKey,
+            string aliases)
+        {
+            entries.Add(new GlobalSearchIndexEntry
+            {
+                Title = title,
+                ResultTypeText = "Действие",
+                PathText = "Быстрое действие",
+                SearchBlob = BuildSearchBlob(title, actionKey, aliases),
+                DefaultRank = rank,
+                IsDefaultSuggestion = true,
+                NavigationTarget = new GlobalSearchNavigationTarget
+                {
+                    ActionKey = actionKey,
+                    ResultKind = GlobalSearchResultKind.Action
+                }
+            });
         }
 
         private static GlobalSearchResultViewModel MapToViewModel(GlobalSearchIndexEntry entry)
@@ -223,10 +203,6 @@ namespace TweakWise.Search
                 Title = entry.Title,
                 ResultTypeText = entry.ResultTypeText,
                 PathText = entry.PathText,
-                SourceBadgeText = entry.SourceBadgeText,
-                SourceTone = CatalogBadgeTone.Info,
-                RiskBadgeText = entry.RiskBadgeText,
-                RiskTone = entry.RiskTone,
                 IsDefaultSuggestion = entry.IsDefaultSuggestion,
                 NavigationTarget = entry.NavigationTarget
             };
@@ -244,7 +220,6 @@ namespace TweakWise.Search
                 totalScore += ScoreSegment(entry.Title, token, 180, 120, 85);
                 totalScore += ScoreSegment(entry.PathText, token, 85, 55, 35);
                 totalScore += ScoreSegment(entry.ResultTypeText, token, 30, 20, 10);
-                totalScore += ScoreSegment(entry.SourceBadgeText, token, 25, 15, 10);
             }
 
             return totalScore + Math.Max(0, 500 - entry.DefaultRank);
@@ -259,7 +234,7 @@ namespace TweakWise.Search
                 return startsWithScore;
 
             if (source
-                .Split(new[] { ' ', '→', '/', '-', ',', '.', ':' }, StringSplitOptions.RemoveEmptyEntries)
+                .Split(new[] { ' ', '>', '/', '-', ',', '.', ':' }, StringSplitOptions.RemoveEmptyEntries)
                 .Any(part => part.StartsWith(token, StringComparison.OrdinalIgnoreCase)))
             {
                 return wordStartsWithScore;
@@ -283,72 +258,11 @@ namespace TweakWise.Search
             return string.Join(" ", parts.Where(part => !string.IsNullOrWhiteSpace(part))).ToLowerInvariant();
         }
 
-        private static string BuildTemplatePath(TweakTemplateDefinition template)
-        {
-            if (string.IsNullOrWhiteSpace(template.ScopeLabel))
-                return "Главная → Шаблоны";
-
-            return template.ScopeLabel.Replace(" / ", " → ");
-        }
-
-        private static string GetTemplatePageKey(
-            TweakTemplateDefinition template,
-            IReadOnlyDictionary<string, TweakDefinition> tweakMap)
-        {
-            if (template.Id.StartsWith("windows-interface-", StringComparison.OrdinalIgnoreCase))
-                return "WindowsInterface";
-
-            string categoryId = GetTemplateCategoryId(template, tweakMap);
-            return string.IsNullOrWhiteSpace(categoryId) ? "Dashboard" : GetPageKey(categoryId);
-        }
-
-        private static string GetTemplateCategoryId(
-            TweakTemplateDefinition template,
-            IReadOnlyDictionary<string, TweakDefinition> tweakMap)
-        {
-            var categories = template.TweakIds
-                .Where(tweakMap.ContainsKey)
-                .Select(id => tweakMap[id].Category)
-                .Distinct()
-                .ToList();
-
-            if (categories.Count == 1)
-                return categories[0];
-
-            return string.Empty;
-        }
-
-        private static string GetPageKey(string categoryId)
-        {
-            return categoryId switch
-            {
-                "WindowsInterface" => "WindowsInterface",
-                "System" => "System",
-                "Maintenance" => "Maintenance",
-                "MonitoringPerformance" => "MonitoringPerformance",
-                _ => "Dashboard"
-            };
-        }
-
-        private static CatalogBadgeTone GetRiskTone(TweakRiskLevel riskLevel)
-        {
-            return riskLevel switch
-            {
-                TweakRiskLevel.Low => CatalogBadgeTone.Success,
-                TweakRiskLevel.Medium => CatalogBadgeTone.Warning,
-                TweakRiskLevel.High => CatalogBadgeTone.Danger,
-                _ => CatalogBadgeTone.Neutral
-            };
-        }
-
         private sealed class GlobalSearchIndexEntry
         {
             public string Title { get; set; } = string.Empty;
             public string ResultTypeText { get; set; } = string.Empty;
             public string PathText { get; set; } = string.Empty;
-            public string SourceBadgeText { get; set; } = string.Empty;
-            public string RiskBadgeText { get; set; } = string.Empty;
-            public CatalogBadgeTone RiskTone { get; set; } = CatalogBadgeTone.Neutral;
             public string SearchBlob { get; set; } = string.Empty;
             public int DefaultRank { get; set; }
             public bool IsDefaultSuggestion { get; set; }

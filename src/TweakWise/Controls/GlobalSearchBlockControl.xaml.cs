@@ -140,7 +140,7 @@ namespace TweakWise.Controls
                 ContainerBorder.BorderThickness = new Thickness(0);
                 ContainerBorder.Padding = new Thickness(0);
                 SearchInputBorder.Margin = new Thickness(0);
-                GlobalSearchTextBox.ToolTip = "Глобальный поиск по разделам, настройкам, шаблонам и действиям";
+                GlobalSearchTextBox.ToolTip = "Глобальный поиск по активным разделам, секциям и действиям";
             }
             else
             {
@@ -149,7 +149,7 @@ namespace TweakWise.Controls
                 ContainerBorder.ClearValue(Border.BorderThicknessProperty);
                 ContainerBorder.ClearValue(Border.PaddingProperty);
                 SearchInputBorder.Margin = new Thickness(0, 14, 0, 0);
-                GlobalSearchTextBox.ToolTip = "Искать разделы, настройки, шаблоны и действия";
+                GlobalSearchTextBox.ToolTip = "Искать разделы, секции и действия";
             }
         }
     }
